@@ -602,9 +602,9 @@ function compute_tendency_dt_max(state::TC.State, edmf::TC.EDMFModel)
     @. area_bulk_f = TC.ᶠinterp_a(area_bulk)
 
     @inbounds for k in TC.real_face_indices(grid)
-        Δt_max_old = Δt_max
+        # Δt_max_old = Δt_max
         ρaw_bulk = sum(i-> prog_up_f[i].ρaw[k], 1:N_up)
-        tends_ρaw_bulk = sum(i-> tendencies_bulk_f[i].ρaw[k], 1:N_up) # this is the tendency of the bulk updrafts, not the face updrafts
+        tends_ρaw_bulk = sum(i-> tendencies_up_f[i].ρaw[k], 1:N_up)
         Δt_max = Δt_max_helper(Δt_max, tends_ρaw_bulk, ρaw_bulk; message = "ρaw bulk") # no env limit, env can go neg... (is that true?)
     end 
 
@@ -762,10 +762,11 @@ function compute_dt_max(state::TC.State, edmf::TC.EDMFModel, dt_max::FT, CFL_lim
             For each species, [tke], [qt, θ], [ql, qr, qi, qs] we need to check if theyre being advected or diffused.
             =#
 
+            # rn this is used for both tke by advection and by diffusion
+            w_conv = aux_tc.temporary_2
+            @. w_conv = sqrt(2*aux_en.tke_convective) # convective velocity scale for advection
 
             if (edmf.convective_tke_handler.transport_tke_by_advection || edmf.convective_tke_handler.transport_conserved_by_advection || edmf.convective_tke_handler.transport_condensed_by_advection) # ::: Any by Advection :: #
-                w_conv = aux_tc.temporary_2
-                @. w_conv = sqrt(2*aux_en.tke_convective) # convective velocity scale for advection
 
                 # CFL bi-directional
                 w_adv = max(w_adv, w_conv[k])

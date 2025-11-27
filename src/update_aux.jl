@@ -941,7 +941,7 @@ function update_aux!(edmf::EDMFModel, state::State, surf::SurfaceBase, param_set
     =#
     # We're only going to set ql, qi here... Everything else will be moved to update_aux_tendencies!()
     if edmf.moisture_model isa EquilibriumMoisture
-        @inbounds for k in real_center_indicies(grid)
+        @inbounds for k in real_center_indices(grid)
             # Adapted from microphysics()!
             ts = aux_en.ts[k]
              # update_sat_unsat

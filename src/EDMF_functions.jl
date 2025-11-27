@@ -311,8 +311,8 @@ function compute_sgs_flux!(edmf::EDMFModel, state::State, surf::SurfaceBase, par
                     @. qi_flux_vert_adv = massflux_qi # same here
                 else
                     # ql and qi should be correlated w/ tke. We handle prt of that in diffusivity but they shouldn't feel the netire advective force
-                    @. massflux_ql = (massflux_en/2 + massflux_en_conv) * IfRBF_q_liq_en(q_liq_en) # + (massflux_en - massflux_en_conv) .* IfRBF_q_liq_en(q_liq_en) # assume liq/ice are in the upper part of the distribution, and the down side has little flux. (massflux_en is small anyway, and significant conv downdrafts should dry quickly)
-                    @. massflux_qi = (massflux_en/2 + massflux_en_conv) * IfRBF_q_ice_en(q_ice_en) # + (massflux_en - massflux_en_conv) .* IfRBF_q_ice_en(q_ice_en) # assume liq/ice are in the upper part of the distribution, and the down side has little flux. (massflux_en is small anyway, and significant conv downdrafts should dry quickly)
+                    @. massflux_ql = (massflux_en/2 + massflux_en_conv) * IfRBF_q_liq_en(q_liq_en) # + (massflux_en/2 - massflux_en_conv) .* IfRBF_q_liq_en(q_liq_en) # assume liq/ice are in the upper part of the distribution, and the down side has little flux. (massflux_en is small anyway, and significant conv downdrafts should dry quickly)
+                    @. massflux_qi = (massflux_en/2 + massflux_en_conv) * IfRBF_q_ice_en(q_ice_en) # + (massflux_en/2 - massflux_en_conv) .* IfRBF_q_ice_en(q_ice_en) # assume liq/ice are in the upper part of the distribution, and the down side has little flux. (massflux_en is small anyway, and significant conv downdrafts should dry quickly)
 
                     @. ql_flux_vert_adv = massflux_ql # same here
                     @. qi_flux_vert_adv = massflux_qi # same here
@@ -473,14 +473,6 @@ function compute_sgs_flux!(edmf::EDMFModel, state::State, surf::SurfaceBase, par
         end
 
     end
-
-    # # save en massflux tendencies before adding updraft contributions
-    # @. aux_tc.env_qt_tendency_vert_adv = -∇c(wvec(massflux_qt)) / ρ_c
-    # @. aux_tc.env_h_tendency_vert_adv = -∇c(wvec(massflux_h)) / ρ_c
-    # if edmf.moisture_model isa NonEquilibriumMoisture
-    #     @. aux_tc.env_ql_tendency_vert_adv = -∇c(wvec(massflux_ql)) / ρ_c
-    #     @. aux_tc.env_qi_tendency_vert_adv = -∇c(wvec(massflux_qi)) / ρ_c
-    # end
 
     # ============================================================================================================================== #
     @inbounds for i in 1:N_up
@@ -784,7 +776,7 @@ function compute_diffusive_fluxes(edmf::EDMFModel, state::State, surf::SurfaceBa
     # == Conserved species == #
     if use_separate_tke_conserved
 
-        if use_separate_tke_conserved && edmf.convective_tke_handler.transport_conserved_by_advection # we just need to remove convective tke
+        if edmf.convective_tke_handler.transport_conserved_by_advection # we just need to remove convective tke
             @. aux_tc_f.diffusive_flux_qt = -aux_tc_f.ρ_ae_KQ * f_K_tke * ∇q_tot_en(wvec(aux_en.q_tot))
             @. aux_tc_f.diffusive_flux_h = -aux_tc_f.ρ_ae_KH * f_K_tke * ∇θ_liq_ice_en(wvec(aux_en.θ_liq_ice))
             @. aux_tc_f.diffusive_flux_uₕ = -aux_tc_f.ρ_ae_KM * f_K_tke * ∇uₕ_gm(prog_gm_uₕ)
@@ -826,7 +818,7 @@ function compute_diffusive_fluxes(edmf::EDMFModel, state::State, surf::SurfaceBa
     if use_separate_tke_condensed
 
 
-        if use_separate_tke_condensed && edmf.convective_tke_handler.transport_condensed_by_advection # we just need to remove convective tke
+        if  edmf.convective_tke_handler.transport_condensed_by_advection # we just need to remove convective tke
             # ∇qc = CCO.DivergenceF2C(; bottom = CCO.SetDivergence(FT(0)), top = CCO.SetDivergence(FT(0))) # placeholder
             # @. aux_tc_f.diffusive_flux_qt = Ifx(-Ic(aux_tc_f.ρ_ae_KQ * f_K_tke) * ∇qc(wvec(Ifx(aux_en.q_tot)))) # convective tke removed from eddy diffusivity
 
@@ -2827,11 +2819,6 @@ function compute_en_tendencies!(
             @warn "Non-finite values in convective TKE production computation."
             error("K_buoy = $(K_buoy); a_en = $(a_en); instability = $(parent(instability)); tke = $(parent(aux_en.tke))")
         end
-
-
-        # kp = Cent(20)
-        # @warn "ρatke_convective_production[$(kp.i)]  = $(ρatke_convective_production[kp]); instability[$(kp.i)] = $(instability[kp]); a_en[$(kp.i)] = $(a_en[kp]); K_buoy = $(K_buoy)"
-
         
         # -- advection/diffusion -- #
         # ∇c_tkec = CCO.DivergenceF2C(; bottom = CCO.SetValue(wvec(FT(0))), top = CCO.SetValue(wvec(FT(0)))) # we have no sure surface value so we could just extrapolate. However since our sfc generates no tke and we leave that to updraft and shear (for now, could revisit if it's problematic), we'll just go w/ 0 on both (technically tke could go out the top but we enforce w=0 so...)

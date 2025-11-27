@@ -363,10 +363,6 @@ cent_aux_vars_edmf(::Type{FT}, local_geometry, edmf, calibrate_io_val::Val{calib
         massflux_tendency_qi = FT(0), # moving to here so they're always there even for eq so can put in diagnostics output
 
         #
-        # env_qt_tendency_vert_adv = FT(0), # diagnostic: vertical advection tendency of qt in the environment
-        # env_h_tendency_vert_adv = FT(0), # diagnostic: vertical advection tendency of h in the environment
-        # env_ql_tendency_vert_adv = FT(0), # diagnostic: vertical advection tendency of ql in the environment
-        # env_qi_tendency_vert_adv = FT(0), # diagnostic: vertical advection
         #
         cent_aux_vars_edmf_moisture(FT, edmf.moisture_model, calibrate_io_val)...,
         prandtl_nvec = FT(0),

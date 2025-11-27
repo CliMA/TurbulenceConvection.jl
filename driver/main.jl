@@ -493,7 +493,9 @@ function solve_args(sim::Simulation1d)
                 if sim.TS.algorithm isa Val{:ImplicitEuler} # adaptive solver
                     alg = ODE.ImplicitEuler(; autodiff = false) # this is far too slow to actually use...
                 elseif sim.TS.algorithm isa Val{:KenCarp47}
-                    alg = ODE.KenCarp47(; autodiff = false, linsolve = ODE.KrylovJL_GMRES()) # see https://docs.sciml.ai/DiffEqDocs/stable/tutorials/advanced_ode_example/#Using-Jacobian-Free-Newton-Krylov
+                    # Deprecated since KrylovJL_GMRES() was moved to LinearSolve.jl
+                    # alg = ODE.KenCarp47(; autodiff = false, linsolve = ODE.KrylovJL_GMRES()) # see https://docs.sciml.ai/DiffEqDocs/stable/tutorials/advanced_ode_example/#Using-Jacobian-Free-Newton-Krylov
+                    error("KrylovJL_GMRES() linear solver for KenCarp47 has been deprecated. Please use LinearSolve.jl directly to specify a linear solver.")
                 else
                     # alg_string = String(typeof(a).parameters[1])
                     alg_string = String(TC.Parameters.unwrap_val(alg))

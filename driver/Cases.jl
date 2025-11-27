@@ -827,7 +827,7 @@ function initialize_profiles(::GATE_III, param_set, state; kwargs...)
 
     prof_u = APL.GATE_III_u(FT)
     prog_gm_uₕ = TC.grid_mean_uₕ(state)
-    TC.set_z!(prog_gm_uₕ, prof_u, prof_v)
+    TC.set_z!(prog_gm_uₕ, prof_u, FT(0))
 
     p = aux_gm.p
     ρ_c = prog_gm.ρ
