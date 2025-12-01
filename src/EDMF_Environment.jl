@@ -329,7 +329,7 @@ function microphysics!(
                         aux_en.q_liq[k],
                         aux_en.q_ice[k],
                         aux_en.N_i[k],
-                        aux_en.term_vel_ice[k],
+                        (edmf.cloud_sedimentation_model isa CloudSedimentationModel) ? aux_en.term_vel_ice[k] : FT(0),
                         aux_tc.term_vel_rain[k],
                         aux_tc.term_vel_snow[k],
                         region_area,
@@ -503,7 +503,7 @@ function microphysics!(
                     aux_en.q_liq[k],
                     aux_en.q_ice[k],
                     aux_en.N_i[k],
-                    aux_en.term_vel_ice[k],
+                    (edmf.cloud_sedimentation_model isa CloudSedimentationModel) ? aux_en.term_vel_ice[k] : FT(0),
                     aux_tc.term_vel_rain[k],
                     aux_tc.term_vel_snow[k],
                     aux_en.area[k],
@@ -605,7 +605,7 @@ function microphysics!(
                     aux_en.q_liq[k],
                     aux_en.q_ice[k],
                     aux_en.N_i[k],
-                    aux_en.term_vel_ice[k],
+                    (edmf.cloud_sedimentation_model isa CloudSedimentationModel) ? aux_en.term_vel_ice[k] : FT(0),
                     aux_tc.term_vel_rain[k],
                     aux_tc.term_vel_snow[k],
                     aux_en.area[k],
@@ -761,6 +761,10 @@ function microphysics!(
             aux_tc.qs_tendency_accr_rai_sno[k] += mph_precip.qs_tendency_accr_rai_sno * aux_en.area[k] # we calculate in aux/en for the temperature dependence but store a combined output
         end
 
+        L_f = TD.latent_heat_fusion(thermo_params, aux_en.T[k])
+        L_v = TD.latent_heat_vapor(thermo_params, aux_en.T[k])
+        L_s = TD.latent_heat_sublim(thermo_params, aux_en.T[k])
+        # latent heating from precip formation
         aux_en.latent_heating[k] += L_f * mph_precip.qi_tendency_accr_ice_liq # fusion from liquid to ice [[ check sign on ice-rai ]]
         # add precip terms (these are from last timestep with current order of operations, and we dont zero them out, so hopefully that's ok...)
         aux_en.latent_heating[k] += L_v * (aux_tc.qr_tendency_evap[k]) # liq + rai # area won't be 0
@@ -1404,8 +1408,8 @@ function microphysics!(
                 N_l = aux_en.N_l[k], 
                 N_i = aux_en.N_i[k],
                 N_i_no_boost = aux_en.N_i_no_boost[k],
-                term_vel_liq = aux_en.term_vel_liq[k],
-                term_vel_ice = aux_en.term_vel_ice[k],
+                term_vel_liq = (edmf.cloud_sedimentation_model isa CloudSedimentationModel) ? aux_en.term_vel_liq[k] : FT(0),
+                term_vel_ice = (edmf.cloud_sedimentation_model isa CloudSedimentationModel) ? aux_en.term_vel_ice[k] : FT(0),
                 term_vel_rain = aux_tc.term_vel_rain[k],
                 term_vel_snow = aux_tc.term_vel_snow[k],
                 #
@@ -1572,8 +1576,11 @@ function microphysics!(
                 S_i = TD.supersaturation(thermo_params, q, ρ, aux_en.T[k], TD.Ice())
                 N_INP = get_INP_concentration(param_set, moisture_model.scheme, q, aux_en.T[k], ρ, w[k])
 
+                w_l = (edmf.cloud_sedimentation_model isa CloudSedimentationModel) ? aux_en.term_vel_liq[k] : FT(0)
+                w_i = (edmf.cloud_sedimentation_model isa CloudSedimentationModel) ? aux_en.term_vel_ice[k] : FT(0)
+
                 (; mph_neq, mph_neq_other, mph_precip) = microphysics_helper(grid, edmf, Δt, param_set, use_fallback_tendency_limiters, aux_en, aux_en_f, k,
-                    aux_en.area[k], aux_en.θ_liq_ice[k], aux_en.q_tot[k], aux_en.q_liq[k], aux_en.q_ice[k], prog_pr.q_rai[k], prog_pr.q_sno[k], aux_en.N_l[k], aux_en.N_i[k], aux_en.N_i_no_boost[k], aux_en.term_vel_liq[k], aux_en.term_vel_ice[k], aux_tc.term_vel_rain[k], aux_tc.term_vel_snow[k], ρ_c[k], p_c[k], aux_en.T[k], ts, precip_fraction,
+                    aux_en.area[k], aux_en.θ_liq_ice[k], aux_en.q_tot[k], aux_en.q_liq[k], aux_en.q_ice[k], prog_pr.q_rai[k], prog_pr.q_sno[k], aux_en.N_l[k], aux_en.N_i[k], aux_en.N_i_no_boost[k], w_l, w_i, aux_tc.term_vel_rain[k], aux_tc.term_vel_snow[k], ρ_c[k], p_c[k], aux_en.T[k], ts, precip_fraction,
                     (aux_en.area[k] > FT(0)) ? aux_en.ql_tendency_sedimentation[k] / aux_en.area[k] : FT(0),
                     (aux_en.area[k] > FT(0)) ? aux_en.ql_tendency_sedimentation_other[k] / aux_en.area[k] : FT(0),
                     (aux_en.area[k] > FT(0)) ? aux_en.qi_tendency_sedimentation[k] / aux_en.area[k] : FT(0),
@@ -1582,7 +1589,7 @@ function microphysics!(
                     q_vap_sat_liq = aux_en.q_vap_sat_liq[k], q_vap_sat_ice = aux_en.q_vap_sat_ice[k], dqvdt = aux_tc.dqvdt[k], dTdt = aux_tc.dTdt[k], w=w[k], tke = aux_en.tke[k], S_i = S_i, τ_liq = aux_en.τ_liq[k], τ_ice = aux_en.τ_ice[k], dN_i_dz = aux_en.dN_i_dz[k], dqidz = aux_en.dqidz[k], N_INP = N_INP, massflux = aux_tc.massflux[k], ∂b∂z = aux_tc.∂b∂z[k], ∂qt∂z = aux_tc.∂qt∂z[k])
             else                
                 (; mph_neq, mph_neq_other, mph_precip) = microphysics_helper(grid, edmf, Δt, param_set, use_fallback_tendency_limiters, aux_en, aux_en_f, k,
-                    aux_en.area[k], aux_en.θ_liq_ice[k], aux_en.q_tot[k], aux_en.q_liq[k], aux_en.q_ice[k], prog_pr.q_rai[k], prog_pr.q_sno[k], aux_en.N_l[k], aux_en.N_i[k], aux_en.N_i_no_boost[k], aux_en.term_vel_liq[k], aux_en.term_vel_ice[k], aux_tc.term_vel_rain[k], aux_tc.term_vel_snow[k], ρ_c[k], p_c[k], aux_en.T[k], ts, precip_fraction,
+                    aux_en.area[k], aux_en.θ_liq_ice[k], aux_en.q_tot[k], aux_en.q_liq[k], aux_en.q_ice[k], prog_pr.q_rai[k], prog_pr.q_sno[k], aux_en.N_l[k], aux_en.N_i[k], aux_en.N_i_no_boost[k], w_l, w_i, aux_tc.term_vel_rain[k], aux_tc.term_vel_snow[k], ρ_c[k], p_c[k], aux_en.T[k], ts, precip_fraction,
                     (aux_en.area[k] > FT(0)) ? aux_en.ql_tendency_sedimentation[k] / aux_en.area[k] : FT(0),
                     (aux_en.area[k] > FT(0)) ? aux_en.ql_tendency_sedimentation_other[k] / aux_en.area[k] : FT(0),
                     (aux_en.area[k] > FT(0)) ? aux_en.qi_tendency_sedimentation[k] / aux_en.area[k] : FT(0),

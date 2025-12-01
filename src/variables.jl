@@ -35,10 +35,10 @@ cloud_sedimentation_variables(FT, ::CloudNoSedimentationModel) =  (;
     N_i_no_boost = FT(0), # N_i without the massflux boost factor
     #
 )
-cloud_sedimentation_variables(FT, ::CloudSedimentationModel) = (; # these are different from the rain snow ones bc they are not on the grid mean, but also in env/up separately
+cloud_sedimentation_variables(FT, cloud_sedimentation_model::CloudSedimentationModel) = (; # these are different from the rain snow ones bc they are not on the grid mean, but also in env/up separately
     term_vel_liq = FT(0), # rn we're not using this
     term_vel_ice = FT(0),
-    cloud_sedimentation_variables(FT, CloudNoSedimentationModel())...,
+    cloud_sedimentation_variables(FT, CloudNoSedimentationModel(cloud_sedimentation_model))...,
 )
 cloud_sedimentation_variables(FT, ::Nothing) =  NamedTuple()
 

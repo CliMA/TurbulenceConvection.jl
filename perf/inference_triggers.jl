@@ -9,7 +9,7 @@ sim.skip_io || open_files(sim) # #removeVarsHack
 (prob, alg, kwargs) = solve_args(sim)
 
 tinf = SnoopCompileCore.@snoop_inference begin
-    sol = ODE.solve(prob, alg; kwargs...)
+    sol = SciMLBase.solve(prob, alg; kwargs...)
 end;
 
 sim.skip_io || close_files(sim) # #removeVarsHack

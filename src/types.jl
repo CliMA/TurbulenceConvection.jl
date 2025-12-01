@@ -680,9 +680,10 @@ function EquilibriumMoisture(param_set::APS, namelist)
     nonequilibrium_moisture_scheme_type::Symbol = Symbol(parse_namelist(namelist, "user_args", "nonequilibrium_moisture_scheme"; default = :relax_to_equilibrium))
 
     nonequilibrium_moisture_scheme = if nonequilibrium_moisture_scheme_type === :relax_to_equilibrium
-        RelaxToEquilibrium()
-    elseif nonequilibrium_moisture_scheme_type === :KorolevMazin2007
-        KorolevMazin2007()
+        # RelaxToEquilibrium()
+        RelaxToEquilibrium(param_set, namelist)
+    # elseif nonequilibrium_moisture_scheme_type === :KorolevMazin2007
+    #     KorolevMazin2007()
     elseif (nonequilibrium_moisture_scheme_type ∈ valid_relaxation_timescale_types) && (nonequilibrium_moisture_scheme_type ∉ [:neural_network, :neural_network_no_weights])
         get_relaxation_timescale_type(nonequilibrium_moisture_scheme_type, param_set, namelist) # we really could just pass namelist here...
     elseif nonequilibrium_moisture_scheme_type ∈ [:neural_network, :neural_network_no_weights]
@@ -713,9 +714,10 @@ function NonEquilibriumMoisture(param_set::APS, namelist)
     nonequilibrium_moisture_scheme_type::Symbol = Symbol(parse_namelist(namelist, "user_args", "nonequilibrium_moisture_scheme"; default = :relax_to_equilibrium))
 
     nonequilibrium_moisture_scheme = if nonequilibrium_moisture_scheme_type === :relax_to_equilibrium
-        RelaxToEquilibrium()
-    elseif nonequilibrium_moisture_scheme_type === :KorolevMazin2007
-        KorolevMazin2007()
+        # RelaxToEquilibrium()
+        RelaxToEquilibrium(param_set, namelist)
+    # elseif nonequilibrium_moisture_scheme_type === :KorolevMazin2007
+    #     KorolevMazin2007()
     elseif (nonequilibrium_moisture_scheme_type ∈ valid_relaxation_timescale_types) && (nonequilibrium_moisture_scheme_type ∉ [:neural_network, :neural_network_no_weights])
         get_relaxation_timescale_type(nonequilibrium_moisture_scheme_type, param_set, namelist) # we really could just pass namelist here...
     elseif nonequilibrium_moisture_scheme_type ∈ [:neural_network, :neural_network_no_weights]
@@ -774,7 +776,23 @@ struct CloudSedimentationModel{FT <: AbstractFloat, LTVS <: Union{CMT.Blk1MVelTy
     grid_mean::Bool # whether or not sedimentation is applied to the grid mean only instead of in env/up separately
 end
 
-struct CloudNoSedimentationModel <: AbstractCloudSedimentationModel end
+struct CloudNoSedimentationModel{FT <: AbstractFloat} <: AbstractCloudSedimentationModel 
+    liq_Dmax::FT
+    ice_Dmax::FT
+end
+
+function CloudNoSedimentationModel(param_set::APS, namelist)
+    FT = eltype(param_set)
+    liq_Dmax = parse_namelist(namelist, "user_params", "liq_sedimentation_Dmax"; default =  FT(Inf))
+    ice_Dmax = parse_namelist(namelist, "user_params", "ice_sedimentation_Dmax"; default =  FT(Inf))
+
+    # NaN's (e.g. from json) get converted to Inf here
+    liq_Dmax = isnan(liq_Dmax) ? FT(Inf) : liq_Dmax
+    ice_Dmax = isnan(ice_Dmax) ? FT(Inf) : ice_Dmax
+
+    return CloudNoSedimentationModel{FT}(liq_Dmax, ice_Dmax)
+end
+CloudNoSedimentationModel(cloud_sedimentation_model::CloudSedimentationModel) = CloudNoSedimentationModel{typeof(cloud_sedimentation_model.liq_Dmax)}(cloud_sedimentation_model.liq_Dmax, cloud_sedimentation_model.ice_Dmax)
 
 function CloudSedimentationModel(param_set::APS, moisture_model::AbstractMoistureModel, namelist)
     FT = eltype(param_set)
@@ -926,8 +944,8 @@ function SnowFormationModel(param_set::APS, moisture_model::AbstractMoistureMode
     if moisture_model isa NonEquilibriumMoisture
         snow_formation_model = if moisture_model.scheme isa RelaxToEquilibrium
             DefaultSnowFormationModel()
-        elseif moisture_model.scheme isa KorolevMazin2007
-            DefaultSnowFormationModel() # should this be default? I guess maybe cause there's no N prediction?
+        # elseif moisture_model.scheme isa KorolevMazin2007
+            # DefaultSnowFormationModel() # should this be default? I guess maybe cause there's no N prediction?
         elseif moisture_model.scheme isa AbstractRelaxationTimescaleType
             NonEquilibriumSnowFormationModel(param_set, namelist)
         else
@@ -1512,7 +1530,7 @@ function EDMFModel(::Type{FT}, namelist, precip_model, rain_formation_model, par
     snow_formation_model = SnowFormationModel(param_set, moisture_model, namelist) # rn this has to go after moisture_model, if we need it to go before later we can go back to dispatching on symbols etc...
 
     use_sedimentation = parse_namelist(namelist, "user_args", "use_sedimentation"; default = false)
-    cloud_sedimentation_model = use_sedimentation ? CloudSedimentationModel(param_set, moisture_model, namelist) : CloudNoSedimentationModel()
+    cloud_sedimentation_model = use_sedimentation ? CloudSedimentationModel(param_set, moisture_model, namelist) : CloudNoSedimentationModel(param_set, namelist)
 
     tendency_limiters = TendencyLimiterSet(param_set, moisture_model, namelist)
 

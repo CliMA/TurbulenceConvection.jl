@@ -145,49 +145,49 @@ function noneq_moisture_sources(
 end
 
 
-function noneq_moisture_sources(
-    param_set::APS,
-    ::KorolevMazin2007,
-    moisture_sources_limiter::Union{BasicMoistureSourcesLimiter, StandardSupersaturationMoistureSourcesLimiter},
-    area::FT,
-    ρ_c::FT,
-    p::FT, # pass this bc it's not a no-op, unlike ρ and q which are stored in nonequil
-    T::FT, # pass this bc it's not a no-op, unlike ρ and q which are stored in nonequil. note pressure is not stored in nonequil
-    Δt::FT,
-    ts::TD.ThermodynamicState{FT},
-    w::FT,
-    # z::FT,
-    q_vap_sat_liq::FT,
-    q_vap_sat_ice::FT,
-    dqvdt::FT,
-    dTdt::FT,
-    τ_liq::FT = FT(NaN),
-    τ_ice::FT = FT(NaN),
-    ;
-    # ts_LCL::Union{Nothing, TD.ThermodynamicState} = nothing,
-)  where {FT}
-    thermo_params::TDPS = TCP.thermodynamics_params(param_set)
-    microphys_params::ACMP = TCP.microphysics_params(param_set)
-    # TODO - when using adaptive timestepping we are limiting the source terms with the previous timestep Δt
-    ql_tendency::FT = FT(0)
-    qi_tendency::FT = FT(0)
-    if area > 0
-        q::TD.PhasePartition{FT} =TD.PhasePartition(thermo_params, ts)
-        ρ::FT = TD.air_density(thermo_params, ts)
-        q_vap::FT = TD.vapor_specific_humidity(thermo_params, ts)
+# function noneq_moisture_sources(
+#     param_set::APS,
+#     ::KorolevMazin2007,
+#     moisture_sources_limiter::Union{BasicMoistureSourcesLimiter, StandardSupersaturationMoistureSourcesLimiter},
+#     area::FT,
+#     ρ_c::FT,
+#     p::FT, # pass this bc it's not a no-op, unlike ρ and q which are stored in nonequil
+#     T::FT, # pass this bc it's not a no-op, unlike ρ and q which are stored in nonequil. note pressure is not stored in nonequil
+#     Δt::FT,
+#     ts::TD.ThermodynamicState{FT},
+#     w::FT,
+#     # z::FT,
+#     q_vap_sat_liq::FT,
+#     q_vap_sat_ice::FT,
+#     dqvdt::FT,
+#     dTdt::FT,
+#     τ_liq::FT = FT(NaN),
+#     τ_ice::FT = FT(NaN),
+#     ;
+#     # ts_LCL::Union{Nothing, TD.ThermodynamicState} = nothing,
+# )  where {FT}
+#     thermo_params::TDPS = TCP.thermodynamics_params(param_set)
+#     microphys_params::ACMP = TCP.microphysics_params(param_set)
+#     # TODO - when using adaptive timestepping we are limiting the source terms with the previous timestep Δt
+#     ql_tendency::FT = FT(0)
+#     qi_tendency::FT = FT(0)
+#     if area > 0
+#         q::TD.PhasePartition{FT} =TD.PhasePartition(thermo_params, ts)
+#         ρ::FT = TD.air_density(thermo_params, ts)
+#         q_vap::FT = TD.vapor_specific_humidity(thermo_params, ts)
         
-        q_eq = TD.PhasePartition(
-            q.tot,
-            q_vap_sat_liq,
-            q_vap_sat_ice,
-        ) # all 3 are vapor amounts
+#         q_eq = TD.PhasePartition(
+#             q.tot,
+#             q_vap_sat_liq,
+#             q_vap_sat_ice,
+#         ) # all 3 are vapor amounts
 
-    S_ql, S_qi = calculate_timestep_limited_sources(moisture_sources_limiter, param_set, area, ρ, FT(0), FT(0), FT(0), FT(0),FT(0), q_vap, dqvdt, dTdt, q, q_eq, Δt, ts)
-    ql_tendency += S_ql
-    qi_tendency += S_qi    
-    end
-    return NoneqMoistureSources{FT}(ql_tendency, qi_tendency)
-end
+#     S_ql, S_qi = calculate_timestep_limited_sources(moisture_sources_limiter, param_set, area, ρ, FT(0), FT(0), FT(0), FT(0),FT(0), q_vap, dqvdt, dTdt, q, q_eq, Δt, ts)
+#     ql_tendency += S_ql
+#     qi_tendency += S_qi    
+#     end
+#     return NoneqMoistureSources{FT}(ql_tendency, qi_tendency)
+# end
 
 # -------------------------------------------------------------------------------------------------------------------------- #
 
@@ -1431,6 +1431,9 @@ function compute_domain_interaction_microphysics_tendencies!(
             # env -> bulk means env area increases with z, da/dz > 0 
             interface_area = ∇a[k] * (∇a[k] > 0) * dz[k] # the real area where these collisions can happen...
 
+            w_i = (edmf.cloud_sedimentation_model.ice_terminal_velocity_model isa CloudSedimentationModel) ? aux_en.term_vel_ice[k] : FT(0)
+            w_i_bulk = (edmf.cloud_sedimentation_model.ice_terminal_velocity_model isa CloudSedimentationModel) ? aux_bulk.term_vel_ice[k] : FT(0)
+
 
             # we do env -> bulk, the bulk part can be divided among each updraft (bc to_other is only calculated for bulk)
             qi_tendency_sedimentation_other_blk = aux_bulk.qi_tendency_sedimentation_other[k] / aux_bulk.area[k] # de-area weight
@@ -1441,7 +1444,7 @@ function compute_domain_interaction_microphysics_tendencies!(
                 get_q_threshold_acnv(param_set, ice_type; N = aux_en.N_i[k], assume_N_is = false, r_acnv_scaling_factor = r_ice_acnv_scaling_factor),
                 get_q_threshold_acnv(param_set, ice_type; N = aux_bulk.N_i[k], assume_N_is = false, r_acnv_scaling_factor = r_ice_acnv_scaling_factor),
                 aux_en.T[k], ρ_c[k], # air density
-                aux_en.term_vel_ice[k] - w_en[k], aux_bulk.term_vel_ice[k] - w_up[k],
+                w_i - w_en[k], w_i_bulk - w_up[k],
                 aux_en.N_i[k], aux_bulk.N_i[k],
                 Dmin, Dmax, Dmin, Dmax,
                 E_ii, ice_acnv_power,

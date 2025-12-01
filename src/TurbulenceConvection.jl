@@ -318,4 +318,13 @@ include("closures/morrison_milbrandt_2015_style_exponential_part_only.jl")
 include("closures/sedimentation.jl")
 include("closures/terminal_velocity.jl")
 
+
+using PrecompileTools: PrecompileTools   # this is a small dependency
+# PrecompileTools.@setup_workload begin
+#     PrecompileTools.@compile_workload begin
+        include("precompile_workload.jl")
+#     end
+# end
+
+
 end

@@ -672,7 +672,7 @@ v(r) = χ_v v_0 (r/r_0)^(v_e + Δ_v) = velocity
         end
 
         # int *= π /4 # we need to multiply by π/4 to get the right answer for π(D/2)^2 = π/4 D^2 [CloudMicrophysics.j actually uses radius]
-        int *= (a0c * _r0^-(aec))  
+        int *= (a0c * _r0^-(aec)) * χv(prs, precip)
 
         int = max(zero(FT), int) # n, a, and v are all positive, so the integral should be positive
     end

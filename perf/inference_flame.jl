@@ -18,7 +18,7 @@ case_name = "SOCRATES_RF" * string(flight_number, pad = 2) * "_" * lowercase(for
 namelist_path = joinpath(CEDMF_dir, "experiments", "SOCRATES_postprocess_runs_storage", "subexperiments","SOCRATES_"*string(nonequilibrium_moisture_scheme), "Calibrate_and_Run", "tau_autoconv_noneq", dt_string, "iwp_mean__lwp_mean__qi_mean__qip_mean__ql_mean__qr_mean", "postprocessing", "output", "Atlas_LES", "RFAll_obs", method, "data", "Output.$case_name.1_1", "namelist_SOCRATES.in")
 namelist = JSON.parsefile(namelist_path, dicttype = Dict, inttype = Int64, null = FT(NaN))
 namelist["meta"]["forcing_type"] = Symbol(namelist["meta"]["forcing_type"]) # this gets messed up for some reason...
-default_namelist = default_namelist = NameList.default_namelist(case_name)
+default_namelist = NameList.default_namelist(case_name)
 NameList.convert_namelist_types_to_default!(namelist, default_namelist) # coerce remaining type
 print(namelist_path)
 global debug = true # allow to run multiple simulaitons at once if we're just debugging and wan't to go faster, puts them in random subdirectories in target location with random uuid suffix\
@@ -64,7 +64,7 @@ sim.skip_io || open_files(sim) # #removeVarsHack
 (prob, alg, kwargs) = solve_args(sim)
 
 tinf = SnoopCompileCore.@snoop_inference begin
-    sol = ODE.solve(prob, alg; kwargs...)
+    sol = SciMLBase.solve(prob, alg; kwargs...)
     # integrator, ds_tc_filenames, return_code = main(namelist)
 end;
 

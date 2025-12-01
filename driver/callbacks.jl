@@ -71,7 +71,7 @@ function affect_io!(integrator)
         nothing
     end
 
-    ODE.u_modified!(integrator, false) # We're legitamately not mutating `u` (the state vector)
+    SciMLBase.u_modified!(integrator, false) # We're legitamately not mutating `u` (the state vector)
 end
 
 function affect_filter!(integrator) #  affect_filter!() is also called in the driver directly... is that not redundant? should we also be calling the limiter again in callbacks?
@@ -94,7 +94,7 @@ function affect_filter!(integrator) #  affect_filter!() is also called in the dr
     # paying for an additional `∑tendencies!` call, which is required
     # to support supplying a continuous representation of the
     # solution.
-    ODE.u_modified!(integrator, false)
+    SciMLBase.u_modified!(integrator, false)
 end
 
 
@@ -126,7 +126,7 @@ function reset_dt!(integrator)
     TS.dt = dt_min
     
     SciMLBase.set_proposed_dt!(integrator, TS.dt)
-    ODE.u_modified!(integrator, false)
+    SciMLBase.u_modified!(integrator, false)
 end
 
 
@@ -189,7 +189,7 @@ function adaptive_dt!(integrator; depth::Int=0)
     #= Note if we're using methods that return tendencies as a function of Δt, those may need to be recalculated
 
     [[ if we're not using a tendency timestep limiter, we switched our callback order to be:
-         callbacks = ODE.CallbackSet( callback_filters, callback_call_update_aux_caller!..., callback_io..., callback_dtmax, callback_adapt_dt..., callback_cfl..., callback_∑tendencies!..., )
+         callbacks = SciMLBase.CallbackSet( callback_filters, callback_call_update_aux_caller!..., callback_io..., callback_dtmax, callback_adapt_dt..., callback_cfl..., callback_∑tendencies!..., )
     So I don't think we should need to recalculate tendencies here since we calculate our tendencies right before stepping... ]]
     =#
 
@@ -200,7 +200,7 @@ function adaptive_dt!(integrator; depth::Int=0)
         prog = integrator.u
         params = integrator.p
 
-        tendencies = ODE.get_du(integrator) # should be integrator.fsallast for Euler
+        tendencies = SciMLBase.get_du(integrator) # should be integrator.fsallast for Euler
         if isnothing(tendencies)
             @warn "No tendencies available for timestep calculation, might be during initialization"
             return nothing
@@ -277,7 +277,7 @@ function adaptive_dt!(integrator; depth::Int=0)
     @debug "t = $t | TS.dt = $(TS.dt) (TS.dt_max_edmf = $(TS.dt_max_edmf), TS.cfl_dt_max = $(TS.cfl_dt_max)), TS.use_fallback_tendency_limiters  = $(TS.use_fallback_tendency_limiters)"
     
     SciMLBase.set_proposed_dt!(integrator, TS.dt)
-    ODE.u_modified!(integrator, false)
+    SciMLBase.u_modified!(integrator, false)
 end
 
 # function spinup_dt!(integrator)
@@ -297,7 +297,7 @@ end
 #         end
 #     end
 #     SciMLBase.set_proposed_dt!(integrator, TS.dt)
-#     ODE.u_modified!(integrator, false)
+#     SciMLBase.u_modified!(integrator, false)
 # end
 
 """
@@ -726,20 +726,22 @@ function compute_dt_max(state::TC.State, edmf::TC.EDMFModel, dt_max::FT, CFL_lim
         end
 
         # 2. Cloud Condensates
-        if use_gm_sed
-            w_sed = max(w_sed, aux_gm.term_vel_liq[k], aux_gm.term_vel_ice[k])
-            if !is_toa
-                w_sed = max(w_sed, aux_gm.term_vel_liq[k+1], aux_gm.term_vel_ice[k+1])
-            end
-        else
-            w_sed = max(w_sed, aux_en.term_vel_liq[k], aux_en.term_vel_ice[k])
-            if !is_toa
-                w_sed = max(w_sed, aux_en.term_vel_liq[k+1], aux_en.term_vel_ice[k+1])
-            end
-            for i in 1:N_up
-                w_sed = max(w_sed, aux_up[i].term_vel_liq[k], aux_up[i].term_vel_ice[k])
+        if edmf.cloud_sedimentation_model isa TC.CloudSedimentationModel
+            if use_gm_sed
+                w_sed = max(w_sed, aux_gm.term_vel_liq[k], aux_gm.term_vel_ice[k])
                 if !is_toa
-                    w_sed = max(w_sed, aux_up[i].term_vel_liq[k+1], aux_up[i].term_vel_ice[k+1])
+                    w_sed = max(w_sed, aux_gm.term_vel_liq[k+1], aux_gm.term_vel_ice[k+1])
+                end
+            else
+                w_sed = max(w_sed, aux_en.term_vel_liq[k], aux_en.term_vel_ice[k])
+                if !is_toa
+                    w_sed = max(w_sed, aux_en.term_vel_liq[k+1], aux_en.term_vel_ice[k+1])
+                end
+                for i in 1:N_up
+                    w_sed = max(w_sed, aux_up[i].term_vel_liq[k], aux_up[i].term_vel_ice[k])
+                    if !is_toa
+                        w_sed = max(w_sed, aux_up[i].term_vel_liq[k+1], aux_up[i].term_vel_ice[k+1])
+                    end
                 end
             end
         end
@@ -847,7 +849,7 @@ function dt_max!(integrator, dt_max::FT, cfl_dt_max::FT) where {FT <: Real}
     CC.Fields.bycolumn(axes(integrator.u.cent)) do colidx
         (; edmf, aux, TS) = integrator.p
         prog = integrator.u
-        tendencies = ODE.get_du(integrator) # should be integrator.fsallast for Euler
+        tendencies = SciMLBase.get_du(integrator) # should be integrator.fsallast for Euler
         if isnothing(tendencies)
             @warn "No tendencies available for timestep calculation, might be during initialization"
             state = TC.column_prog_aux(prog, aux, colidx, integrator.p.calibrate_io)
@@ -861,7 +863,7 @@ function dt_max!(integrator, dt_max::FT, cfl_dt_max::FT) where {FT <: Real}
     (; TS) = integrator.p
     TS.dt_max_edmf = to_float(dt_max)
     TS.cfl_dt_max = to_float(cfl_dt_max)
-    ODE.u_modified!(integrator, false)
+    SciMLBase.u_modified!(integrator, false)
 end
 
 """
@@ -870,13 +872,13 @@ Call the ∑tendencies! function in a callback so you can move its position arou
 function call_∑tendencies!(integrator)
     CC.Fields.bycolumn(axes(integrator.u.cent)) do colidx
         (; edmf, aux, TS) = integrator.p
-        tendencies = ODE.get_du(integrator) # should be integrator.fsallast for Euler
+        tendencies = SciMLBase.get_du(integrator) # should be integrator.fsallast for Euler
         prog = integrator.u
         params = integrator.p
         t = integrator.t
         ∑tendencies!(tendencies, prog, params, t)
     end
-    ODE.u_modified!(integrator, false)
+    SciMLBase.u_modified!(integrator, false)
 end
 
 """
@@ -890,7 +892,7 @@ function call_update_aux_caller!(integrator)
         t = integrator.t
         update_aux_caller!(prog, params, t)
     end
-    ODE.u_modified!(integrator, false)
+    SciMLBase.u_modified!(integrator, false)
 end
 
 function monitor_cfl!(integrator)
@@ -908,7 +910,7 @@ function monitor_cfl!(integrator)
             monitor_cfl_detailed!(state, edmf, TS.dt, TS.cfl_limit)
         end
     end
-    ODE.u_modified!(integrator, false)
+    SciMLBase.u_modified!(integrator, false)
 end
 
 function monitor_cfl_detailed!(state, edmf, Δt, CFL_limit)

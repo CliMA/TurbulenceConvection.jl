@@ -18,7 +18,9 @@ import Flux
 import LinearAlgebra
 import NCDatasets
 import OrderedCollections
-import OrdinaryDiffEq
+# import OrdinaryDiffEq
+import OrdinaryDiffEqLowOrderRK
+import OrdinaryDiffEqTsit5
 import PoissonRandom
 import Random
 import RootSolvers
@@ -42,7 +44,9 @@ deps_to_monitor = [
     LinearAlgebra,
     NCDatasets,
     OrderedCollections,
-    OrdinaryDiffEq,
+    # OrdinaryDiffEq,
+    OrdinaryDiffEqLowOrderRK,
+    OrdinaryDiffEqTsit5,
     PoissonRandom,
     Random,
     RootSolvers,

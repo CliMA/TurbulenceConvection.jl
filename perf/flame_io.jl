@@ -63,18 +63,18 @@ open_files(sim) # force compilation
 close_files(sim) # force compilation
 # open_files(sim)
 # (prob, alg, kwargs) = solve_args(sim)
-# integrator = ODE.init(prob, alg; kwargs...)
+# integrator = SciMLBase.init(prob, alg; kwargs...)
 
-# ODE.step!(integrator) # force compilation
+# SciMLBase.step!(integrator) # force compilation
 # # callbacks not called after first `step!`
 # # call, so need to call `step!` again:
-# ODE.step!(integrator) # force compilation
+# SciMLBase.step!(integrator) # force compilation
 
 Profile.clear_malloc_data()
 Profile.init(10_000_000, 0.001)  # n = buffer size, delay = sampling interval in seconds
 prof = Profile.@profile begin
     # for _ in 1:10
-    #     ODE.step!(integrator)
+    #     SciMLBase.step!(integrator)
     # end
 
     main1d(namelist)

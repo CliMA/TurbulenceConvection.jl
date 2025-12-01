@@ -28,8 +28,6 @@ include("supersaturation_regimes.jl")
 # ---------------------------------------------------------------------------------------------------------------------------------------- #
 abstract type AbstractNonEquillibriumSourcesType end
 abstract type AbstractRelaxationTimescaleType <: AbstractNonEquillibriumSourcesType end
-struct KorolevMazin2007 <: AbstractNonEquillibriumSourcesType end  # placeholder to keep that code around
-struct RelaxToEquilibrium <: AbstractNonEquillibriumSourcesType end  # placeholder to keep that code around
 
 Base.broadcastable(x::AbstractNonEquillibriumSourcesType) = Ref(x) # permit broadcasting over these types, e.g. f.(::AbstractNonEquillibriumSourcesType, T, p, q,...)
 
@@ -83,6 +81,21 @@ function get_relaxation_timescale_args(namelist, FT)
         get(namelist["user_params"], "max_N_ice", FT(Inf))
         
     )
+end
+
+# ---------------------------------------------------------------------------------------------------------------------------------------- #
+
+
+# struct KorolevMazin2007 <: AbstractNonEquillibriumSourcesType end  # placeholder to keep that code around
+struct RelaxToEquilibrium{FT} <: AbstractNonEquillibriumSourcesType 
+    adjust_ice_N::Bool
+    args::RelaxationTimescaleArgs{FT} # Maybe pare this down to remove tau
+end  # placeholder to keep that code around
+
+function RelaxToEquilibrium(param_set::APS, namelist)
+    FT = eltype(param_set)
+    adjust_ice_N = get(namelist["user_args"], "adjust_ice_N", false) # default to false if not set
+    return RelaxToEquilibrium{FT}(adjust_ice_N, get_relaxation_timescale_args(namelist, FT))
 end
 
 # ---------------------------------------------------------------------------------------------------------------------------------------- #
@@ -256,8 +269,12 @@ get_relaxation_timescale_type(param_set::APS, namelist) = get_relaxation_timesca
 # ---------------------------------------------------------------------------------------------------------------------------------------- #
 get_adjust_ice_N(relaxation_timescale::AbstractRelaxationTimescaleType) = hasproperty(relaxation_timescale, :adjust_ice_N) ? relaxation_timescale.adjust_ice_N : false
 get_adjust_liq_N(relaxation_timescale::AbstractRelaxationTimescaleType) = hasproperty(relaxation_timescale, :adjust_liq_N) ? relaxation_timescale.adjust_liq_N : false
+
+get_adjust_ice_N(relaxation_timescale::RelaxToEquilibrium) = false
+get_adjust_liq_N(relaxation_timescale::RelaxToEquilibrium) = false
 # ---------------------------------------------------------------------------------------------------------------------------------------- #
 # ---------------------------------------------------------------------------------------------------------------------------------------- #
+
 
 # :Base
 function get_relaxation_timescale_type(::Val{:Base}, param_set::APS, microphys_params::ACMP, namelist) # added namelist

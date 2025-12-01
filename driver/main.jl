@@ -18,7 +18,9 @@ import CloudMicrophysics.CommonTypes as CMT
 import ClimaCore as CC
 import SciMLBase
 
-import OrdinaryDiffEq as ODE
+# import OrdinaryDiffEq as ODE
+import OrdinaryDiffEqTsit5
+import OrdinaryDiffEqLowOrderRK
 import StochasticDiffEq as SDE
 import StaticArrays: SVector
 import StaticArrays as SA  # moved out of driver/Surface.jl due to https://github.com/CliMA/SurfaceFluxes.jl/pull/128/commits 
@@ -343,7 +345,7 @@ function initialize(sim::Simulation1d)
     end
 
     (prob, alg, kwargs) = solve_args(sim)
-    integrator = ODE.init(prob, alg; kwargs...)
+    integrator = SciMLBase.init(prob, alg; kwargs...)
     skip_io && return (integrator, :success)
 
     open_files(sim)
@@ -394,15 +396,15 @@ function solve_args(sim::Simulation1d)
         dt_min = sim.dt_min,
     )
 
-    callback_io = ODE.DiscreteCallback(condition_io, affect_io!; save_positions = (false, false))
+    callback_io = SciMLBase.DiscreteCallback(condition_io, affect_io!; save_positions = (false, false))
     callback_io = sim.skip_io ? () : (callback_io,)
-    callback_cfl = ODE.DiscreteCallback(condition_every_iter, monitor_cfl!; save_positions = (false, false))
+    callback_cfl = SciMLBase.DiscreteCallback(condition_every_iter, monitor_cfl!; save_positions = (false, false))
     callback_cfl = sim.precip_model isa TC.Clima1M ? (callback_cfl,) : ()
-    callback_dtmax = ODE.DiscreteCallback(condition_every_iter, dt_max!; save_positions = (false, false))
-    callback_filters = ODE.DiscreteCallback(condition_every_iter, affect_filter!; save_positions = (false, false))
-    callback_adapt_dt = ODE.DiscreteCallback(condition_every_iter, adaptive_dt!; save_positions = (false, false))
+    callback_dtmax = SciMLBase.DiscreteCallback(condition_every_iter, dt_max!; save_positions = (false, false))
+    callback_filters = SciMLBase.DiscreteCallback(condition_every_iter, affect_filter!; save_positions = (false, false))
+    callback_adapt_dt = SciMLBase.DiscreteCallback(condition_every_iter, adaptive_dt!; save_positions = (false, false))
     callback_adapt_dt = (sim.adapt_dt || sim.TS.spinup_half_t_max > 0 || sim.TS.use_tendency_timestep_limiter) ? (callback_adapt_dt,) : ()
-    # callback_spinup_dt = ODE.DiscreteCallback(condition_every_iter, spinup_dt!; save_positions = (false, false)) 
+    # callback_spinup_dt = SciMLBase.DiscreteCallback(condition_every_iter, spinup_dt!; save_positions = (false, false)) 
     # callback_spinup_dt = (sim.TS.spinup_half_t_max > 0) ? (callback_spinup_dt,) : () # we condition on spinup_half_t_max > 0 | put in tuple so can splat if it doesnt exist
     if sim.edmf.entr_closure isa TC.PrognosticNoisyRelaxationProcess && sim.adapt_dt
         @warn("The prognostic noisy relaxation process currently uses a Euler-Maruyama time stepping method,
@@ -410,18 +412,18 @@ function solve_args(sim::Simulation1d)
         callback_adapt_dt = ()
     end
 
-    # callback_∑tendencies! = sim.TS.use_tendency_timestep_limiter ? (ODE.DiscreteCallback(condition_every_iter, call_∑tendencies!; save_positions = (false, false)),) : ()
-    callback_∑tendencies! = sim.TS.use_tendency_timestep_limiter ? (ODE.DiscreteCallback(condition_every_iter, call_∑tendencies!; save_positions = (false, false)),) : (ODE.DiscreteCallback(condition_every_iter, call_∑tendencies!; save_positions = (false, false)),)
-    callback_call_update_aux_caller! = sim.TS.use_tendency_timestep_limiter ? () : (ODE.DiscreteCallback(condition_every_iter, call_update_aux_caller!; save_positions = (false, false)),)
+    # callback_∑tendencies! = sim.TS.use_tendency_timestep_limiter ? (SciMLBase.DiscreteCallback(condition_every_iter, call_∑tendencies!; save_positions = (false, false)),) : ()
+    callback_∑tendencies! = sim.TS.use_tendency_timestep_limiter ? (SciMLBase.DiscreteCallback(condition_every_iter, call_∑tendencies!; save_positions = (false, false)),) : (SciMLBase.DiscreteCallback(condition_every_iter, call_∑tendencies!; save_positions = (false, false)),)
+    callback_call_update_aux_caller! = sim.TS.use_tendency_timestep_limiter ? () : (SciMLBase.DiscreteCallback(condition_every_iter, call_update_aux_caller!; save_positions = (false, false)),)
 
-    callback_reset_dt = sim.adapt_dt ? ODE.DiscreteCallback(condition_every_iter, reset_dt!; save_positions = (false, false)) : ()
+    callback_reset_dt = sim.adapt_dt ? SciMLBase.DiscreteCallback(condition_every_iter, reset_dt!; save_positions = (false, false)) : ()
     
 
     # Maybe we need to edit TS.dt here at the start? idk when the callback is called but seems to be every 100 steps... perhaps?
     # The ode callback will adjust sim.TS.dt but i'm not sure letting dycore do it is the right move...
 
-    # callbacks = ODE.CallbackSet(callback_dtmax, callback_adapt_dt..., callback_cfl..., callback_filters, callback_io...)
-    local callbacks::ODE.CallbackSet
+    # callbacks = SciMLBase.CallbackSet(callback_dtmax, callback_adapt_dt..., callback_cfl..., callback_filters, callback_io...)
+    local callbacks::SciMLBase.CallbackSet
 
     if sim.edmf.entr_closure isa TC.PrognosticNoisyRelaxationProcess
         prob = SDE.SDEProblem(∑tendencies!, ∑stoch_tendencies!, prog, t_span, params; dt = sim.TS.dt)
@@ -434,8 +436,8 @@ function solve_args(sim::Simulation1d)
                     # Before, we would update_aux then calculate tendencies in ∑tendencies!, then take the step, then calculate a dt in callbacks, then filter then do io in callbacks. 
                     # To match, we should filter then do io in callbacks, then update aux then calculate tendencies in callback_∑tendencies!, then calculate the needed timestep in dt_max/adapt_dt, then take the step
                     # if we left the original order, we'd calculate our tendencies then do all our filtering, then take the step...
-                    callbacks = ODE.CallbackSet(callback_filters, callback_io..., callback_reset_dt, callback_∑tendencies!..., callback_dtmax, callback_adapt_dt..., callback_cfl..., )  
-                    prob = ODE.ODEProblem{true, SciMLBase.FullSpecialize}(∑tendencies_null!, prog, t_span, params; dt = sim.TS.dt) # we will calculate tendencies in the callback so that we can use them for the most up to date du so we don't need another call to ∑tendencies!, so we use ∑tendencies_null!
+                    callbacks = SciMLBase.CallbackSet(callback_filters, callback_io..., callback_reset_dt, callback_∑tendencies!..., callback_dtmax, callback_adapt_dt..., callback_cfl..., )  
+                    prob = SciMLBase.ODEProblem{true, SciMLBase.FullSpecialize}(∑tendencies_null!, prog, t_span, params; dt = sim.TS.dt) # we will calculate tendencies in the callback so that we can use them for the most up to date du so we don't need another call to ∑tendencies!, so we use ∑tendencies_null!
                     # The upside is we get the dt we want, the downside is we calculate the tendencies in the dt_max! callback so when the step is taken, we return to the io callback without having dones any filtering/etc
                 else
                     #= 
@@ -452,14 +454,14 @@ function solve_args(sim::Simulation1d)
                         4) step
 
                     =#
-                    # callbacks = ODE.CallbackSet(callback_dtmax, callback_adapt_dt..., callback_cfl..., callback_filters, callback_io...) # original
-                    # prob = ODE.ODEProblem(∑tendencies!, prog, t_span, params; dt = sim.TS.dt)
-                    callbacks = ODE.CallbackSet( callback_filters, callback_call_update_aux_caller!..., callback_dtmax, callback_adapt_dt..., callback_cfl..., callback_∑tendencies!..., callback_io...,)
-                    # prob = ODE.ODEProblem(∑tendencies_null!, prog, t_span, params; dt = sim.TS.dt) # we will calculate tendencies in the step so we don't need another call to ∑tendencies! so we use ∑tendencies_null!
-                    prob = ODE.ODEProblem{true, SciMLBase.FullSpecialize}(∑tendencies_null!, prog, t_span, params; dt = sim.TS.dt) # full specialize to try to avoid inference issues
+                    # callbacks = SciMLBase.CallbackSet(callback_dtmax, callback_adapt_dt..., callback_cfl..., callback_filters, callback_io...) # original
+                    # prob = SciMLBase.ODEProblem(∑tendencies!, prog, t_span, params; dt = sim.TS.dt)
+                    callbacks = SciMLBase.CallbackSet( callback_filters, callback_call_update_aux_caller!..., callback_dtmax, callback_adapt_dt..., callback_cfl..., callback_∑tendencies!..., callback_io...,)
+                    # prob = SciMLBase.ODEProblem(∑tendencies_null!, prog, t_span, params; dt = sim.TS.dt) # we will calculate tendencies in the step so we don't need another call to ∑tendencies! so we use ∑tendencies_null!
+                    prob = SciMLBase.ODEProblem{true, SciMLBase.FullSpecialize}(∑tendencies_null!, prog, t_span, params; dt = sim.TS.dt) # full specialize to try to avoid inference issues
                 end
                 alg = if sim.TS.algorithm isa Val{:Euler}
-                    ODE.Euler()
+                    OrdinaryDiffEqLowOrderRK.Euler()
                 else
                     # alg_string = String(typeof(alg).parameters[1])
                     alg_string = String(TC.Parameters.unwrap_val(alg))
@@ -468,15 +470,15 @@ function solve_args(sim::Simulation1d)
 
             else
 
-                callbacks = ODE.CallbackSet(callback_cfl..., callback_filters, callback_io...) # drop the dt stuff since the adaptive solver will do it by itself
-                prob = ODE.ODEProblem{true, SciMLBase.FullSpecialize}(∑tendencies_robust!, prog, t_span, params; dt = sim.TS.dt) # use robust version that won't crash when out of domain.
+                callbacks = SciMLBase.CallbackSet(callback_cfl..., callback_filters, callback_io...) # drop the dt stuff since the adaptive solver will do it by itself
+                prob = SciMLBase.ODEProblem{true, SciMLBase.FullSpecialize}(∑tendencies_robust!, prog, t_span, params; dt = sim.TS.dt) # use robust version that won't crash when out of domain.
 
                 alg = if sim.TS.algorithm isa Val{:Heun}
-                    ODE.Heun()
+                    OrdinaryDiffEqLowOrderRK.Heun()
                 elseif sim.TS.algorithm isa Val{:RK4}
-                    alg = ODE.RK4()
+                    alg = OrdinaryDiffEqLowOrderRK.RK4()
                 elseif sim.TS.algorithm isa Val{:Tsit5}
-                    alg = ODE.Tsit5()
+                    alg = OrdinaryDiffEqTsit5.Tsit5()
                 else
                     # alg_string = String(typeof(a).parameters[1])
                     alg_string = String(TC.Parameters.unwrap_val(alg))
@@ -488,13 +490,14 @@ function solve_args(sim::Simulation1d)
             if sim.TS.fixed_step_solver
                 error("No implicit fixed-step solver currently supported")
             else
-                callbacks = ODE.CallbackSet(callback_cfl..., callback_filters, callback_io...) # drop the dt stuff since the implicit solver will do it by itself. leave cfl... hopefully the model stability also prevents cfl violations.... (we still also have buoyancy limits)
-                prob = ODE.ODEProblem{true, SciMLBase.FullSpecialize}(∑tendencies!, prog, t_span, params; dt = sim.TS.dt)
+                callbacks = SciMLBase.CallbackSet(callback_cfl..., callback_filters, callback_io...) # drop the dt stuff since the implicit solver will do it by itself. leave cfl... hopefully the model stability also prevents cfl violations.... (we still also have buoyancy limits)
+                prob = SciMLBase.ODEProblem{true, SciMLBase.FullSpecialize}(∑tendencies!, prog, t_span, params; dt = sim.TS.dt)
                 if sim.TS.algorithm isa Val{:ImplicitEuler} # adaptive solver
-                    alg = ODE.ImplicitEuler(; autodiff = false) # this is far too slow to actually use...
+                    # alg = OrdinaryDiffEqSDIRK.ImplicitEuler(; autodiff = false) # this is far too slow to actually use...
+                    error("Deprecated for faster precompilation")
                 elseif sim.TS.algorithm isa Val{:KenCarp47}
                     # Deprecated since KrylovJL_GMRES() was moved to LinearSolve.jl
-                    # alg = ODE.KenCarp47(; autodiff = false, linsolve = ODE.KrylovJL_GMRES()) # see https://docs.sciml.ai/DiffEqDocs/stable/tutorials/advanced_ode_example/#Using-Jacobian-Free-Newton-Krylov
+                    # alg = OrdinaryDiffEqSDIRK.KenCarp47(; autodiff = false, linsolve = LinearSolve.KrylovJL_GMRES()) # see https://docs.sciml.ai/DiffEqDocs/stable/tutorials/advanced_ode_example/#Using-Jacobian-Free-Newton-Krylov
                     error("KrylovJL_GMRES() linear solver for KenCarp47 has been deprecated. Please use LinearSolve.jl directly to specify a linear solver.")
                 else
                     # alg_string = String(typeof(a).parameters[1])
@@ -514,7 +517,8 @@ function solve_args(sim::Simulation1d)
         progress = true,
         progress_message = (dt, u, p, t) -> t,
         # my additions
-        isoutofdomain = sim.TS.use_isoutofdomain_limiter ? isoutofdomain : ODE.DiffEqBase.ODE_DEFAULT_ISOUTOFDOMAIN, # use our isoutofdomain if we set it, otherwise use their default which just returns false
+        # isoutofdomain = sim.TS.use_isoutofdomain_limiter ? isoutofdomain : ODE.DiffEqBase.ODE_DEFAULT_ISOUTOFDOMAIN, # use our isoutofdomain if we set it, otherwise use their default which just returns false
+        isoutofdomain = sim.TS.use_isoutofdomain_limiter ? isoutofdomain : my_default_is_out_of_domain, # use our isoutofdomain if we set it, otherwise use their default which just returns false [[ i think we don't have diffeqbase anymore? not sure ]]
         unstable_check = my_unstable_check,
         (isnan(sim.TS.abstol) ? (;) : (;abstol = sim.TS.abstol))...,
         (isnan(sim.TS.reltol) ? (;) : (;reltol = sim.TS.reltol))...,
@@ -526,6 +530,7 @@ function solve_args(sim::Simulation1d)
     return (prob, alg, kwargs)
 end
 
+my_default_is_out_of_domain(dt, u, p, t) = false
 
 """
     default is any(isnan, u)
@@ -564,15 +569,15 @@ function sim_run(sim::Simulation1d, integrator; time_run = true) # named sim_run
     local sol
     try
         if time_run
-            # sol = @timev ODE.solve!(integrator)
+            # sol = @timev SciMLBase.solve!(integrator)
         sol = begin
-            t = @timed ODE.solve!(integrator)
-            @warn "ODE.solve!() completed in $(t.time) seconds, memory used: $(round(t.bytes / 1024^3, digits=2)) GiB"
+            t = @timed SciMLBase.solve!(integrator)
+            @warn "SciMLBase.solve!() completed in $(t.time) seconds, memory used: $(round(t.bytes / 1024^3, digits=2)) GiB"
             t.value
         end
 
         else
-            sol = ODE.solve!(integrator)
+            sol = SciMLBase.solve!(integrator)
         end
     catch e
         if sim.truncate_stack_trace

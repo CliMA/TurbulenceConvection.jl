@@ -555,15 +555,15 @@ function compute_phys_entr_detr!(
                         εδ_dyn(mean_model, εδ_model_vars, edmf.entr_dim_scale, edmf.detr_dim_scale, ε_nondim, δ_nondim)
                     # turbulent & mean nondimensional entrainment
                     ε_nondim, δ_nondim = non_dimensional_function(mean_model, εδ_model_vars)
-                    ε_ml_nondim = min(ε_ml_nondim,  inv(eps(FT))) # don't let these blow up
-                    δ_ml_nondim = min(δ_ml_nondim,  inv(eps(FT))) # don't let these blow up
+                    ε_nondim = min(ε_nondim,  inv(eps(FT))) # don't let these blow up
+                    δ_nondim = min(δ_nondim,  inv(eps(FT))) # don't let these blow up
                     ε_dyn, δ_dyn =
                         εδ_dyn(mean_model, εδ_model_vars, edmf.entr_dim_scale, edmf.detr_dim_scale, ε_nondim, δ_nondim)
                 else
                     # fractional, turbulent & nondimensional entrainment
                     ε_nondim, δ_nondim = non_dimensional_function(εδ_closure, εδ_model_vars)
-                    ε_ml_nondim = min(ε_ml_nondim,  inv(eps(FT))) # don't let these blow up
-                    δ_ml_nondim = min(δ_ml_nondim,  inv(eps(FT))) # don't let these blow up
+                    ε_nondim = min(ε_nondim,  inv(eps(FT))) # don't let these blow up
+                    δ_nondim = min(δ_nondim,  inv(eps(FT))) # don't let these blow up
                     ε_dyn, δ_dyn =
                         εδ_dyn(εδ_closure, εδ_model_vars, edmf.entr_dim_scale, edmf.detr_dim_scale, ε_nondim, δ_nondim)
                 end

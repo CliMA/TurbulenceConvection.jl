@@ -10,12 +10,12 @@ import Profile
 case_name = parsed_args["case"]
 sim = init_sim(case_name)
 (prob, alg, kwargs) = solve_args(sim)
-integrator = ODE.init(prob, alg; kwargs...)
+integrator = SciMLBase.init(prob, alg; kwargs...)
 
 function do_work!(integrator)
     Logging.with_logger(Logging.NullLogger()) do
         for _ in 1:1000
-            ODE.step!(integrator)
+            SciMLBase.step!(integrator)
         end
     end
 end
