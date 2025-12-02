@@ -2065,6 +2065,11 @@ function adjust_ice_N(
         #     N_i = N_i - (N_i - 0.85*N_i) / (FT(2e-4) - FT(0)) * clamp(q_l, FT(0), FT(2e-4))
         # end
 
+        # Added 12/01/2025 -- I think we're are too susceptible to a low N_INP_top... We should never go below N_thresh/8 I think. If we have ice it came from somewhere. I think this also feeds into wi terminal velocity explosions and crashes.
+        if !isnan(N_INP_top)
+            N_INP_top = max(N_INP_top, N_thresh/8)
+        end
+
     
 
 
@@ -2207,6 +2212,8 @@ function adjust_ice_N(
                     end
                     N_INP_adjusted = N_INP_adjusted_here
                 end
+            else
+                N_INP_adjusted = max(N_INP_adjusted, N_thresh/8) # added 12/01/2025 to prevent underflow probs
             end
 
 
@@ -2242,9 +2249,8 @@ function adjust_ice_N(
                 @warn "Got non-finite N_INP_adjusted = $N_INP_adjusted or N_i = $N_i from inputs N_INP = $N_INP; N_i_in = $N_i_in; q_i = $q_i; ρ = $ρ; r_is = $r_is; μ = $μ; massflux = $massflux; w_i = $w_i; S_i = $S_i; dNINP_dz = $dNINP_dz; N_INP_top = $N_INP_top; N_i_from_INP = $N_i_from_INP; q_l = $q_l; q_s = $q_s; apply_massflux_boost = $apply_massflux_boost; apply_sedimentation_boost = $apply_sedimentation_boost"
             end
 
-
         else
-            N_INP_adjusted = N_INP
+            N_INP_adjusted = max(N_INP, N_thresh/8) # changed to `N_thresh/8` 12/01/2025 to prevent underflow probs
         end
         # ----------------------------------------------------------------- #
 
@@ -2335,10 +2341,10 @@ function adjust_ice_N(
 
         end
 
-        # Added 10/23/2023 -- I think we really do need some control on N outside of just the bounds from r_acnv and r_thresh, since those don't account for INP availability at all.
+        # Added 10/23/2025 -- I think we really do need some control on N outside of just the bounds from r_acnv and r_thresh, since those don't account for INP availability at all.
         # Since the incoming NINP accounts for ice mult we're ok there, and if q gets too large most new sub/dep goes straight to snow so there are limits to how big N can become...  I saw N_i = 7000+ in an updraft... ridiculous.
         # Let's bound ourselves to below N_INP_top for sure..., if we don't have it maybe 5xN_INP_adjusted? idk...
-        N_below_r_is_top = (isnan(N_INP_top) || iszero(N_INP_top)) ? FT(Inf) : get_Ni_from_INP_qi_qs(param_set, N_i, N_INP_top, q_i, q_s; ρ=ρ, ice_type=ice_type, μ=μ, monodisperse=monodisperse, add_dry_aerosol_mass=true)
+        N_below_r_is_top = (isnan(N_INP_top) || iszero(N_INP_top)) ? FT(Inf) : max(get_Ni_from_INP_qi_qs(param_set, N_i, N_INP_top, q_i, q_s; ρ=ρ, ice_type=ice_type, μ=μ, monodisperse=monodisperse, add_dry_aerosol_mass=true), N_thresh/8) # added min bound to prevent 0 division probs
         N_bounds = min.(N_bounds, N_below_r_is_top, (S_i < FT(0)) ? (8 * N_INP_adjusted) : (2 * N_INP_adjusted)) # not sure if should use N_INP_adjusted here or N_INP directly. I guess N_INP_adjusted is probably better since it includes MF boost, but it can also be too small with sedimentation... maybe only use it if S_i > 0? idk. it really is only a runaway growth stopper. we'll enforce a stronger limit in supersat when <r> isn't so big so terminal velocity is less important...? but also in growth regions with mf boost we should be limited by inp fairly strongly so maybe both can be more tightly bounded? idk.
 
 
@@ -2353,6 +2359,8 @@ function adjust_ice_N(
     if !isfinite(N_i) || (iszero(N_i) && (q_i > 0))
         @warn "Got non-finite or zero N_i = $N_i from inputs N_i_in = $N_i_in; N_INP = $N_INP; q_i = $q_i; ρ = $ρ; S_i = $S_i; q_l = $q_l; q_s = $q_s; monodisperse = $monodisperse; ice_type = $ice_type; decrease_N_if_subsaturated = $decrease_N_if_subsaturated; N_INP_top = $N_INP_top; massflux = $massflux; w_i = $w_i; N_i_from_INP = $N_i_from_INP"
     end
+
+
 
     return N_i
 end
@@ -2371,6 +2379,9 @@ function adjust_liq_N(
     decrease_N_if_subsaturated::Bool = false
 ) where {FT}
 
+
+    N_CCN = param_set.user_params.N_CCN
+    N_l *= N_CCN/(100e6)
     
     # r_lr = param_set.user_params.r_liq_rain # There is no r_lr for liquid...instead we just set it in user_params.
     # ρ_l = CMP.ρ_cloud_liq(microphys_params)

@@ -295,7 +295,8 @@ function calculate_sedimentation_velocity(
     rain_type::CMT.RainType = rain_type, # rain_type is available from a a global, we dispatch this way bc liq_type doesn't have terminal velocity defined
 ) where {FT <: Real}
 
-    Nt = isnan(Nt) ? FT(250*1e6) : Nt # default to 250 / cm^-3 as that's a reasonable rain amount, do not let the default value for rain win as you'll get something ridiculously high. Even this might need to be scaled down, idk.
+    Nt = isnan(Nt) ? FT(param_set.user_params.N_CCN) : Nt # default to 250 / cm^-3 as that's a reasonable rain amount, do not let the default value for rain win as you'll get something ridiculously high. Even this might need to be scaled down, idk.
+    # Nt = isnan(Nt) ? FT(250*1e6) : Nt # default to 250 / cm^-3 as that's a reasonable rain amount, do not let the default value for rain win as you'll get something ridiculously high. Even this might need to be scaled down, idk.
 
     if velo_scheme == Chen2022Vel
         w = my_terminal_velocity(param_set, rain_type, velo_scheme, ρ, q; Dmax = Dmax, Nt = Nt) # testing [ this version makes you pass in raintype to avoid creating another object] [ rain_type is avilable from a global]

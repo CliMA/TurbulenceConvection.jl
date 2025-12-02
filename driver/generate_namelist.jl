@@ -286,6 +286,9 @@ function default_namelist(
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["fno_ent_params"] =
         SA.SVector{50}(rand(50))
 
+
+    namelist_defaults["user_params"] = Dict()
+
     #! format: on
 
     if case_name == "Soares"
@@ -691,6 +694,7 @@ function LES_driven_SCM(namelist_defaults)
     return namelist
 end
 
+
 function SOCRATES(namelist_defaults; case_name = "SOCRATES_RFXX_XXX_data")
     namelist = deepcopy(namelist_defaults)
 
@@ -749,6 +753,18 @@ function SOCRATES(namelist_defaults; case_name = "SOCRATES_RFXX_XXX_data")
             "Invalid SOCRATES setup specification, forcing_type in string of form SOCRATES_{flight_specifier}_{forcing_specifier} must contain either \"obs\" or \"ERA5\"",
         )
     end
+
+
+    N_CCNs_default = Dict(
+        1 => 75e6, # 75 / cm^3
+        9 => 190e6, # 190 / cm^3
+        10 => 55e6, # 55 / cm^3
+        11 => 115e6, # 115 / cm^3
+        12 => 210e6, # 210 / cm^3
+        13 => 180e6, # 180 / cm^3
+        )
+
+    namelist["user_params"]["N_CCN"] = N_CCNs_default[namelist["meta"]["flight_number"]]
 
     return namelist
 end

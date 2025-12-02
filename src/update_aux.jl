@@ -1195,17 +1195,18 @@ function update_aux!(edmf::EDMFModel, state::State, surf::SurfaceBase, param_set
         KH[k] = KM[k] / aux_tc.prandtl_nvec[k]
         KQ[k] = KH[k] / Le
 
-        # aux_en_2m.tke.buoy[k] = -aux_en.area[k] * ρ_c[k] * KH[k] * bg.∂b∂z
+        aux_en_2m.tke.buoy[k] = -aux_en.area[k] * ρ_c[k] * KH[k] * bg.∂b∂z
 
-        # 1. Calculate the normal buoyancy production [[ commenting this part out didn't make the updrafts come back...]]
-        original_buoy = -aux_en.area[k] * ρ_c[k] * KH[k] * bg.∂b∂z
-        # 2. Calculate a "buoyancy floor" that ramps up linearly with instability. This single line implements the ramp you described.
-        min_∂b∂z = FT(1e-5)  # threshold for tke starting to be produced from buoyancy. above this value, we want the buoyancy to be unchanged.
-        max_∂b∂z = FT(-1e-4) # benchmark value for very strong instability, at this ∂b∂z, we want buoyancy tke production to be at least 1e-2
-        # buoy_target = FT(1e-2)  # target minimum buoyancy production rate at strong instability
-        buoy_target = FT(1e-3)  # target minimum buoyancy production rate at strong instability
-        buoy_floor = (buoy_target / (min_∂b∂z - max_∂b∂z )) * max(FT(0), min_∂b∂z - bg.∂b∂z)        # 3. Apply the floor to ensure a minimum production rate in strong instability
-        aux_en_2m.tke.buoy[k] = (bg.∂b∂z < min_∂b∂z) ? max(original_buoy, buoy_floor) : original_buoy
+        # I dont think we need this section anymore bc 1) we updated the buoyancy gradient 2) we have convective tke now... It seems to be too strong and too inflexible and leads to runaway TKE growth.
+        # # 1. Calculate the normal buoyancy production [[ commenting this part out didn't make the updrafts come back...]]
+        # original_buoy = -aux_en.area[k] * ρ_c[k] * KH[k] * bg.∂b∂z
+        # # 2. Calculate a "buoyancy floor" that ramps up linearly with instability. This single line implements the ramp you described.
+        # min_∂b∂z = FT(1e-5)  # threshold for tke starting to be produced from buoyancy. above this value, we want the buoyancy to be unchanged.
+        # max_∂b∂z = FT(-1e-4) # benchmark value for very strong instability, at this ∂b∂z, we want buoyancy tke production to be at least 1e-2
+        # # buoy_target = FT(1e-2)  # target minimum buoyancy production rate at strong instability
+        # buoy_target = FT(1e-3)  # target minimum buoyancy production rate at strong instability
+        # buoy_floor = (buoy_target / (min_∂b∂z - max_∂b∂z )) * max(FT(0), min_∂b∂z - bg.∂b∂z)        # 3. Apply the floor to ensure a minimum production rate in strong instability
+        # aux_en_2m.tke.buoy[k] = (bg.∂b∂z < min_∂b∂z) ? (ρ_c[k] * aux_en.area[k] * max(original_buoy, buoy_floor)) : original_buoy
 
         # TEMPORARY :: TEST EXTENDING THIS TKE TO THE CELL BELOW SINCE RESOLUTION MIGHT SKEW THINGS
         # aux_en_2m.tke.buoy[k-1] = max(aux_en_2m.tke.buoy[k-1], aux_en_2m.tke.buoy[k]) # prolly will break things at lower resolution... but is useful
@@ -1452,11 +1453,13 @@ function update_N_τ_termvel!(edmf::EDMFModel, state::State, param_set::APS, the
         if (TD.has_condensate(aux_en.q_ice[k]) && aux_en.area[k] > 1e-6) && (aux_en.frac_supersat[k] > FT(0))
             S_k = TD.supersaturation(thermo_params,  TD.PhasePartition(thermo_params, aux_en.ts[k]), ρ_c[k], aux_en.T[k], TD.Ice())
             
-            if edmf.moisture_model isa NonEquilibriumMoisture
-                N_i_cloud_top_ice_en_here = get_INP_concentration(param_set, edmf.moisture_model.scheme, TD.PhasePartition(thermo_params, aux_en.ts[k]), aux_en.T[k], ρ_c[k], w[k])
-            else
-                N_i_cloud_top_ice_en_here = get_N_i_Cooper_curve(aux_en.T[k]; clamp_N=true) # the fallback
-            end
+            N_i_cloud_top_ice_en_here = get_INP_concentration(param_set, edmf.moisture_model.scheme, TD.PhasePartition(thermo_params, aux_en.ts[k]), aux_en.T[k], ρ_c[k], w[k], param_set.user_params.S_ice_min_activation) # if we use S_k we might get 0. we need frac_activation not frac_supersat really.
+
+            # if edmf.moisture_model isa NonEquilibriumMoisture
+            #     N_i_cloud_top_ice_en_here = get_INP_concentration(param_set, edmf.moisture_model.scheme, TD.PhasePartition(thermo_params, aux_en.ts[k]), aux_en.T[k], ρ_c[k], w[k])
+            # else
+            #     N_i_cloud_top_ice_en_here = get_N_i_Cooper_curve(aux_en.T[k]; clamp_N=true) # the fallback
+            # end
             N_i_cloud_top_ice_en_here *= aux_en.frac_supersat[k] # scale by fraction supersat
 
             if N_i_cloud_top_ice_en_here ≥ N_i_cloud_top_ice_en
@@ -1474,10 +1477,6 @@ function update_N_τ_termvel!(edmf::EDMFModel, state::State, param_set::APS, the
                         S_kp1 = TD.supersaturation(thermo_params, TD.PhasePartition(thermo_params, aux_en.ts[k+1]), ρ_c[k+1], aux_en.T[k+1], TD.Ice())
                         T_top_here = linear_interpolate_extrapolate(FT(0), (S_k, S_kp1), (aux_en.T[k], aux_en.T[k+1]))
                         do_print = false
-                        # if rand() < 1e-4
-                        #     @warn "Got T_top = $T_top_here at k=$k with S_k=$S_k and S_kp1=$S_kp1, T_k=$(aux_en.T[k]), T_kp1=$(aux_en.T[k+1])"
-                        #     do_print = true
-                        # end
                         # add noise [so we land somewhere between our interpolation bounds
                         # T_top_here when transformed becomes (aux_en.T[k] + aux_en.T[k+1])/2 in transformed space.
                         # Add noise with 4σ = (aux_en.T[k+1] - aux_en.T[k]) so 95% of the time we stay within bounds. clamp the result to be sure
@@ -1489,11 +1488,12 @@ function update_N_τ_termvel!(edmf::EDMFModel, state::State, param_set::APS, the
                         # end
 
                         # update N_i
-                        if edmf.moisture_model isa NonEquilibriumMoisture
-                            N_i_cloud_top_ice_en_here = get_INP_concentration(param_set, edmf.moisture_model.scheme, TD.PhasePartition(thermo_params, aux_en.ts[k]), T_top_here, ρ_c[k], w[k])
-                        else
-                            N_i_cloud_top_ice_en_here = get_N_i_Cooper_curve(T_top_here; clamp_N=true) # the fallback
-                        end
+                        N_i_cloud_top_ice_en_here = get_INP_concentration(param_set, edmf.moisture_model.scheme, TD.PhasePartition(thermo_params, aux_en.ts[k]), T_top_here, ρ_c[k], w[k], param_set.user_params.S_ice_min_activation) # if we use S_k we might get 0. we need frac_activation not frac_supersat really.
+                        # if edmf.moisture_model isa NonEquilibriumMoisture
+                        #     N_i_cloud_top_ice_en_here = get_INP_concentration(param_set, edmf.moisture_model.scheme, TD.PhasePartition(thermo_params, aux_en.ts[k]), T_top_here, ρ_c[k], w[k])
+                        # else
+                        #     N_i_cloud_top_ice_en_here = get_N_i_Cooper_curve(T_top_here; clamp_N=true) # the fallback
+                        # end
                         if !isfinite(N_i_cloud_top_ice_en_here)
                             @error "cloud_top_ice_T_en is not finite. N_i_cloud_top_ice_en = $N_i_cloud_top_ice_en;"
                         end
@@ -1527,7 +1527,7 @@ function update_N_τ_termvel!(edmf::EDMFModel, state::State, param_set::APS, the
                 if edmf.moisture_model isa NonEquilibriumMoisture
                     # we know w_mean = 0 so we can calulate w_up 
                     w_up = -w[k] * aux_en.area[k] / (1-aux_up[i].area[k] + eps(FT))
-                    N_i_cloud_top_ice_ups_here = get_INP_concentration(param_set, edmf.moisture_model.scheme, TD.PhasePartition(thermo_params, aux_up[i].ts[k]), aux_up[i].T[k], ρ_c[k], w_up)
+                    N_i_cloud_top_ice_ups_here = get_INP_concentration(param_set, edmf.moisture_model.scheme, TD.PhasePartition(thermo_params, aux_up[i].ts[k]), aux_up[i].T[k], ρ_c[k], w_up, param_set.user_params.S_ice_min_activation) # if we use S_k we might get 0. we need frac_activation not frac_supersat really.
                 else
                     N_i_cloud_top_ice_ups_here = get_N_i_Cooper_curve(aux_up[i].T[k]; clamp_N=true) # the fallback
                 end
@@ -1552,7 +1552,7 @@ function update_N_τ_termvel!(edmf::EDMFModel, state::State, param_set::APS, the
 
                             # update N_i
                             if edmf.moisture_model isa NonEquilibriumMoisture
-                                N_i_cloud_top_ice_ups_here = get_INP_concentration(param_set, edmf.moisture_model.scheme, TD.PhasePartition(thermo_params, aux_up[i].ts[k]), T_top_here, ρ_c[k], w_up)
+                                N_i_cloud_top_ice_ups_here = get_INP_concentration(param_set, edmf.moisture_model.scheme, TD.PhasePartition(thermo_params, aux_up[i].ts[k]), T_top_here, ρ_c[k], w_up, param_set.user_params.S_ice_min_activation) # if we use S_k we might get 0. we need frac_activation not frac_supersat really.
                             else
                                 N_i_cloud_top_ice_ups_here = get_N_i_Cooper_curve(T_top_here; clamp_N=true) # the fallback
                             end
@@ -1638,11 +1638,13 @@ function update_N_τ_termvel!(edmf::EDMFModel, state::State, param_set::APS, the
     if (edmf.moisture_model isa NonEquilibriumMoisture) && edmf.moisture_model.heterogeneous_ice_nucleation.use_ice_mult
         @inbounds for k in Base.Iterators.reverse(real_center_indices(grid)) # have to use fully qualified Base.Iterators.reverse(), see Grid.jl for implementation. But we wanna go TOA to SFC since the factor increases w/ depth
             if (prog_pr.q_rai[k] > FT(0)) # drizzle drive both Hallet-Mossop and Droplet Shattering ICNC growth
-                if edmf.moisture_model isa NonEquilibriumMoisture
-                    N_INP = get_INP_concentration(param_set, edmf.moisture_model.scheme, TD.PhasePartition(thermo_params, aux_gm.ts[k]), aux_gm.T[k], ρ_c[k], w[k])
-                else
-                    N_INP = get_N_i_Cooper_curve(aux_gm.T[k]; clamp_N=true)
-                end
+                S_i = TD.supersaturation(thermo_params,  TD.PhasePartition(thermo_params, aux_gm.ts[k]), ρ_c[k], aux_gm.T[k], TD.Ice())
+                N_INP = get_INP_concentration(param_set, edmf.moisture_model.scheme, TD.PhasePartition(thermo_params, aux_gm.ts[k]), aux_gm.T[k], ρ_c[k], w[k], S_i)
+                # if edmf.moisture_model isa NonEquilibriumMoisture
+                #     N_INP = get_INP_concentration(param_set, edmf.moisture_model.scheme, TD.PhasePartition(thermo_params, aux_gm.ts[k]), aux_gm.T[k], ρ_c[k], w[k])
+                # else
+                #     N_INP = get_N_i_Cooper_curve(aux_gm.T[k]; clamp_N=true)
+                # end
 
                 if (ice_mult_factor_candidate = get_ice_mult_factor_ICNC_max(param_set, N_INP, aux_gm.N_i[k], aux_gm.q_ice[k], prog_pr.q_rai[k], prog_pr.q_sno[k], aux_gm.T[k], ρ_c[k])) > ICNC_SIP_scaling_factor
                     ICNC_SIP_scaling_factor = ice_mult_factor_candidate

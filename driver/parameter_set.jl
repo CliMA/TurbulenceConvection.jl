@@ -290,6 +290,24 @@ function create_parameter_set(
     namelist_user_params["massflux_N_i_boost_max_ratio"] =  TC.parse_namelist(namelist, "user_params", "massflux_N_i_boost_max_ratio"; default = 0.7) # this is set no matter what
     namelist_user_params["massflux_N_i_boost_progress_fraction"] =  TC.parse_namelist(namelist, "user_params", "massflux_N_i_boost_progress_fraction"; default = 0.5) # this is set no matter what
     
+    namelist_user_params["S_ice_min_activation"] =  TC.parse_namelist(namelist, "user_params", "S_ice_min_activation"; default = zero(FT)) # this is set no matter what
+
+    # Set default CCN value (should be set in default namelist for SOCRATES)
+
+    if namelist["meta"]["casename"] == "SOCRATES"
+        N_CCNs_default = Dict(
+            1 => 75e6, # 75 / cm^3
+            9 => 190e6, # 190 / cm^3
+            10 => 55e6, # 55 / cm^3
+            11 => 115e6, # 115 / cm^3
+            12 => 210e6, # 210 / cm^3
+            13 => 180e6, # 180 / cm^3
+            )
+        namelist_user_params["N_CCN"] =  TC.parse_namelist(namelist, "user_params", "N_CCN"; default = get(N_CCNs_default, namelist["meta"]["flight_number"], 142e6)) # 142e6 is average of the above
+    else
+        namelist_user_params["N_CCN"] =  TC.parse_namelist(namelist, "user_params", "N_CCN"; default = FT(250*1e6)) # this is set no matter what [[ 142 = sum([75 190 55 210 180]) / 5 from Atlas etal N_d ]]
+    end
+
     # namelist_user_params["use_ice_mult"] =  TC.parse_namelist(namelist, "user_params", "use_ice_mult"; default = true) # this is set no matter what
 
     # If we decide to add this to the calibration... 

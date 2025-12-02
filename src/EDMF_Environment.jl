@@ -314,7 +314,7 @@ function microphysics!(
 
                     q = TD.PhasePartition(thermo_params, ts) # we don't have it cached here but we do in updraft so calculating outside the fcn saves work
                     S_i = TD.supersaturation(thermo_params, q, ρ, T, TD.Ice())
-                    N_INP = get_INP_concentration(param_set, moisture_model.scheme, q, T, ρ, w_region)
+                    N_INP = get_INP_concentration(param_set, moisture_model.scheme, q, T, ρ, w_region, S_i)
 
                     mph_precip_here = precipitation_formation(
                         param_set,
@@ -489,7 +489,7 @@ function microphysics!(
 
                 q = TD.PhasePartition(thermo_params, ts_env[k]) # we don't have it cached here but we do in updraft so calculating outside the fcn saves work
                 S_i = TD.supersaturation(thermo_params, q, ρ_c[k], aux_en.T[k], TD.Ice())
-                N_INP = get_INP_concentration(param_set, moisture_model.scheme, q, aux_en.T[k], ρ_c[k], w[k])
+                N_INP = get_INP_concentration(param_set, moisture_model.scheme, q, aux_en.T[k], ρ_c[k], w[k], S_i)
                 mph_precip = precipitation_formation( # we leave this out of quadrature for now...
                     param_set,
                     moisture_model,
@@ -590,7 +590,7 @@ function microphysics!(
                 ρ = TD.air_density(thermo_params, ts)
                 p = TD.air_pressure(thermo_params, ts)
                 S_i = TD.supersaturation(thermo_params, q, ρ_c[k], ρ, TD.Ice())
-                N_INP = get_INP_concentration(param_set, moisture_model.scheme, q, T, ρ, FT(0)) # Don't need w since it'll just call Cooper)
+                N_INP = get_INP_concentration(param_set, moisture_model.scheme, q, T, ρ, FT(0), S_i)  # Don't need w since it'll just call Cooper)
 
                 mph_precip_here = precipitation_formation(
                     param_set,
@@ -1424,7 +1424,7 @@ function microphysics!(
                 dTdt = aux_tc.dTdt[k],
                 #
                 S_i = (moisture_model isa NonEquilibriumMoisture) ? TD.supersaturation(thermo_params, q, ρ, aux_en.T[k], TD.Ice()) : FT(NaN), # only needed for NonEq
-                N_INP = (moisture_model isa NonEquilibriumMoisture) ? get_INP_concentration(param_set, moisture_model.scheme, q, aux_en.T[k], ρ, w[k]) : FT(NaN), # only needed for NonEq
+                N_INP = (moisture_model isa NonEquilibriumMoisture) ? get_INP_concentration(param_set, moisture_model.scheme, q, aux_en.T[k], ρ, w[k], S_i) : FT(NaN), # only needed for NonEq
                 τ_liq = aux_en.τ_liq[k], # only needed for NonEq
                 τ_ice = aux_en.τ_ice[k], # only needed for NonEq
                 dN_i_dz = aux_en.dN_i_dz[k], # only needed for NonEq
@@ -1574,7 +1574,7 @@ function microphysics!(
                 ρ = TD.air_density(thermo_params, ts)
                 q = TD.PhasePartition(thermo_params, ts_env[k]) # we don't have it cached here but we do in updraft so calculating outside the fcn saves work
                 S_i = TD.supersaturation(thermo_params, q, ρ, aux_en.T[k], TD.Ice())
-                N_INP = get_INP_concentration(param_set, moisture_model.scheme, q, aux_en.T[k], ρ, w[k])
+                N_INP = get_INP_concentration(param_set, moisture_model.scheme, q, aux_en.T[k], ρ, w[k], S_i)
 
                 w_l = (edmf.cloud_sedimentation_model isa CloudSedimentationModel) ? aux_en.term_vel_liq[k] : FT(0)
                 w_i = (edmf.cloud_sedimentation_model isa CloudSedimentationModel) ? aux_en.term_vel_ice[k] : FT(0)
@@ -1823,7 +1823,7 @@ function microphysics_helper(grid::Grid, edmf::EDMFModel, Δt::FT, param_set::AP
 
             q = TD.PhasePartition(thermo_params, ts) # we don't have it cached here but we do in updraft so calculating outside the fcn saves work
             S_i = TD.supersaturation(thermo_params, q, ρ, T, TD.Ice())
-            N_INP = get_INP_concentration(param_set, moisture_model.scheme, q, T, ρ, w)
+            N_INP = get_INP_concentration(param_set, moisture_model.scheme, q, T, ρ, w, S_i)
             
             # autoconversion and accretion
             mph_precip = precipitation_formation(
@@ -1872,7 +1872,7 @@ function microphysics_helper(grid::Grid, edmf::EDMFModel, Δt::FT, param_set::AP
 
             q = TD.PhasePartition(thermo_params, ts) # we don't have it cached here but we do in updraft so calculating outside the fcn saves work
             S_i = TD.supersaturation(thermo_params, q, ρ, T, TD.Ice())
-            N_INP = get_INP_concentration(param_set, moisture_model.scheme, q, T, ρ, w)
+            N_INP = get_INP_concentration(param_set, moisture_model.scheme, q, T, ρ, w, S_i)
 
 
 

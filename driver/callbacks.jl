@@ -690,8 +690,9 @@ function compute_dt_max(state::TC.State, edmf::TC.EDMFModel, dt_max::FT, CFL_lim
             # We are using diffusion
             f_c_m::FT = FT(edmf.convective_tke_handler.ed_scaling_factor) # adjustment to c_m, tke_ed_coeff
             f_K_tke = aux_tc.temporary_1
-            @. f_K_tke = ifelse((aux_en.tke) > 0, sqrt(max((aux_en.tke) - (aux_en.tke_convective), FT(0))) / sqrt((aux_en.tke)), FT(0)) # adjustment factor for K based on convective tke removal (we leave tke in elsewhere to generate covariances... probably should be separated out also lol)
-            
+            # @. f_K_tke = ifelse((aux_en.tke) > 0, sqrt(max((aux_en.tke) - (aux_en.tke_convective), FT(0))) / sqrt((aux_en.tke)), FT(0)) # adjustment factor for K based on convective tke removal (we leave tke in elsewhere to generate covariances... probably should be separated out also lol)
+            @. f_K_tke = FT(1)
+
             c_m = TC.mixing_length_params(edmf).c_m
             Le = TC.mixing_length_params(edmf).Le
             N = aux_tc.temporary_2

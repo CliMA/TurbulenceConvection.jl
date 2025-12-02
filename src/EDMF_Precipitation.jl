@@ -321,25 +321,50 @@ function compute_precipitation_sink_tendencies(
                 ts_bulk = thermo_state_pθq(param_set, p_c[k], aux_bulk.θ_liq_ice[k], aux_bulk.q_tot[k])
             end
             regions = (
-                (aux_bulk.area[k], aux_bulk.T[k], ts_bulk, w0, aux_bulk.N_i[k], TD.vapor_specific_humidity(thermo_params, ts_bulk), f_ql_up*qr, f_qi_up*qs, true), # we don't store bulk ts, so just use grid mean ts (we only really need density)
-                (aux_en.a_cloak_up[k], aux_en.T_cloak_up[k], aux_en.ts_cloak_up[k], w0, aux_en.N_i[k], TD.vapor_specific_humidity(thermo_params, aux_en.ts_cloak_up[k]), f_ql_cup*qr, f_qi_cup*qs, true),
-                (aux_en.a_cloak_dn[k], aux_en.T_cloak_dn[k], aux_en.ts_cloak_dn[k], w0, aux_en.N_i[k], TD.vapor_specific_humidity(thermo_params, aux_en.ts_cloak_dn[k]), f_ql_cdn*qr, f_qi_cdn*qs, false), # all zeroed out
-                (aux_en.a_en_remaining[k], aux_en.T[k], aux_en.ts[k], w0, aux_en.N_i[k], TD.vapor_specific_humidity(thermo_params, aux_en.ts[k]), f_ql_enr*qr, f_qi_enr*qs, false),
+                (aux_bulk.area[k], aux_bulk.T[k], ts_bulk, w0, aux_bulk.N_i[k], TD.vapor_specific_humidity(thermo_params, ts_bulk), f_ql_up*qr, f_qi_up*qs, Bulk), # we don't store bulk ts, so just use grid mean ts (we only really need density)
+                (aux_en.a_cloak_up[k], aux_en.T_cloak_up[k], aux_en.ts_cloak_up[k], w0, aux_en.N_i[k], TD.vapor_specific_humidity(thermo_params, aux_en.ts_cloak_up[k]), f_ql_cup*qr, f_qi_cup*qs, CloakUp),
+                (aux_en.a_cloak_dn[k], aux_en.T_cloak_dn[k], aux_en.ts_cloak_dn[k], w0, aux_en.N_i[k], TD.vapor_specific_humidity(thermo_params, aux_en.ts_cloak_dn[k]), f_ql_cdn*qr, f_qi_cdn*qs, CloakDown),
+                (aux_en.a_en_remaining[k], aux_en.T[k], aux_en.ts[k], w0, aux_en.N_i[k], TD.vapor_specific_humidity(thermo_params, aux_en.ts[k]), f_ql_enr*qr, f_qi_enr*qs, EnvRemaining),
                 # (FT(1), T_gm, ts, w0, aux_gm.N_i[k], qv, qr, qs, false), # testing
             )
         else
-            regions = (
-                (FT(1), T_gm, ts, w0, aux_gm.N_i[k], qv, qr, qs, false), 
-                ) # we don't store gm w, so just use 0
+            if !iszero(edmf.moisture_model.condensate_qt_SD)
+                if edmf.moisture_model isa NonEquilibriumMoisture   
+                    ts_bulk = thermo_state_pθq(param_set, p_c[k], aux_bulk.θ_liq_ice[k], aux_bulk.q_tot[k], aux_bulk.q_liq[k], aux_bulk.q_ice[k])
+                else
+                    ts_bulk = thermo_state_pθq(param_set, p_c[k], aux_bulk.θ_liq_ice[k], aux_bulk.q_tot[k])
+                end
+
+                 regions = (
+                    (aux_bulk.area[k], aux_bulk.T[k], ts_bulk, w0, aux_bulk.N_i[k], qv, prog_pr.q_rai[k], prog_pr.q_sno[k], Bulk ),
+                    (aux_en.area[k], aux_en.T[k], aux_en.ts[k], w0, aux_en.N_i[k], qv, prog_pr.q_rai[k], prog_pr.q_sno[k], Env),
+                    )
+            else
+                regions = (
+                    (FT(1), T_gm, ts, w0, aux_gm.N_i[k], qv, qr, qs, false), 
+                    ) # we don't store gm w, so just use 0
+            end
         end
 
 
         S_qr_evap = FT(0)
         S_qs_melt = FT(0)
         S_qs_sub_dep = FT(0)
-        for (area_region, T_region, ts_region, w, N_i, qv_region, qr_region, qs_region, is_updraft) in regions
+        for (area_region, T_region, ts_region, w, N_i, qv_region, qr_region, qs_region, region) in regions
             ρ_region = TD.air_density(thermo_params, ts_region)
             q_region = TD.PhasePartition(thermo_params, ts_region)
+
+            if region isa EnvDomain
+                if !iszero(edmf.moisture_model.condensate_qt_SD)
+                    # TODO: Consider turning this off for when we are using cloaks.... also set an error in the quadrature branches
+                    q_tot_sd = sqrt(aux_en.QTvar[k])
+                    qt = q_region.tot + edmf.moisture_model.condensate_qt_SD * q_tot_sd
+                    θ = TD.liquid_ice_pottemp(thermo_params, ts_region)
+                    ts_region = (edmf.moisture_model isa NonEquilibriumMoisture) ? thermo_state_pθq(param_set, p_c[k], θ, qt, q_region.liq, q_region.ice) : thermo_state_pθq(param_set, p_c[k], θ, qt)
+                    q_region = TD.PhasePartition(thermo_params, ts_region)
+                end
+            end
+            
 
             # Note if T makes a very low excursion (or too high) , while S*G might mostly cancel and give a real result, you can get NaN from 0 * Inf or something, but I think this is just a legitimate model crash bc those temps are super extreme.
             qvsat_liq = TD.q_vap_saturation_generic(thermo_params, T_region, ρ_region, TD.Liquid()) # we don't have this stored for grid-mean and we can't calculate form en/up bc it's non-linear...
@@ -354,11 +379,14 @@ function compute_precipitation_sink_tendencies(
             S_qs_melt_here = limit_tendency(ptl, -α_melt * CM1.snow_melt(microphys_params, qs_region, ρ_region, T_region), qs_region, Δt) * precip_fraction
 
             # -------------------------- #
-            if edmf.moisture_model isa NonEquilibriumMoisture
-                N_INP = get_INP_concentration(param_set, edmf.moisture_model.scheme, q_region, T_region, ρ_region, w)
-            else
-                N_INP = get_N_i_Cooper_curve(T_region; clamp_N=true)
-            end
+            S_i = TD.supersaturation(thermo_params, q_region, ρ_region, T_region, TD.Ice())
+            N_INP = get_INP_concentration(param_set, edmf.moisture_model.scheme, q_region, T_region, ρ_region, w, S_i)
+            # if edmf.moisture_model isa NonEquilibriumMoisture
+            #     N_INP = get_INP_concentration(param_set, edmf.moisture_model.scheme, q_region, T_region, ρ_region, w, S_i)
+            # else
+            #     # N_INP = get_N_i_Cooper_curve(T_region; clamp_N=true)
+            #     N_INP = get_INP_concentration(param_set, edmf.moisture_model.scheme, q_region, T_region, ρ_region, w, S_i)
+            # end
 
             N_s_min = max(N_INP - N_i, FT(0)) # the fewest N,
             if N_s_min > FT(0) && (qs_region > 1e-9) # we could add dry aerosol mass but we don't know N, # we will do this by varying lambda...
@@ -382,8 +410,7 @@ function compute_precipitation_sink_tendencies(
 
             dv = FT(0)
             # dv += Δt * max(aux_tc.dqvdt[k] * aux_tc.area[k], FT(0)) # hopefully this is ok to just add like this...
-            if is_updraft
-            end
+
             
             # δi *= 10000 # test
 

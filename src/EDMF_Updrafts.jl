@@ -141,7 +141,7 @@ function updraft_microphysics!(
 
             q = TD.PhasePartition(aux_up[i].q_tot[k], aux_up[i].q_liq[k], aux_up[i].q_ice[k])
             S_i = TD.supersaturation(thermo_params, q, ρ_c[k], aux_up[i].T[k], TD.Ice())
-            N_INP = get_INP_concentration(param_set, moisture_model.scheme, q, aux_up[i].T[k], ρ_c[k], w[k])
+            N_INP = get_INP_concentration(param_set, moisture_model.scheme, q, aux_up[i].T[k], ρ_c[k], w[k], S_i)
 
             if moisture_model isa NonEquilibriumMoisture
                 # autoconversion and accretion

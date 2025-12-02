@@ -294,6 +294,8 @@ function other_microphysics_processes(
                 # if (S_i >= 1.08) || (S_i >= 0.999 && T <= 265.15)
                 if (S_i > FT(0)) && (T < TCP.T_freeze(param_set))
 
+
+
                     q_activation = FT(0)
                     N_i_activation = FT(0)
                     N_INP_max = FT(0)
@@ -304,14 +306,19 @@ function other_microphysics_processes(
 
                     # N scales w/ T, do we wanna add an S scaling here? Maybe that's overcomplex...
 
+                    # We dont care about existing N we only want activation if the supersaturation is high. Even if N_NP is high if S_i is low we shouldn't activate more.
+                    r0_activation = FT(10e-6) # 10 μm particle post activation, matches
+                    m0_activation = particle_mass(param_set, ice_type, r0_activation)
+                    scaling_factor = INP_supersaturation_scaling_factor(param_set, S_i, q.ice, FT(Inf)) # never saturation q_ice_threshold so that we are never forced to 1
+                    N_INP_max = get_INP_concentration(param_set, noneq_moisture_scheme, q, T, ρ_c, w, S_i; apply_supersaturation_scaling=false) * scaling_factor
 
                     # Cooper curve: max number of INPs per L, convert to per kg and clamp
-                    if !(noneq_moisture_scheme isa INP_Aware_Timescale)
-                        N_INP_max = get_N_i_Cooper_curve(T; clamp_N=true)
-                        # N_INP_max = clamp(N_INP_max / ρ_c, FT(0), FT(500e3) / ρ_c)
-                    else
-                        N_INP_max = get_INP_concentration(param_set, noneq_moisture_scheme, q, T, ρ_c, w) # get the number of ice nuclei per m³
-                    end
+                    # if !(noneq_moisture_scheme isa INP_Aware_Timescale)
+                    #     # N_INP_max = get_N_i_Cooper_curve(T; clamp_N=true)
+                    #     N_INP_max = get_INP_concentration(param_set, noneq_moisture_scheme, q, T, ρ_c, w, S_i) # get the number of ice nuclei per m³ [[ use this because it has activation controls ]]
+                    # else
+                    #     N_INP_max = get_INP_concentration(param_set, noneq_moisture_scheme, q, T, ρ_c, w, S_i) # get the number of ice nuclei per m³
+                    # end
                     if isnan(N_i) # just assume q / MI0 (actually that's too small, we'll assume r_is...)
                         # N_i = q.ice / m0_activation
                         r_is = CMP.r_ice_snow(microphys_params)

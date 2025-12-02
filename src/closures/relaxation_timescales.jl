@@ -320,7 +320,7 @@ function get_N_i(param_set::APS, relaxation_timescale::RTT, q::TD.PhasePartition
     if get_adjust_ice_N(relaxation_timescale)
         thermo_params = TCP.thermodynamics_params(param_set)
         S_i = TD.supersaturation(thermo_params, q, ρ, T, TD.Ice())
-        N_INP = get_INP_concentration(param_set, relaxation_timescale, q, T, ρ, w)
+        N_INP = get_INP_concentration(param_set, relaxation_timescale, q, T, ρ, w, S_i)
         dNINP_dz = get_dNINP_dz(param_set, relaxation_timescale, T, dTdz) # should this be limited to only when we have ice supersat?
         N_i_from_INP = (relaxation_timescale isa INP_Aware_Timescale)
         N_i = adjust_ice_N(param_set, N_i, N_INP * f_ice_mult, q.ice; ρ = ρ, S_i = S_i, monodisperse = false, decrease_N_if_subsaturated = true, N_INP_top = N_INP_top * f_ice_mult, q_l = q.liq, q_s = q_sno, massflux = massflux, dNINP_dz = dNINP_dz, w_i = w_i, N_i_from_INP = N_i_from_INP, apply_massflux_boost = apply_massflux_boost, apply_sedimentation_boost = apply_sedimentation_boost)
@@ -337,7 +337,7 @@ function get_N_i_and_N_i_no_boost(param_set::APS, relaxation_timescale::RTT, q::
     if get_adjust_ice_N(relaxation_timescale)
         thermo_params = TCP.thermodynamics_params(param_set)
         S_i = TD.supersaturation(thermo_params, q, ρ, T, TD.Ice())
-        N_INP = get_INP_concentration(param_set, relaxation_timescale, q, T, ρ, w)
+        N_INP = get_INP_concentration(param_set, relaxation_timescale, q, T, ρ, w, S_i)
         dNINP_dz = get_dNINP_dz(param_set, relaxation_timescale, T, dTdz) # should this be limited to only when we have ice supersat?
         N_i_from_INP = (relaxation_timescale isa INP_Aware_Timescale)
         N_i = adjust_ice_N(param_set, N_i, N_INP * f_ice_mult, q.ice; ρ = ρ, S_i = S_i, monodisperse = false, decrease_N_if_subsaturated = true, N_INP_top = N_INP_top * f_ice_mult, q_l = q.liq, q_s = q_sno, massflux = massflux, dNINP_dz = dNINP_dz, w_i = w_i, N_i_from_INP = N_i_from_INP, apply_massflux_boost = apply_massflux_boost, apply_sedimentation_boost = apply_sedimentation_boost)
@@ -358,7 +358,7 @@ function get_N_i_raw_and_adjusted(param_set::APS, relaxation_timescale::RTT, q::
     if get_adjust_ice_N(relaxation_timescale)
         thermo_params = TCP.thermodynamics_params(param_set)
         S_i = TD.supersaturation(thermo_params, q, ρ, T, TD.Ice())
-        N_INP = get_INP_concentration(param_set, relaxation_timescale, q, T, ρ, w)
+        N_INP = get_INP_concentration(param_set, relaxation_timescale, q, T, ρ, w, S_i)
         dNINP_dz = get_dNINP_dz(param_set, relaxation_timescale, T, dTdz) # should this be limited to only when we have ice supersat?
         N_i_from_INP = (relaxation_timescale isa INP_Aware_Timescale)
         N_i_adjusted = adjust_ice_N(param_set, N_i, N_INP * f_ice_mult, q.ice; ρ = ρ, S_i = S_i, monodisperse = false, decrease_N_if_subsaturated = true, N_INP_top = N_INP_top * f_ice_mult, q_l = q.liq, q_s = q_sno, massflux = massflux, dNINP_dz = dNINP_dz, w_i = w_i, N_i_from_INP = N_i_from_INP, apply_massflux_boost = apply_massflux_boost, apply_sedimentation_boost = apply_sedimentation_boost)
@@ -377,7 +377,7 @@ function get_N_i_raw_and_adjusted_and_N_i_no_boost(param_set::APS, relaxation_ti
     if get_adjust_ice_N(relaxation_timescale)
         thermo_params = TCP.thermodynamics_params(param_set)
         S_i = TD.supersaturation(thermo_params, q, ρ, T, TD.Ice())
-        N_INP = get_INP_concentration(param_set, relaxation_timescale, q, T, ρ, w)
+        N_INP = get_INP_concentration(param_set, relaxation_timescale, q, T, ρ, w, S_i)
         dNINP_dz = get_dNINP_dz(param_set, relaxation_timescale, T, dTdz) # should this be limited to only when we have ice supersat?
         N_i_from_INP = (relaxation_timescale isa INP_Aware_Timescale)
         N_i_adjusted = adjust_ice_N(param_set, N_i, N_INP * f_ice_mult, q.ice; ρ = ρ, S_i = S_i, monodisperse = false, decrease_N_if_subsaturated = true, N_INP_top = N_INP_top * f_ice_mult, q_l = q.liq, q_s = q_sno, massflux = massflux, dNINP_dz = dNINP_dz, w_i = w_i, N_i_from_INP = N_i_from_INP, apply_massflux_boost = apply_massflux_boost, apply_sedimentation_boost = apply_sedimentation_boost)
@@ -534,7 +534,7 @@ function get_N_i_raw_and_adjusted(param_set::APS, relaxation_timescale::Geometri
     if get_adjust_ice_N(relaxation_timescale)
         thermo_params = TCP.thermodynamics_params(param_set)
         S_i = TD.supersaturation(thermo_params, q, ρ, T, TD.Ice())
-        N_INP = get_INP_concentration(param_set, relaxation_timescale, q, T, ρ, w)
+        N_INP = get_INP_concentration(param_set, relaxation_timescale, q, T, ρ, w, S_i)
         dNINP_dz = get_dNINP_dz(param_set, relaxation_timescale, T, dTdz) # should this be limited to only when we have ice supersat?
         N_i_from_INP = (relaxation_timescale isa INP_Aware_Timescale)
         N_i_adjusted = adjust_ice_N(param_set, N_i, N_INP * f_ice_mult, q.ice; ρ = ρ, S_i = S_i, monodisperse = false, decrease_N_if_subsaturated = true, N_INP_top = N_INP_top * f_ice_mult, q_l = q.liq, q_s = q_sno, massflux = massflux, dNINP_dz = dNINP_dz, w_i = w_i, N_i_from_INP = N_i_from_INP, apply_massflux_boost = apply_massflux_boost, apply_sedimentation_boost = apply_sedimentation_boost)
@@ -552,7 +552,7 @@ function get_N_i_raw_and_adjusted_and_N_i_no_boost(param_set::APS, relaxation_ti
     if get_adjust_ice_N(relaxation_timescale)
         thermo_params = TCP.thermodynamics_params(param_set)
         S_i = TD.supersaturation(thermo_params, q, ρ, T, TD.Ice())
-        N_INP = get_INP_concentration(param_set, relaxation_timescale, q, T, ρ, w)
+        N_INP = get_INP_concentration(param_set, relaxation_timescale, q, T, ρ, w, S_i)
         dNINP_dz = get_dNINP_dz(param_set, relaxation_timescale, T, dTdz) # should this be limited to only when we have ice supersat?
         N_i_from_INP = (relaxation_timescale isa INP_Aware_Timescale)
         N_i_adjusted = adjust_ice_N(param_set, N_i, N_INP * f_ice_mult, q.ice; ρ = ρ, S_i = S_i, monodisperse = false, decrease_N_if_subsaturated = true, N_INP_top = N_INP_top * f_ice_mult, q_l = q.liq, q_s = q_sno, massflux = massflux, dNINP_dz = dNINP_dz, w_i = w_i, N_i_from_INP = N_i_from_INP, apply_massflux_boost = apply_massflux_boost, apply_sedimentation_boost = apply_sedimentation_boost)
@@ -572,12 +572,98 @@ end
 
 # ======================================================================================================================================== #
 
-function get_INP_concentration(param_set::APS, relaxation_timescale::RTT, q::TD.PhasePartition, T::FT, ρ::FT, w::FT) where {FT, RTT <: Union{RelaxToEquilibrium, AbstractRelaxationTimescaleType}}
+function get_INP_concentration(param_set::APS, relaxation_timescale::RTT, q::TD.PhasePartition, T::FT, ρ::FT, w::FT, S_i::FT; apply_supersaturation_scaling::Bool=true) where {FT, RTT <: Union{RelaxToEquilibrium, AbstractRelaxationTimescaleType}}
     # return FT(NaN) # for ansatz where we don't actually predict INP... needed for say ice nucleation.
-    return get_N_i_Cooper_curve(T; clamp_N=true)
+    N_INP = get_N_i_Cooper_curve(T; clamp_N=true)
+    if apply_supersaturation_scaling
+        r0_activation = FT(10e-6) # 10 μm particle post activation, matches https://github.com/DOI-USGS/COAWST/blob/6419fc46d737b9703f31206112ff5fba65be400d/WRF/phys/module_mp_morr_two_moment.F#L1089
+        m0_activation = particle_mass(param_set, ice_type, r0_activation)
+        N_INP *= INP_supersaturation_scaling_factor(param_set, S_i, q.ice, N_INP * m0_activation)
+    end
+    return N_INP
 end
-function get_INP_concentration(param_set::APS, relaxation_timescale::INP_Aware_Timescale, q::TD.PhasePartition, T::FT, ρ::FT, w::FT) where {FT}
-    return get_N_i_raw(param_set, relaxation_timescale, q, T, ρ, w)
+function get_INP_concentration(param_set::APS, relaxation_timescale::INP_Aware_Timescale, q::TD.PhasePartition, T::FT, ρ::FT, w::FT, S_i::FT; apply_supersaturation_scaling::Bool=true) where {FT}
+    N_INP = get_N_i_raw(param_set, relaxation_timescale, q, T, ρ, w)
+    if apply_supersaturation_scaling
+        r0_activation = FT(10e-6) # 10 μm particle post activation, matches
+        m0_activation = particle_mass(param_set, ice_type, r0_activation)
+        N_INP *= INP_supersaturation_scaling_factor(param_set, S_i, q.ice, N_INP * m0_activation)
+    end
+    return N_INP
+end
+
+"""
+    INP_supersaturation_scaling_factor(param_set, S_i, q_i, q_ice_threshold; kwargs...)
+
+Returns a scaling factor [0, 1] for INP concentration by blending two physical constraints:
+1. **Supersaturation Activation**: INPs activate as `S_i` exceeds `S_ice_min_activation` (from `param_set`).
+2. **Ice Feedback Masking**: If cloud ice (`q_i`) is already present, the dependence on `S_i` is reduced. 
+   As `q_i` approaches `q_ice_threshold`, the factor is forced to 1.0 regardless of supersaturation.
+
+# Arguments
+- `param_set`: Struct containing `user_params.S_ice_min_activation`.
+- `S_i`: Current ice supersaturation ratio (or supersaturation, depending on config).
+- `q_i`: Current cloud ice specific humidity.
+- `q_ice_threshold`: The ice concentration at which the scaling factor is forced to 1.0.
+
+# Example Behavior
+(Assuming `S_min = 0.1` and `q_thresh = 1e-4`)
+
+| S_i  | q_i    | Result | Status              |
+|:---- |:------ |:------ |:------------------- |
+| 0.00 | 0.0    | 0.00   | Inactive            |
+| 0.12 | 0.0    | 1.00   | Active (by S_i)     |
+| 0.00 | 5e-5   | 0.50   | Lifted (by Ice)     |
+| 0.00 | 1e-4   | 1.00   | Masked (Full Ice)   |
+"""
+function INP_supersaturation_scaling_factor(
+    param_set::APS, 
+    S_i::FT,
+    q_i::FT,
+    q_ice_threshold::FT; 
+    smooth_fcn::Bool=true, 
+    cutoff::FT = FT(0.9),
+    transition_width_param::FT = FT(9.0)
+    ) where {FT}
+
+    S_min = FT(param_set.user_params.S_ice_min_activation)
+
+    # --- 1. S_i Activation Scaling ---
+    S_start = cutoff * S_min
+    S_width = S_min - S_start 
+
+    scaling_factor = FT(0)
+
+    if !smooth_fcn
+        scaling_factor = clamp((S_i - S_start) / S_width, FT(0), FT(1))
+    else
+        S_mid = (S_start + S_min) / FT(2)
+        k_steep = transition_width_param / S_width
+        scaling_factor = FT(1) / (FT(1) + exp(-k_steep * (S_i - S_mid)))
+    end
+
+    # --- 2. q_i Masking Factor ---
+    q_mask = FT(0)
+
+    # CHECK 1: If we exceeded the threshold (and threshold is not Inf)
+    if q_i >= q_ice_threshold
+        q_mask = FT(1)
+        
+    # CHECK 2: Only calculate smooth curve if we have ice AND a valid finite threshold
+    elseif q_i > FT(0) && isfinite(q_ice_threshold)
+        if !smooth_fcn
+            q_mask = q_i / q_ice_threshold
+        else
+            k_steep_q = transition_width_param / q_ice_threshold
+            q_mid = q_ice_threshold / FT(2)
+            q_mask = FT(1) / (FT(1) + exp(-k_steep_q * (q_i - q_mid)))
+        end
+    end
+
+    # --- 3. Blend ---
+    scaling_factor = scaling_factor + (FT(1) - scaling_factor) * q_mask
+
+    return min(scaling_factor, FT(1))
 end
 
 
@@ -1004,7 +1090,7 @@ function get_Ns(param_set::APS, relaxation_timescale::NeuralNetworkRelaxationTim
         # microphys_params = TCP.microphysics_params(param_set) # hopefully the compiler optimizes this out if it's loaded earlier
         thermo_params = TCP.thermodynamics_params(param_set)
         S_i = TD.supersaturation(thermo_params, q, ρ, T, TD.Ice())
-        N_INP = get_INP_concentration(param_set, relaxation_timescale, q, T, ρ, w)
+        N_INP = get_INP_concentration(param_set, relaxation_timescale, q, T, ρ, w, S_i)
         dNINP_dz = get_dNINP_dz(param_set, relaxation_timescale, T, dTdz) # should this be limited to only when we have ice supersat?
         N_i_from_INP = false
         N_i = adjust_ice_N(param_set, N_i, N_INP * f_ice_mult, q.ice; ρ = ρ, S_i = S_i, monodisperse = false, decrease_N_if_subsaturated = true, N_INP_top = N_INP_top * f_ice_mult, q_l = q.liq, q_s = q_sno, massflux = massflux, dNINP_dz = dNINP_dz, w_i = w_i, N_i_from_INP = N_i_from_INP, apply_massflux_boost = apply_massflux_boost, apply_sedimentation_boost = apply_sedimentation_boost)
@@ -1032,7 +1118,7 @@ function get_Ns_and_N_i_no_boost(param_set::APS, relaxation_timescale::NeuralNet
         # microphys_params = TCP.microphysics_params(param_set) # hopefully the compiler optimizes this out if it's loaded earlier
         thermo_params = TCP.thermodynamics_params(param_set)
         S_i = TD.supersaturation(thermo_params, q, ρ, T, TD.Ice())
-        N_INP = get_INP_concentration(param_set, relaxation_timescale, q, T, ρ, w)
+        N_INP = get_INP_concentration(param_set, relaxation_timescale, q, T, ρ, w, S_i)
         dNINP_dz = get_dNINP_dz(param_set, relaxation_timescale, T, dTdz) # should this be limited to only when we have ice supersat?
         N_i_from_INP = false
         N_i = adjust_ice_N(param_set, N_i, N_INP * f_ice_mult, q.ice; ρ = ρ, S_i = S_i, monodisperse = false, decrease_N_if_subsaturated = true, N_INP_top = N_INP_top * f_ice_mult, q_l = q.liq, q_s = q_sno, massflux = massflux, dNINP_dz = dNINP_dz, w_i = w_i, N_i_from_INP = N_i_from_INP, apply_massflux_boost = apply_massflux_boost, apply_sedimentation_boost = apply_sedimentation_boost)
@@ -1062,7 +1148,7 @@ function get_τs_and_Ns(param_set::APS, microphys_params::ACMP, relaxation_times
     if get_adjust_ice_N(relaxation_timescale)
         thermo_params = TCP.thermodynamics_params(param_set)
         S_i = TD.supersaturation(thermo_params, q, ρ, T, TD.Ice())
-        N_INP = get_INP_concentration(param_set, relaxation_timescale, q, T, ρ, w)
+        N_INP = get_INP_concentration(param_set, relaxation_timescale, q, T, ρ, w, S_i)
         dNINP_dz = get_dNINP_dz(param_set, relaxation_timescale, T, dTdz)
         N_i_from_INP = false
         N_i = adjust_ice_N(param_set, N_i, N_INP * f_ice_mult, q.ice; ρ = ρ, S_i = S_i, monodisperse = false, decrease_N_if_subsaturated = true, N_INP_top = N_INP_top * f_ice_mult, q_l = q.liq, q_s = q_sno, massflux = massflux, w_i = w_i, dNINP_dz = dNINP_dz, N_i_from_INP = N_i_from_INP, apply_massflux_boost = apply_massflux_boost, apply_sedimentation_boost = apply_sedimentation_boost)
@@ -1088,7 +1174,7 @@ function get_τs_and_Ns_and_N_i_no_boost(param_set::APS, microphys_params::ACMP,
     if get_adjust_ice_N(relaxation_timescale)
         thermo_params = TCP.thermodynamics_params(param_set)
         S_i = TD.supersaturation(thermo_params, q, ρ, T, TD.Ice())
-        N_INP = get_INP_concentration(param_set, relaxation_timescale, q, T, ρ, w)
+        N_INP = get_INP_concentration(param_set, relaxation_timescale, q, T, ρ, w, S_i)
         dNINP_dz = get_dNINP_dz(param_set, relaxation_timescale, T, dTdz)
         N_i_from_INP = false
         N_i = adjust_ice_N(param_set, N_i, N_INP * f_ice_mult, q.ice; ρ = ρ, S_i = S_i, monodisperse = false, decrease_N_if_subsaturated = true, N_INP_top = N_INP_top * f_ice_mult, q_l = q.liq, q_s = q_sno, massflux = massflux, w_i = w_i, dNINP_dz = dNINP_dz, N_i_from_INP = N_i_from_INP, apply_massflux_boost = apply_massflux_boost, apply_sedimentation_boost = apply_sedimentation_boost)
