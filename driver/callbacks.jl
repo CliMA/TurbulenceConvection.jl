@@ -751,7 +751,7 @@ function compute_dt_max(state::TC.State, edmf::TC.EDMFModel, dt_max::FT, CFL_lim
 
 
         # --- B. Diffusion ---
-        if !(edmf.convective_tke_handler isa TC.ConvectiveTKE)  # :: Everything Normal :: #
+        if !(edmf.convective_tke_handler isa TC.ConvectiveTKE) # :: Everything Normal :: #
             # --- B. Diffusion (Bidirectional: Check k, k+1, k-1) ---
             # Local K
             K_eff = max(aux_tc.KM[k], aux_tc.KH[k], aux_tc.KQ[k])
@@ -770,7 +770,6 @@ function compute_dt_max(state::TC.State, edmf::TC.EDMFModel, dt_max::FT, CFL_lim
             @. w_conv = sqrt(2*aux_en.tke_convective) # convective velocity scale for advection
 
             if (edmf.convective_tke_handler.transport_tke_by_advection || edmf.convective_tke_handler.transport_conserved_by_advection || edmf.convective_tke_handler.transport_condensed_by_advection) # ::: Any by Advection :: #
-
                 # CFL bi-directional
                 w_adv = max(w_adv, w_conv[k])
                 is_toa && (w_adv = max(w_adv, w_conv[k+1]))
@@ -778,15 +777,21 @@ function compute_dt_max(state::TC.State, edmf::TC.EDMFModel, dt_max::FT, CFL_lim
             end
 
 
-            if (!edmf.convective_tke_handler.transport_conserved_by_advection) || (!edmf.convective_tke_handler.transport_condensed_by_advection) # Amy are diffusion
-                #
-            end
+            # if (!edmf.convective_tke_handler.transport_conserved_by_advection) || (!edmf.convective_tke_handler.transport_condensed_by_advection) # Amy are diffusion
+            #     #
+            # end
 
 
             # Regular Diffusion Calculations
-            K_eff = max(aux_tc.KM[k], aux_tc.KH[k], aux_tc.KQ[k]) * f_K_tke[k]
-            !is_toa && (K_eff = max(K_eff, max(aux_tc.KM[k+1], aux_tc.KH[k+1]/(Prconv[k+1]), aux_tc.KQ[k+1])/(Prconv[k+1]*Le)))
-            !is_surf && (K_eff = max(K_eff, max(aux_tc.KM[k-1], aux_tc.KH[k-1]/(Prconv[k-1]), aux_tc.KQ[k-1])/(Prconv[k-1]*Le)))
+            if (!edmf.convective_tke_handler.transport_tke_by_advection) || (!edmf.convective_tke_handler.transport_conserved_by_advection) || (!edmf.convective_tke_handler.transport_condensed_by_advection) # Amy are diffusion
+                K_eff = max(aux_tc.KM[k], aux_tc.KH[k], aux_tc.KQ[k]) * f_K_tke[k]
+                !is_toa  && (K_eff = max(K_eff, max(aux_tc.KM[k+1], aux_tc.KH[k+1] * f_K_tke[k+1], aux_tc.KQ[k+1] * f_K_tke[k+1])))
+                !is_surf && (K_eff = max(K_eff, max(aux_tc.KM[k-1], aux_tc.KH[k-1] * f_K_tke[k-1], aux_tc.KQ[k-1] * f_K_tke[k-1])))
+            else
+                K_eff = max(aux_tc.KM[k], aux_tc.KH[k], aux_tc.KQ[k])
+                !is_toa && (K_eff = max(K_eff, max(aux_tc.KM[k+1], aux_tc.KH[k+1], aux_tc.KQ[k+1])))
+                !is_surf && (K_eff = max(K_eff, max(aux_tc.KM[k-1], aux_tc.KH[k-1], aux_tc.KQ[k-1])))
+            end
 
             if !edmf.convective_tke_handler.transport_tke_by_advection # ::: [tke] :: # (( See EDMF_Functions.jl ))
                 # @. ρatke_convective_advection = -∇c(wvec(  # This is the flux, F = -ρ * a * K * ∇f(k)
@@ -798,15 +803,15 @@ function compute_dt_max(state::TC.State, edmf::TC.EDMFModel, dt_max::FT, CFL_lim
             end
 
 
-            # so KH is just scaled by f_K_tke
-
-            if use_separate_tke_conserved # ::: [qt, θ]
-                K_eff = max(K_eff, aux_tc.KM[k] * f_c_m * f_K_tke[k] , aux_tc.KH[k] * f_c_m * f_K_tke[k])
-                !is_toa && (K_eff = max(K_eff, aux_tc.KM[k+1] * f_c_m * f_K_tke[k+1] , aux_tc.KH[k+1]/(Prconv[k+1])))
-                !is_surf && (K_eff = max(K_eff, aux_tc.KM[k-1] * f_c_m * f_K_tke[k-1] , aux_tc.KH[k-1]/(Prconv[k-1])))
+            # separate tke acts on conserved vars. here we consider the separate tke part. KHconv = KMconv / Prconv, KQconv = KMconv / (Prconv * Le)
+            if use_separate_tke_conserved  && !edmf.convective_tke_handler.transport_conserved_by_advection # ::: [qt, θ]
+                K_eff = max(K_eff, KMconv[k]/Prconv[k], KMconv[k]/(Prconv[k]*Le))
+                !is_toa && (K_eff = max(K_eff, KMconv[k+1]/Prconv[k+1], KMconv[k+1]/(Prconv[k+1]*Le)))
+                !is_surf && (K_eff = max(K_eff, KMconv[k-1]/Prconv[k-1], KMconv[k-1]/(Prconv[k-1]*Le)))
             end
 
-            if use_separate_tke_condensed # ::: [ql, qr, qi, qs]
+            # separate tke acts on condensed vars. here we consider the separate tke part . KQconv = KMconv / (Prconv * Le)
+            if use_separate_tke_condensed  && !edmf.convective_tke_handler.transport_condensed_by_advection # ::: [ql, qr, qi, qs]
                 K_eff = max(K_eff, KMconv[k])
                 !is_toa && (K_eff = max(K_eff, KMconv[k+1]/(Prconv[k+1]*Le)))
                 !is_surf && (K_eff = max(K_eff, KMconv[k-1]/(Prconv[k-1]*Le)))

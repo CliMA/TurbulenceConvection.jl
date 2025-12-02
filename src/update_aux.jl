@@ -1197,7 +1197,7 @@ function update_aux!(edmf::EDMFModel, state::State, surf::SurfaceBase, param_set
 
         aux_en_2m.tke.buoy[k] = -aux_en.area[k] * ρ_c[k] * KH[k] * bg.∂b∂z
 
-        # I dont think we need this section anymore bc 1) we updated the buoyancy gradient 2) we have convective tke now... It seems to be too strong and too inflexible and leads to runaway TKE growth.
+        # I dont think we need this section anymore bc 1) we updated the buoyancy gradient 2) we have convective tke now... It seems to be too strong and too inflexible and leads to runaway TKE growth. Also doesnt respect latent haeting etc.
         # # 1. Calculate the normal buoyancy production [[ commenting this part out didn't make the updrafts come back...]]
         # original_buoy = -aux_en.area[k] * ρ_c[k] * KH[k] * bg.∂b∂z
         # # 2. Calculate a "buoyancy floor" that ramps up linearly with instability. This single line implements the ramp you described.
