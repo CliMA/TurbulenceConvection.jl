@@ -520,9 +520,9 @@ for flight_number in flight_numbers
 
 
         namelist["turbulence"]["EDMF_PrognosticTKE"]["convective_tke_buoyancy_coeff"] = FT(3)
-        namelist["turbulence"]["EDMF_PrognosticTKE"]["convective_tke_advection_coeff"] = FT(5)
-        # namelist["turbulence"]["EDMF_PrognosticTKE"]["convective_tke_dissipation_coeff"] = FT(10.) # smaller than generation
-        # namelist["turbulence"]["EDMF_PrognosticTKE"]["convective_tke_self_dissipation_coeff"] = FT(0.005) # extra dissipation when tke is convectively generated
+        namelist["turbulence"]["EDMF_PrognosticTKE"]["convective_tke_advection_coeff"] = FT(3)
+        namelist["turbulence"]["EDMF_PrognosticTKE"]["convective_tke_dissipation_coeff"] = FT(0.0005) # smaller than generation
+        namelist["turbulence"]["EDMF_PrognosticTKE"]["convective_tke_self_dissipation_coeff"] = FT(0.005) # extra dissipation when tke is convectively generated
         namelist["turbulence"]["EDMF_PrognosticTKE"]["convective_tke_transport_tke_by_advection"] = true
         namelist["turbulence"]["EDMF_PrognosticTKE"]["convective_tke_transport_conserved_by_advection"] = true
         namelist["turbulence"]["EDMF_PrognosticTKE"]["convective_tke_transport_condensed_by_advection"] = true

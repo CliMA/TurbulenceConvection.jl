@@ -2973,24 +2973,53 @@ function compute_en_tendencies!(
         end
 
 
-        # === dissipation === #
-        ℓ = FT(500) # mixing length for convective tke dissipation
+        # # === dissipation === #
+        # ℓ = FT(500) # mixing length for convective tke dissipation
 
-        # We want this full at 100% area subsat, and ramped down to 0 at f_crit
-        sat_efficiency = aux_tc.temporary_4 # 1 and 2 used above but avail again
-        # @. sat_efficiency = clamp((aux_en.frac_supersat - f_crit) / (one(FT) - f_crit), zero(FT),  one(FT)) # I think this is more ok here since tke is correlated with the saturated part, so only when it's really dry should dissipation kick in...
-        @. sat_efficiency = clamp((f_crit - aux_en.frac_supersat) / f_crit, zero(FT), one(FT))
+        # # We want this full at 100% area subsat, and ramped down to 0 at f_crit
+        # sat_efficiency = aux_tc.temporary_4 # 1 and 2 used above but avail again
+        # # @. sat_efficiency = clamp((aux_en.frac_supersat - f_crit) / (one(FT) - f_crit), zero(FT),  one(FT)) # I think this is more ok here since tke is correlated with the saturated part, so only when it's really dry should dissipation kick in...
+        # @. sat_efficiency = clamp((f_crit - aux_en.frac_supersat) / f_crit, zero(FT), one(FT))
 
 
-        # dissipation due to stability [[ should we use MSE for static stability? part of me also feels like we should be using moist static energy here since it's actually constant in the cloud but idk.... ]]
+        # # dissipation due to stability [[ should we use MSE for static stability? part of me also feels like we should be using moist static energy here since it's actually constant in the cloud but idk.... ]]
+        # ρatke_convective_dissipation = aux_en.tke_convective_dissipation # for some reason these have ρa in ρatke but are named this way so we follow
+        # k_diss::FT = edmf.convective_tke_handler.dissipation_coeff
+        # # @. ρatke_convective_dissipation = max(k_diss * -instability / (g/(c_p * aux_en.T)), 0)^2  * (ρatke_convective/(ρ_c * area_en))^(3/2) / ℓ * ρ_c * area_en # dissipation  goes as tke^(3/2)/l, normalize by g/(c_p T_0) to get more favorable (energy) units
+        # @. ρatke_convective_dissipation = max(k_diss * stability / (g/(c_p * aux_en.T)), 0)^2 * sat_efficiency * (ρatke_convective/(ρ_c * area_en))^(3/2) / ℓ * ρ_c * area_en # dissipation  goes as tke^(3/2)/l, normalize by g/(c_p T_0) to get more favorable (energy) units
+
+        # # self dissipation [[ calculated in  `compute_covariance_dissipation()`.. we apply here or else tke can build up for the entire run if it's not advected away ]]
+        # k_self_diss::FT = edmf.convective_tke_handler.self_dissipation_coeff
+        # @. ρatke_convective_dissipation += k_self_diss * ρ_c * area_en * max( (ρatke_convective/(ρ_c * area_en)), 0)^FT(3/2) / ℓ # should have mixing_length maybe 1000+ . For them, c_d was < 1 so this made dissipation smaller... unclear where our c_d lands... but it's bigger but we want less disipation I think..
+
+        # === Dissipation (Split Physical Closures) === #
         ρatke_convective_dissipation = aux_en.tke_convective_dissipation # for some reason these have ρa in ρatke but are named this way so we follow
-        k_diss::FT = edmf.convective_tke_handler.dissipation_coeff
-        # @. ρatke_convective_dissipation = max(k_diss * -instability / (g/(c_p * aux_en.T)), 0)^2  * (ρatke_convective/(ρ_c * area_en))^(3/2) / ℓ * ρ_c * area_en # dissipation  goes as tke^(3/2)/l, normalize by g/(c_p T_0) to get more favorable (energy) units
-        @. ρatke_convective_dissipation = max(k_diss * stability / (g/(c_p * aux_en.T)), 0)^2 * sat_efficiency * (ρatke_convective/(ρ_c * area_en))^(3/2) / ℓ * ρ_c * area_en # dissipation  goes as tke^(3/2)/l, normalize by g/(c_p T_0) to get more favorable (energy) units
 
-        # self dissipation [[ calculated in  `compute_covariance_dissipation()`.. we apply here or else tke can build up for the entire run if it's not advected away ]]
-        k_self_diss::FT = edmf.convective_tke_handler.self_dissipation_coeff
-        @. ρatke_convective_dissipation += k_self_diss * ρ_c * area_en * max( (ρatke_convective/(ρ_c * area_en)), 0)^FT(3/2) / ℓ # should have mixing_length maybe 1000+ . For them, c_d was < 1 so this made dissipation smaller... unclear where our c_d lands... but it's bigger but we want less disipation I think..
+        # 1. Constants & Coefficients
+        ℓ_mix = FT(500.0)
+        k_self_diss = edmf.convective_tke_handler.self_dissipation_coeff # Controls Viscous Drag
+        k_diss      = edmf.convective_tke_handler.dissipation_coeff      # Controls Stability Damping
+
+        # 2. Calculate Dissipation (Fully Fused)
+        #    Inputs: w_convective (√2k), ∂b∂z (N^2)
+        #    Formula: ε = (Drag + Buoyancy) * Mass
+        #
+        #    Term 1 (Drag): k_self_diss * (k^1.5 / ℓ)
+        #    Term 2 (Buoy): k_diss * k * N
+        #
+        #    (Using identity: k = 0.5 * w^2)
+        
+        @. ρatke_convective_dissipation = (ρ_c * area_en) * (0.5 * w_convective^2) * (
+            # A. Viscous Drag (Inertial Cascade)
+            #    Scales with w / ℓ
+            (k_self_diss * (w_convective / sqrt(FT(2))) / ℓ_mix) +
+            
+            # B. Buoyancy Penalty (Gravity Work)
+            #    Scales with N (independent of ℓ)
+            (k_diss * sqrt(max(aux_tc.∂b∂z, 0)))
+        )
+
+
 
         # -- limit production to enforce tke max -- #
         # limit production and net if we're exceeding tke max (smooth limiter that ramps on as we exceed tke max)
