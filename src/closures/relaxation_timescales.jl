@@ -602,6 +602,9 @@ function get_INP_concentration(param_set::APS, relaxation_timescale::INP_Aware_T
         r0_activation = FT(10e-6) # 10 μm particle post activation, matches
         m0_activation = particle_mass(param_set, ice_type, r0_activation)
         N_INP *= INP_supersaturation_scaling_factor(param_set, S_i, q.ice, N_INP * m0_activation)
+        if !isfinite(N_INP)
+            error("N_INP = $N_INP not finite, N_INP_raw was $(get_N_i_raw(param_set, relaxation_timescale, q, T, ρ, w)); scaling_factor was $(INP_supersaturation_scaling_factor(param_set, S_i, q.ice, N_INP * m0_activation)); inputs were T=$T, ρ=$ρ, w=$w, S_i=$S_i, q_ice=$(q.ice)")
+        end
     end
     return N_INP
 end
@@ -643,17 +646,32 @@ function INP_supersaturation_scaling_factor(
     S_min = FT(param_set.user_params.S_ice_min_activation)
 
     # --- 1. S_i Activation Scaling ---
-    S_start = cutoff * S_min
-    S_width = S_min - S_start 
+    # SHORTCUT: If activation threshold is 0, use a step function
+    if S_min ≤ zero(FT)
+        # Safety check: Parameter cannot be negative
+        if (S_min < zero(FT))
+            error("S_ice_min_activation cannot be negative")
+        end
+        
+        # Step function: 1.0 if supersaturated, 0.0 if subsaturated
+        scaling_factor = (S_i ≥ zero(FT)) ? one(FT) : zero(FT)
 
-    scaling_factor = FT(0)
-
-    if !smooth_fcn
-        scaling_factor = clamp((S_i - S_start) / S_width, FT(0), FT(1))
     else
-        S_mid = (S_start + S_min) / FT(2)
-        k_steep = transition_width_param / S_width
-        scaling_factor = FT(1) / (FT(1) + exp(-k_steep * (S_i - S_mid)))
+        # STANDARD: Calculate smooth transition or linear clamp
+
+        # --- 1. S_i Activation Scaling ---
+        S_start = cutoff * S_min
+        S_width = S_min - S_start 
+
+        scaling_factor = FT(0)
+
+        if !smooth_fcn
+            scaling_factor = clamp((S_i - S_start) / S_width, FT(0), FT(1))
+        else
+            S_mid = (S_start + S_min) / FT(2)
+            k_steep = transition_width_param / S_width
+            scaling_factor = FT(1) / (FT(1) + exp(-k_steep * (S_i - S_mid)))
+        end
     end
 
     # --- 2. q_i Masking Factor ---

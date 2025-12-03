@@ -1453,7 +1453,7 @@ function update_N_τ_termvel!(edmf::EDMFModel, state::State, param_set::APS, the
         if (TD.has_condensate(aux_en.q_ice[k]) && aux_en.area[k] > 1e-6) && (aux_en.frac_supersat[k] > FT(0))
             S_k = TD.supersaturation(thermo_params,  TD.PhasePartition(thermo_params, aux_en.ts[k]), ρ_c[k], aux_en.T[k], TD.Ice())
             
-            N_i_cloud_top_ice_en_here = get_INP_concentration(param_set, edmf.moisture_model.scheme, TD.PhasePartition(thermo_params, aux_en.ts[k]), aux_en.T[k], ρ_c[k], w[k], param_set.user_params.S_ice_min_activation) # if we use S_k we might get 0. we need frac_activation not frac_supersat really.
+            N_i_cloud_top_ice_en_here = get_INP_concentration(param_set, edmf.moisture_model.scheme, TD.PhasePartition(thermo_params, aux_en.ts[k]), aux_en.T[k], ρ_c[k], w[k], S_k) # if we use S_k we might get 0. we need frac_activation not frac_supersat really.
 
             # if edmf.moisture_model isa NonEquilibriumMoisture
             #     N_i_cloud_top_ice_en_here = get_INP_concentration(param_set, edmf.moisture_model.scheme, TD.PhasePartition(thermo_params, aux_en.ts[k]), aux_en.T[k], ρ_c[k], w[k])
@@ -1473,7 +1473,7 @@ function update_N_τ_termvel!(edmf::EDMFModel, state::State, param_set::APS, the
                     # S_kp1 = TD.supersaturation(thermo_params, TD.PhasePartition(thermo_params, aux_en.ts[k+1]), ρ_c[k+1], aux_en.T[k+1], TD.Ice())
                     frac_supersat_kp1 = aux_en.frac_supersat[k+1]
                     # T_top = if (S_kp1 < FT(0))
-                    T_top = if (frac_supersat_kp1 == FT(0))
+                    T_top = if iszero(frac_supersat_kp1)
                         S_kp1 = TD.supersaturation(thermo_params, TD.PhasePartition(thermo_params, aux_en.ts[k+1]), ρ_c[k+1], aux_en.T[k+1], TD.Ice())
                         T_top_here = linear_interpolate_extrapolate(FT(0), (S_k, S_kp1), (aux_en.T[k], aux_en.T[k+1]))
                         do_print = false
@@ -1488,14 +1488,16 @@ function update_N_τ_termvel!(edmf::EDMFModel, state::State, param_set::APS, the
                         # end
 
                         # update N_i
-                        N_i_cloud_top_ice_en_here = get_INP_concentration(param_set, edmf.moisture_model.scheme, TD.PhasePartition(thermo_params, aux_en.ts[k]), T_top_here, ρ_c[k], w[k], param_set.user_params.S_ice_min_activation) # if we use S_k we might get 0. we need frac_activation not frac_supersat really.
+                        N_i_cloud_top_ice_en_here_candidate = get_INP_concentration(param_set, edmf.moisture_model.scheme, TD.PhasePartition(thermo_params, aux_en.ts[k]), T_top_here, ρ_c[k], w[k], FT(0)) # if we use S_k we might get 0. we need frac_activation not frac_supersat really.
+                        N_i_cloud_top_ice_en_here = max(N_i_cloud_top_ice_en_here, N_i_cloud_top_ice_en_here_candidate)
+
                         # if edmf.moisture_model isa NonEquilibriumMoisture
                         #     N_i_cloud_top_ice_en_here = get_INP_concentration(param_set, edmf.moisture_model.scheme, TD.PhasePartition(thermo_params, aux_en.ts[k]), T_top_here, ρ_c[k], w[k])
                         # else
                         #     N_i_cloud_top_ice_en_here = get_N_i_Cooper_curve(T_top_here; clamp_N=true) # the fallback
                         # end
                         if !isfinite(N_i_cloud_top_ice_en_here)
-                            @error "cloud_top_ice_T_en is not finite. N_i_cloud_top_ice_en = $N_i_cloud_top_ice_en;"
+                            @error "cloud_top_ice_T_en $cloud_top_ice_T_en is not finite. N_i_cloud_top_ice_en = $N_i_cloud_top_ice_en; N_i_cloud_top_ice_en_here = $N_i_cloud_top_ice_en_here; k=$k; S_k=$S_k; T_top_here=$T_top_here"
                         end
                         N_i_cloud_top_ice_en_here = max(N_i_cloud_top_ice_en_here, N_i_cloud_top_ice_en)
                         N_i_cloud_top_ice_en = N_i_cloud_top_ice_en_here
@@ -1527,7 +1529,7 @@ function update_N_τ_termvel!(edmf::EDMFModel, state::State, param_set::APS, the
                 if edmf.moisture_model isa NonEquilibriumMoisture
                     # we know w_mean = 0 so we can calulate w_up 
                     w_up = -w[k] * aux_en.area[k] / (1-aux_up[i].area[k] + eps(FT))
-                    N_i_cloud_top_ice_ups_here = get_INP_concentration(param_set, edmf.moisture_model.scheme, TD.PhasePartition(thermo_params, aux_up[i].ts[k]), aux_up[i].T[k], ρ_c[k], w_up, param_set.user_params.S_ice_min_activation) # if we use S_k we might get 0. we need frac_activation not frac_supersat really.
+                    N_i_cloud_top_ice_ups_here = get_INP_concentration(param_set, edmf.moisture_model.scheme, TD.PhasePartition(thermo_params, aux_up[i].ts[k]), aux_up[i].T[k], ρ_c[k], w_up, S_k) # if we use S_k we might get 0. we need frac_activation not frac_supersat really.
                 else
                     N_i_cloud_top_ice_ups_here = get_N_i_Cooper_curve(aux_up[i].T[k]; clamp_N=true) # the fallback
                 end
@@ -1551,11 +1553,13 @@ function update_N_τ_termvel!(edmf::EDMFModel, state::State, param_set::APS, the
                             T_top_here = transform_T(T_top_transformed, aux_up[i].T[k], aux_up[i].T[k+1], T_top_here; inverse=true)
 
                             # update N_i
-                            if edmf.moisture_model isa NonEquilibriumMoisture
-                                N_i_cloud_top_ice_ups_here = get_INP_concentration(param_set, edmf.moisture_model.scheme, TD.PhasePartition(thermo_params, aux_up[i].ts[k]), T_top_here, ρ_c[k], w_up, param_set.user_params.S_ice_min_activation) # if we use S_k we might get 0. we need frac_activation not frac_supersat really.
-                            else
-                                N_i_cloud_top_ice_ups_here = get_N_i_Cooper_curve(T_top_here; clamp_N=true) # the fallback
-                            end
+                            N_i_cloud_top_ice_ups_here_candidate = get_INP_concentration(param_set, edmf.moisture_model.scheme, TD.PhasePartition(thermo_params, aux_up[i].ts[k]), T_top_here, ρ_c[k], w_up, FT(0)) # if we use S_k we might get 0. we need frac_activation not frac_supersat really.
+                            N_i_cloud_top_ice_ups_here = max(N_i_cloud_top_ice_ups_here, N_i_cloud_top_ice_ups_here_candidate)
+                            # if edmf.moisture_model isa NonEquilibriumMoisture
+                            #     N_i_cloud_top_ice_ups_here = max(N_i_cloud_top_ice_ups_here, get_INP_concentration(param_set, edmf.moisture_model.scheme, TD.PhasePartition(thermo_params, aux_up[i].ts[k]), T_top_here, ρ_c[k], w_up, FT(0))) # if we use S_k we might get 0. we need frac_activation not frac_supersat really.
+                            # else
+                            #     N_i_cloud_top_ice_ups_here = get_N_i_Cooper_curve(T_top_here; clamp_N=true) # the fallback
+                            # end
                             N_i_cloud_top_ice_ups_here = max(N_i_cloud_top_ice_ups_here, N_i_cloud_top_ice_ups[i])
                             N_i_cloud_top_ice_ups[i] = N_i_cloud_top_ice_ups_here
 
