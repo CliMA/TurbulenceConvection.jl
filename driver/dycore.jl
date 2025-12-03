@@ -113,10 +113,8 @@ end
 
 function set_thermo_state_from_prog!(state::TC.State, moisture_model::TC.AbstractMoistureModel, param_set::APS)
     grid = TC.Grid(state)
-    thermo_params = TCP.thermodynamics_params(param_set)
     ts_gm = TC.center_aux_grid_mean(state).ts
     prog_gm = TC.center_prog_grid_mean(state)
-    prog_gm_f = TC.face_prog_grid_mean(state)
     aux_gm = TC.center_aux_grid_mean(state)
     p_c = aux_gm.p
     ρ_c = prog_gm.ρ
@@ -149,11 +147,11 @@ function set_thermo_state_from_aux!(state, moisture_model, param_set)
         elseif moisture_model isa TC.NonEquilibriumMoisture
             # (prog_gm.q_liq[k], prog_gm.q_ice[k])
             (aux_gm.q_liq[k], aux_gm.q_ice[k])
+            prog_gm.q_liq[k] = aux_gm.q_liq[k] # make sure they agree
+            prog_gm.q_ice[k] = aux_gm.q_ice[k] # make sure they agree
         else
             error("Something went wrong. The moisture_model options are equilibrium or nonequilibrium")
         end
-        prog_gm.q_liq[k] = aux_gm.q_liq[k] # make sure they agree
-        prog_gm.q_ice[k] = aux_gm.q_ice[k] # make sure they agree
         ts_gm[k] = TC.thermo_state_pθq(param_set, p_c[k], aux_gm.θ_liq_ice[k], aux_gm.q_tot[k], thermo_args...)
     end
     return nothing

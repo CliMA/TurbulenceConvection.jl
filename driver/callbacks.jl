@@ -1036,7 +1036,7 @@ function monitor_cfl_detailed!(state, edmf, Δt, CFL_limit)
                 term_vel = term_vel_rain[k + 1]
                 species = "rain"
                 q = prog_pr.q_rai[k + 1]
-                q_liq, q_ice = prog_gm.q_liq[k + 1], prog_gm.q_ice[k + 1]
+                q_liq, q_ice = (edmf.moisture_model isa TC.NonEquilibriumMoisture) ? (prog_gm.q_liq[k + 1], prog_gm.q_ice[k + 1]) : (aux_gm.q_liq[k + 1], aux_gm.q_ice[k + 1])
                 q_tot = aux_gm.q_tot[k + 1]
                 q_tot_up, q_liq_up, q_ice_up = aux_bulk.q_tot[k + 1], aux_bulk.q_liq[k + 1], aux_bulk.q_ice[k + 1]
                 q_tot_env, q_liq_env, q_ice_env = aux_en.q_tot[k + 1], aux_en.q_liq[k + 1], aux_en.q_ice[k + 1]
@@ -1046,7 +1046,7 @@ function monitor_cfl_detailed!(state, edmf, Δt, CFL_limit)
                 term_vel = term_vel_rain[k]
                 species = "rain"
                 q = prog_pr.q_rai[k]
-                q_liq, q_ice = prog_gm.q_liq[k], prog_gm.q_ice[k]
+                q_liq, q_ice = (edmf.moisture_model isa TC.NonEquilibriumMoisture) ? (prog_gm.q_liq[k], prog_gm.q_ice[k]) : (aux_gm.q_liq[k], aux_gm.q_ice[k])
                 q_tot = aux_gm.q_tot[k]
                 q_tot_up, q_liq_up, q_ice_up = aux_bulk.q_tot[k], aux_bulk.q_liq[k], aux_bulk.q_ice[k]
                 q_tot_env, q_liq_env, q_ice_env = aux_en.q_tot[k], aux_en.q_liq[k], aux_en.q_ice[k]
@@ -1056,7 +1056,7 @@ function monitor_cfl_detailed!(state, edmf, Δt, CFL_limit)
                 term_vel = term_vel_snow[k + 1]
                 species = "snow"
                 q = prog_pr.q_sno[k + 1]
-                q_liq, q_ice = prog_gm.q_liq[k + 1], prog_gm.q_ice[k + 1]
+                q_liq, q_ice = (edmf.moisture_model isa TC.NonEquilibriumMoisture) ? (prog_gm.q_liq[k + 1], prog_gm.q_ice[k + 1]) : (aux_gm.q_liq[k + 1], aux_gm.q_ice[k + 1])
                 q_tot = aux_gm.q_tot[k + 1]
                 q_tot_up, q_liq_up, q_ice_up = aux_bulk.q_tot[k + 1], aux_bulk.q_liq[k + 1], aux_bulk.q_ice[k + 1]
                 q_tot_env, q_liq_env, q_ice_env = aux_en.q_tot[k + 1], aux_en.q_liq[k + 1], aux_en.q_ice[k + 1]
@@ -1066,7 +1066,7 @@ function monitor_cfl_detailed!(state, edmf, Δt, CFL_limit)
                 term_vel = term_vel_snow[k]
                 species = "snow"
                 q = prog_pr.q_sno[k]
-                q_liq, q_ice = prog_gm.q_liq[k], prog_gm.q_ice[k]
+                q_liq, q_ice = (edmf.moisture_model isa TC.NonEquilibriumMoisture) ? (prog_gm.q_liq[k], prog_gm.q_ice[k]) : (aux_gm.q_liq[k], aux_gm.q_ice[k])
                 q_tot_up, q_liq_up, q_ice_up = aux_bulk.q_tot[k], aux_bulk.q_liq[k], aux_bulk.q_ice[k]
                 q_tot_env, q_liq_env, q_ice_env = aux_en.q_tot[k], aux_en.q_liq[k], aux_en.q_ice[k]
                 updraft_area = aux_bulk.area[k]

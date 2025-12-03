@@ -331,6 +331,13 @@ function initialize(sim::Simulation1d)
             end
         end
         Cases.initialize_profiles(case, param_set, state; aux_data_kwarg...)
+        if edmf.moisture_model isa TC.NonEquilibriumMoisture
+            # we also added machinery to set this in `set_thermo_state_from_aux!()` but this is a good thing to have here since we don't pass edmf to initialize_profiles()
+            prog_gm = TC.center_prog_grid_mean(state)
+            aux_gm = TC.center_aux_grid_mean(state)
+            @. prog_gm.q_liq = aux_gm.q_liq
+            @. prog_gm.q_ice = aux_gm.q_ice
+        end
         set_thermo_state_from_aux!(state, edmf.moisture_model, param_set)
         set_grid_mean_from_thermo_state!(param_set, state)
         assign_thermo_aux!(state, param_set)

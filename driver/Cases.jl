@@ -1425,13 +1425,11 @@ function initialize_profiles(case::SOCRATES, param_set, state; kwargs...) # Reli
         #= sat adjust (no ice) for initialization =# 
         # to avoid high supersat messing with liq and ice activation [[ LES is sat adjust so]] :: Now that buoyancy gradient and convective tke are fixed, we're not relying on that initial shock anymore
         ts_eq_liq = TC.PhaseEquil_pθq_given_liquid_fraction(thermo_params, aux_gm.p[k], aux_gm.θ_liq_ice[k], aux_gm.q_tot[k], one(FT)) # assme 1 liquid fraction....
-        aux_gm.q_liq[k] = TC.liquid_specific_humidity_given_liquid_fraction(thermo_params, ts_eq_liq, one(FT))
-        prog_gm.q_liq[k] = aux_gm.q_liq[k]
-        # aux_gm.q_ice[k] = FT(0)
-        # prog_gm.q_ice[k] = FT(0)
+        aux_gm.q_liq[k] = TC.liquid_specific_humidity_given_liquid_fraction(thermo_params, ts_eq_liq, one(FT)) # can't set prog here because we dont know moisture model
+        # aux_gm.q_ice[k] = FT(0) # can't set prog here because we dont know moisture model
 
         #=
-            Initializing tke as 0 is bad becaue it prevents further tke generation, since buoyancy tke production is tied to tke existence (not sure it has to be that way)
+            Initializing tke as 0 is bad because it prevents further tke generation, since buoyancy tke production is tied to tke existence (not sure it has to be that way)
             We have a couple options. Atlas LES suggests TKE peaks about about 2 m²/s² near cloud top for RF09, but we can try mediate based on stability... idk
         =#
         aux_gm.tke[k] = FT(1) 
