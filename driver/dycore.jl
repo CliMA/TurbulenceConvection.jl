@@ -146,9 +146,9 @@ function set_thermo_state_from_aux!(state, moisture_model, param_set)
             ()
         elseif moisture_model isa TC.NonEquilibriumMoisture
             # (prog_gm.q_liq[k], prog_gm.q_ice[k])
-            (aux_gm.q_liq[k], aux_gm.q_ice[k])
             prog_gm.q_liq[k] = aux_gm.q_liq[k] # make sure they agree
             prog_gm.q_ice[k] = aux_gm.q_ice[k] # make sure they agree
+            (aux_gm.q_liq[k], aux_gm.q_ice[k])
         else
             error("Something went wrong. The moisture_model options are equilibrium or nonequilibrium")
         end
