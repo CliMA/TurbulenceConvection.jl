@@ -1,0 +1,455 @@
+
+FT = Float64
+forcing_type = :obs_data
+flight_numbers = 9
+CEDMF_dir = expanduser("~/Research_Schneider/CliMA/CalibrateEDMF.jl")
+
+
+# convert flight_number to array if it's not already
+if isa(flight_numbers, Int)
+    flight_numbers = [flight_numbers]
+end
+if forcing_type === :obs_data
+    forcing_str = "Obs"
+elseif forcing_type === :ERA5_data
+    forcing_str = "ERA5"
+else
+    error("forcing_type must be :obs_data or :ERA5_data")
+end
+# nonequilibrium_moisture_scheme = :geometric_liq__exponential_T_scaling_and_geometric_ice
+nonequilibrium_moisture_scheme = :geometric_liq__exponential_T_scaling_ice
+# nonequilibrium_moisture_scheme = :exponential_T_scaling_ice
+dt_string = "adapt_dt__dt_min_5.0__dt_max_10.0"
+method = "best_particle_final"
+flight_number = 9
+case_name = "SOCRATES_RF" * string(flight_number, pad = 2) * "_" * lowercase(forcing_str) * "_data" # can't recall why it's lower here lol
+namelist_path = joinpath(CEDMF_dir, "experiments", "SOCRATES_postprocess_runs_storage", "subexperiments","SOCRATES_"*string(nonequilibrium_moisture_scheme), "Calibrate_and_Run", "tau_autoconv_noneq", dt_string, "iwp_mean__lwp_mean__qi_mean__qip_mean__ql_mean__qr_mean", "postprocessing", "output", "Atlas_LES", "RFAll_obs", method, "data", "Output.$case_name.1_1", "namelist_SOCRATES.in")
+namelist = JSON.parsefile(namelist_path, dicttype = Dict, inttype = Int64, null = FT(NaN))
+namelist["meta"]["forcing_type"] = Symbol(namelist["meta"]["forcing_type"]) # this gets messed up for some reason...
+default_namelist = default_namelist = NameList.default_namelist(case_name)
+NameList.convert_namelist_types_to_default!(namelist, default_namelist) # coerce remaining type
+print(namelist_path)
+
+
+
+
+
+
+using Revise; import Pkg; import TurbulenceConvection 
+FT = Float64; CP = TC.CP; NameList = TC.NameList; APS = TC.APS; TD = TC.TD; create_parameter_set = TC.create_parameter_set
+Pkg.activate(expanduser("~/Research_Schneider/CliMA/TurbulenceConvection.jl/integration_tests/"))
+# using OrderedCollections: OrderedCollections # is only available from /integration_tests/ so we have to load it here
+# Pkg.activate(expanduser("~/Research_Schneider/CliMA/TurbulenceConvection.jl/"))
+tc_dir = expanduser("~/Research_Schneider/CliMA/TurbulenceConvection.jl")
+Pkg.activate(expanduser("~/Research_Schneider/CliMA/TurbulenceConvection.jl/integration_tests/"))
+# include(expanduser("~/Research_Schneider/CliMA/TurbulenceConvection.jl/src/TurbulenceConvection.jl")) 
+# using ForwardDiff # for netcdf.io
+include(joinpath(tc_dir, "driver", "NetCDFIO.jl"))
+include(joinpath(tc_dir, "driver", "generate_namelist.jl"))
+include(joinpath(tc_dir, "driver", "Cases.jl"))
+include(joinpath(tc_dir, "driver", "parameter_set.jl"))
+include(joinpath(tc_dir, "driver", "dycore.jl"))
+toml_dict = CP.create_toml_dict(FT; dict_type = "alias")
+namelist = NameList.default_namelist("SOCRATES_RF09_Obs_data"; write = false) # we don't need a directory
+# namelist["root"] = thisdir
+# namelist["output"]["output_root"] = thisdir
+namelist["meta"] = Dict("simname" => "test_mm_2015", "uuid" => "")
+
+param_set = create_parameter_set(namelist, toml_dict, FT) # this creates an override file in  a directory we don' need...
+thermo_params = TCP.thermodynamics_params(param_set)
+
+
+qi_tendency_sub_dep = 1.; qi =  1e-6; N = 200.; ρ = 1.; ql=FT(0); N_INP = 300.; q_s = 1e-5; μ = FT(0); Δt_factor = 1.; p_c = 1e5; ρ_c = 1.;
+Thermodynamics = TC.TD; Thermodynamics.PhasePartition{FT}(qt, ql, qi) where FT = Thermodynamics.PhasePartition(FT(qt), FT(ql), FT(qi))
+q = TD.PhasePartition{Float64}(0.0049504728062363, ql, qi);
+new_N_i = TC.adjust_ice_N(param_set, N, N_INP, q.ice; ρ=ρ, S_i=FT(0.05), q_l=ql, q_s=q_s, monodisperse=false, ice_type=TC.ice_type, decrease_N_if_subsaturated=true, N_INP_top=FT(150.))
+
+S_ql = 1.5740282460754777e-6; S_qi = 8.837601096511839e-8; area = 0.049966362669001334; ρ = 1.4607008779607433; p = 74651.29711651805; T = 178.1058319793084; w = 0.018706561325269898; τ_liq = 6.656910134239524e-9; τ_ice = 0.14858242869377136; q_vap = 5.095529671220612e-10; q = Thermodynamics.PhasePartition{Float64}(0.00020172170899797012, 5.7675685444915575e-9, 0.0002017154318764585); q_eq = Thermodynamics.PhasePartition{Float64}(0.00020172170899797012, 7.545234665120191e-8, 2.9644619882828738e-8); Δt = 0.007696511708622092; ts = Thermodynamics.PhaseNonEquil{Float64}(-68295.73889316698, 1.4607008779607433, Thermodynamics.PhasePartition{Float64}(0.00020172170899797012, 5.7675685444915575e-9, 0.0002017154318764585)); dqvdt = 1.2898707234822461e-5; dTdt = 0.01384903619503847
+q_liq = q.liq; q_ice = q.ice; δ_eq = q_vap - q_eq.liq; δi_eq = q_vap - q_eq.ice; dδdt_no_S = dqvdt; Γ_l = 1.7; Γ_i = 1.6; δ_0 = q_vap - q_eq.liq; δ_0i = q_vap - q_eq.ice; below_freezing = (T < TCP.T_freeze(param_set)); microphys_params = TCP.microphysics_params(param_set)
+q_vap_0 = q_vap_0 = q.tot -q.liq - q.ice + .00001
+regime = TC.get_saturation_regime(δ_0, δ_0i, q.liq, q.ice, below_freezing)
+
+milestone_t = FT(.001); milestone = TC.NotAtSupersaturationMilestone; time_tolerance = FT(1e-6)
+# TC.do_standard_fallback(milestone_t, milestone, time_tolerance, S_ql, S_qi, q_liq, q_ice, δ_eq, δi_eq, dδdt_no_S, Γ_l, Γ_i, regime, param_set, area, ρ, p, T, w, τ_liq, τ_ice, δ_0, δ_0i, q, q_eq, Δt, ts; use_fix=true, return_mixing_ratio=false, depth=0, dqvdt=dqvdt, dTdt=dTdt, fallback_to_standard_supersaturation_limiter=false )
+# TC.standard_supersaturation_sources(TC.StandardSupersaturationMoistureSourcesLimiter(), param_set, area, ρ, p, T, w, τ_liq, τ_ice, δ_0, δ_0i, dqvdt, dTdt, q, q_eq, Δt, ts) 
+
+
+use_fix = false
+fallback_to_standard_supersaturation_limiter = false
+at_δ_eq_point = false
+allow_δ_eq_point = true
+δ_eq, δi_eq = TC.get_δ_eq_point(q_eq, τ_liq, τ_ice; dδdt_no_S = dδdt_no_S, Γ_l = Γ_l, Γ_i = Γ_i) # this is the point where the vapor sources balance out, i.e. the supersaturation is zero
+dδdt = dδdt_no_S - (S_ql*Γ_l + S_qi*Γ_i) # this is the tendency of the supersaturation, i.e. how fast it is changing without the sources
+
+using BenchmarkTools: @btime
+
+
+ @btime TC.calculate_next_standard_milestone_time($q_eq, $q_liq, $q_ice, $δ_0, $δ_0i, $δ_eq, $δi_eq, $S_ql, $S_qi; dδdt=$dδdt, dδdt_is_full_tendency=true, Γ_l=$Γ_l, Γ_i=$Γ_i, at_δ_eq_point=$at_δ_eq_point, allow_δ_eq_point=$allow_δ_eq_point)
+ @code_warntype TC.calculate_next_standard_milestone_time(q_eq, q_liq, q_ice, δ_0, δ_0i, δ_eq, δi_eq, S_ql, S_qi; dδdt=dδdt, dδdt_is_full_tendency=true, Γ_l=Γ_l, Γ_i=Γ_i, at_δ_eq_point=at_δ_eq_point, allow_δ_eq_point=allow_δ_eq_point)
+
+
+ @btime TC.morrison_milbrandt_2015_style_exponential_part_only($regime, $param_set, $area, $ρ, $p, $T, $w, $τ_liq, $τ_ice, $δ_0, $δ_0i, $q, $q_eq, $Δt, $ts; use_fix=$use_fix, return_mixing_ratio=false, dqvdt=$dqvdt, dTdt=$dTdt, fallback_to_standard_supersaturation_limiter=$fallback_to_standard_supersaturation_limiter, time_tolerance=$time_tolerance)
+ @code_warntype TC.morrison_milbrandt_2015_style_exponential_part_only(regime, param_set, area, ρ, p, T, w, τ_liq, τ_ice, δ_0, δ_0i, q, q_eq, Δt, ts; use_fix=use_fix, return_mixing_ratio=false, dqvdt=dqvdt, dTdt=dTdt, fallback_to_standard_supersaturation_limiter=fallback_to_standard_supersaturation_limiter, time_tolerance=time_tolerance) 
+
+
+  do_standard_fallback(
+            standard_milestone_t, standard_milestone, time_tolerance, S_ql, S_qi, q_liq, q_ice, δ_eq, δi_eq, A_c_no_WBF, Γ_l, Γ_i,
+            regime, param_set, area, ρ, p, T, w, τ_liq, τ_ice, δ_0, δ_0i, q, q_eq, Δt, ts; use_fix = use_fix, return_mixing_ratio = true, depth = depth, dqvdt=dqvdt, dTdt=dTdt, fallback_to_standard_supersaturation_limiter = fallback_to_standard_supersaturation_limiter
+            )
+
+milestone_t, i_milestone_t = TC.calculate_next_standard_milestone_time(q_eq, q_liq, q_ice, δ_0, δ_0i, δ_eq, δi_eq, S_ql, S_qi; dδdt=dδdt, dδdt_is_full_tendency=true, Γ_l=Γ_l, Γ_i=Γ_i, at_δ_eq_point=at_δ_eq_point, allow_δ_eq_point=allow_δ_eq_point)
+
+@btime TC.do_standard_fallback($milestone_t, $milestone, $time_tolerance, $S_ql, $S_qi, $q_liq, $q_ice, $δ_eq, $δi_eq, $dδdt_no_S, $Γ_l, $Γ_i, $regime, $param_set, $area, $ρ, $p, $T, $w, $τ_liq, $τ_ice, $δ_0, $δ_0i, $q, $q_eq, $Δt, $ts; use_fix=$use_fix, return_mixing_ratio=true, depth=0, dqvdt=$dqvdt, dTdt=$dTdt, fallback_to_standard_supersaturation_limiter=$fallback_to_standard_supersaturation_limiter)
+@code_warntype TC.do_standard_fallback(milestone_t, milestone, time_tolerance, S_ql, S_qi, q_liq, q_ice, δ_eq, δi_eq, dδdt_no_S, Γ_l, Γ_i, regime, param_set, area, ρ, p, T, w, τ_liq, τ_ice, δ_0, δ_0i, q, q_eq, Δt, ts; use_fix=use_fix, return_mixing_ratio=true, depth=0, dqvdt=dqvdt, dTdt=dTdt, fallback_to_standard_supersaturation_limiter=fallback_to_standard_supersaturation_limiter)
+
+#  julia> @btime TC.morrison_milbrandt_2015_style_exponential_part_only($regime, $param_set, $area, $ρ, $p, $T, $w, $τ_liq, $τ_ice, $δ_0, $δ_0i, $q, $q_eq, $Δt, $ts; use_fix=$use_fix, return_mixing_ratio=false, dqvdt=$dqvdt, dTdt=$dTdt, fallback_to_standard_supersaturation_limiter=$fallback_to_standard_supersaturation_limiter, time_tolerance=$time_tolerance)
+#  9.032 μs (71 allocations: 8.69 KiB)
+# (3.0150505105728585e-6, 1.4610448958720172e-7)
+limiter = TC.StandardSupersaturationMoistureSourcesLimiter()
+q_liq, q_ice, δ_0, δ_0i, new_regime = step(regime, limiter, dt, q_liq, q_ice, δ_0, δ_0i, δ_eq, δi_eq, q_eq, S_ql, S_qi, ((milestone_t < Δt) ? milestone : NotAtSupersaturationMilestone); dδdt_no_S=dδdt_no_S, Γ_l=Γ_l, Γ_i=Γ_i) # if milestone_t < Δt then we do the step, otherwise we don't (we just return the current state)
+@btime TC.step($regime, $limiter, $Δt, $q_liq, $q_ice, $δ_0, $δ_0i, $δ_eq, $δi_eq, $q_eq, $S_ql, $S_qi, (($milestone_t < $Δt) ? $milestone : TC.NotAtSupersaturationMilestone); dδdt_no_S=$dδdt_no_S, Γ_l=$Γ_l, Γ_i=$Γ_i)
+@code_warntype TC.step(regime, limiter, Δt, q_liq, q_ice, δ_0, δ_0i, δ_eq, δi_eq, q_eq, S_ql, S_qi, milestone; dδdt_no_S=dδdt_no_S, Γ_l=Γ_l, Γ_i=Γ_i)
+
+# new_regime_type = get_new_saturation_regime_type_from_milestone(milestone, regime, old_δ_0, old_δ_0i) # old_δ_0 and old_δ_0i are just for checks... could prolly get rid of them...
+@btime TC.get_new_saturation_regime_type_from_milestone($milestone, $regime, $δ_0, $δ_0i)
+@code_warntype TC.get_new_saturation_regime_type_from_milestone(milestone, regime, δ_0, δ_0i)
+
+new_regime_type = TC.get_new_saturation_regime_type_from_milestone(milestone, regime, δ_0, δ_0i)
+@btime TC.add_regime_parameters($new_regime_type, $q_liq, $q_ice, $is_below_freezing(regime))
+@code_warntype TC.add_regime_parameters(new_regime_type, q_liq, q_ice, is_below_freezing(regime))
+
+dt = Δt
+dt_here = min(milestone_t, dt)
+total_dt = dt + dt_here
+milestone_t, milestone, S_ql_addit, S_qi_addit, δ_eq, δi_eq = TC.calculate_next_standard_milestone_time(regime, q_eq, q_liq, q_ice, δ_0, δ_0i, is_below_freezing(regime), τ_liq, τ_ice; dδdt_no_S = dδdt_no_S, Γ_l=Γ_l, Γ_i=Γ_i, at_δ_eq_point = true) # can we use the sources we already have here?
+S_ql, S_qi = TC.resolve_S_S_addit(S_ql, S_qi, dt, S_ql_addit, S_qi_addit, dt_here, dt + dt_here) # rescale to the timestep
+@btime TC.resolve_S_S_addit($S_ql, $S_qi, $Δt, $S_ql_addit, $S_qi_addit, $dt_here, $Δt + $dt_here)
+@code_warntype TC.resolve_S_S_addit(S_ql, S_qi, Δt, S_ql_addit, S_qi_addit, dt_here, total_dt)
+
+# S_ql_addit, S_qi_addit = morrison_milbrandt_2015_style_exponential_part_only(new_regime, param_set, area, ρ, p, T, w, τ_liq, τ_ice, δ_0, δ_0i, new_q, q_eq, Δt_left, ts; use_fix = use_fix, return_mixing_ratio = true, depth = depth+1, dqvdt=dqvdt, dTdt=dTdt, fallback_to_standard_supersaturation_limiter = fallback_to_standard_supersaturation_limiter, time_tolerance = time_tolerance)
+new_regime = TC.add_regime_parameters(new_regime_type, q_liq, q_ice, is_below_freezing(regime))
+new_q = q
+Δt_left = Δt - dt_here
+@btime TC.morrison_milbrandt_2015_style_exponential_part_only($new_regime, $param_set, $area, $ρ, $p, $T, $w, $τ_liq, $τ_ice, $δ_0, $δ_0i, $new_q, $q_eq, $Δt_left, $ts; use_fix=$use_fix, return_mixing_ratio=true, dqvdt=$dqvdt, dTdt=$dTdt, fallback_to_standard_supersaturation_limiter=$fallback_to_standard_supersaturation_limiter, time_tolerance=$time_tolerance)
+@code_warntype TC.morrison_milbrandt_2015_style_exponential_part_only(new_regime, param_set, area, ρ, p, T, w, τ_liq, τ_ice, δ_0, δ_0i, new_q, q_eq, Δt_left, ts; use_fix=use_fix, return_mixing_ratio=true, dqvdt=dqvdt, dTdt=dTdt, fallback_to_standard_supersaturation_limiter=fallback_to_standard_supersaturation_limiter, time_tolerance=time_tolerance)
+
+# for regime_type in (TC.Supersaturated, TC.WBF, TC.Subsaturated)
+#     for has_liq in (true, false)
+#         for has_ice in (true, false)
+#             for below_freezing in (true, false)
+#                 regime = regime_type(has_liq, has_ice, below_freezing)
+#                 @info "regime = $(regime)"
+#                 @code_warntype TC.morrison_milbrandt_2015_style_exponential_part_only(regime, param_set, area, ρ, p, T, w, τ_liq, τ_ice, δ_0, δ_0i, q, q_eq, Δt, ts; use_fix = use_fix, return_mixing_ratio = true, dqvdt=dqvdt, dTdt=dTdt, fallback_to_standard_supersaturation_limiter = fallback_to_standard_supersaturation_limiter, time_tolerance = time_tolerance)
+#             end
+#         end
+#     end
+# end
+
+regime = TurbulenceConvection.WBF{false, false, true}(false, false, true)
+@code_warntype TC.morrison_milbrandt_2015_style_exponential_part_only(regime, param_set, area, ρ, p, T, w, τ_liq, τ_ice, δ_0, δ_0i, q, q_eq, Δt, ts; use_fix = use_fix, return_mixing_ratio = false, dqvdt=dqvdt, dTdt=dTdt, fallback_to_standard_supersaturation_limiter = fallback_to_standard_supersaturation_limiter, time_tolerance = time_tolerance)
+
+
+
+(; g, L_i, L_l, c_p, e_sl, e_si, dqsl_dT, dqsi_dT, q_sl, q_si, q_liq, q_ice, T_freeze, δ_0, δ_0i, Γ_l, Γ_i, dqvdt, dTdt) = TC.get_params_and_go_to_mixing_ratio_exponential_part_only(param_set, area, ρ, p, T, w, τ_liq, τ_ice, δ_0, δ_0i, dqvdt, dTdt, q, q_eq, Δt, ts; use_fix=use_fix)
+(; A_c, A_c_no_WBF) = TC.A_c_func_with_and_without_WBF(τ_ice, Γ_l, q_sl, q_si, g, w, c_p, e_sl, L_i, dqsl_dT, dqvdt, dTdt, p, ρ) # Eq C4
+τ = TC.τ_func_EPA(τ_liq, τ_ice, L_i, c_p, dqsl_dT, Γ_i)
+
+
+standard_milestone_t, standard_milestone, S_ql, S_qi, δ_eq, δi_eq = TC.calculate_next_standard_milestone_time(regime, q_eq, q_liq, q_ice, δ_0, δ_0i, T<T_freeze, τ_liq, τ_ice; dδdt_no_S = A_c_no_WBF, Γ_l=Γ_l, Γ_i=Γ_i, allow_δ_eq_point = true) # we need to allow the eq point because otherwise we risk WBF oscillations, see note in do_standard_fallback()
+
+
+t_hit_sat = BF ? TC.t_δ_hit_value(q_si-q_sl, δ_0, A_c, τ) : TC.t_δ_hit_value(FT(0), δ_0, A_c, τ) # below freezing, stop at ice sat which is lower, above freezing, stop at liq sat which is lower
+t_out_of_liq = TC.get_t_out_of_q_liq_EPA(δ_0, A_c, τ, τ_liq, q_liq, Γ_l)
+t_out_of_ice = TC.get_t_out_of_q_ice_EPA(δ_0, A_c, τ, τ_ice, q_ice, Γ_i, q_sl, q_si)
+
+BF = T < T_freeze
+value = BF ? (q_si - q_sl) : FT(0)
+@btime TC.t_δ_hit_value($value, $δ_0, $A_c, $τ)
+@code_warntype TC.t_δ_hit_value(value, δ_0, A_c, τ)
+
+@btime TC.get_t_out_of_q_liq_EPA($δ_0, $A_c, $τ, $τ_liq, $q_liq, $Γ_l)
+@code_warntype TC.get_t_out_of_q_liq_EPA(δ_0, A_c, τ, τ_liq, q_liq, Γ_l)
+
+
+# function get_t_out_of_q_no_WBF(δ_0::FT, A_c::FT, τ::FT, τ_c::FT, q_c::FT, Γ::FT, exit_if_fail::Bool=true) where {FT}
+@btime TC.get_t_out_of_q_ice_EPA($δ_0, $A_c, $τ, $τ_ice, $q_ice, $Γ_i, $q_sl, $q_si)
+@code_warntype TC.get_t_out_of_q_ice_EPA(δ_0, A_c, τ, τ_ice, q_ice, Γ_i, q_sl, q_si)
+
+
+
+# int += sum(int__v_Dk_n__dD.(aiu, bi, ciu, _n0, _λ, k; Dmin = Dmin, Dmax = Dmax, μ=μ)) 
+(aius, bis, cius) = (FT[0.1, 0.2, 0.3], FT[0.01, 0.02, 0.03], FT[0.001, 0.002, 0.003]); n0 = FT(1e6); λ = FT(1e3); k = FT(2.0); Dmin = FT(0.0); Dmax = FT(Inf); μ = FT(0.0)
+aiu, bi, ciu = aius[1], bis[1], cius[1]
+@btime TC.int__v_Dk_n__dD($aiu, $bi, $ciu, $n0, $λ, $k; Dmin = $Dmin, Dmax = $Dmax, μ=$μ)
+@code_warntype TC.int__v_Dk_n__dD(aiu, bi, ciu, n0, λ, k; Dmin = Dmin, Dmax = Dmax, μ=μ)
+
+
+#  function int_nav_dr(
+#     # prs::ACMP,
+#     param_set::APS,
+#     precip::CMT.IceType,
+#     velo_scheme::CMT.Chen2022Type,
+#     q::FT,
+#     ρ::FT,
+#     μ::FT;
+#     Nt::FT = FT(NaN), # testing for type stability, use NaN instead of nothing
+#     Dmin::FT = FT(0),
+#     Dmax::FT = FT(Inf),
+#     D_transition::FT = FT((0.625e-3)/2), # .625mm is the transition from small to large ice crystals in Chen paper
+# ) where {FT <: Real}
+
+Nt = FT(200.0); Dmin = FT(0.0); Dmax = FT(Inf); D_transition = FT((0.625e-3)/2); q_ice = FT(1e-6); ρ = FT(1.0); μ = FT(1e-5); precip = TC.ice_type; Chen2022Vel = TC.Chen2022Vel; ice_type = TC.ice_type
+@btime TC.int_nav_dr($param_set, $ice_type, $Chen2022Vel, $q_ice, $ρ, $μ; Nt=$Nt, Dmin=$Dmin, Dmax=$Dmax, D_transition=$D_transition)
+@code_warntype TC.int_nav_dr(param_set, precip, velo_scheme, q_ice, ρ, μ; Nt=Nt, Dmin=Dmin, Dmax=Dmax, D_transition=D_transition)
+
+
+
+
+# aux_up[i].τ_liq[k], aux_up[i].τ_ice[k], aux_up[i].N_l[k], aux_up[i].N_i[k] = get_τs_and_Ns(param_set, microphys_params, edmf.moisture_model.scheme, TD.PhasePartition(thermo_params, ts_up[k]), aux_up[i].T[k], aux_up[i].p[k], TD.air_density(thermo_params, ts_up[k]), w[k]; N_INP_top = N_INP_cloud_top_ices[i+1], f_ice_mult = ICNC_SIP_scaling_factors[k], q_sno = prog_pr.q_sno[k], massflux = massflux_N_i[k], dTdz = aux_up[i].dTdz[k], w_i = aux_up[i].term_vel_ice[k], apply_massflux_boost=false, apply_sedimentation_boost=apply_sedimentation_boost) # not sure if massflux boost should be 0 in the updraft
+N_INP_cloud_top_ices_i1 = FT(150.); ICNC_SIP_scaling_factors_k = FT(1.0); prog_pr_q_sno_k = FT(0.0); massflux_N_i_k = FT(0.01); aux_up_i_dTdz_k = FT(-0.01); aux_up_i_term_vel_ice_k = FT(0.1); apply_sedimentation_boost = false; aux_up_i_T_k = FT(250.0); aux_up_i_p_k = FT(80000.0); ρ = FT(1.0); w_k = FT(0.5); N_INP_top = FT(1000); f_ice_mult = FT(1.0); q_sno = FT(0.0); massflux = FT(0.0); dTdz = FT(0.0); w_i = FT(0.0)
+moisture_model =         TC.NonEquilibriumMoisture(param_set, namelist); scheme = moisture_model.scheme
+@btime TC.get_τs_and_Ns($param_set, $microphys_params, $scheme, $q, $aux_up_i_T_k, $aux_up_i_p_k, $ρ, $w_k; N_INP_top = $N_INP_cloud_top_ices_i1, f_ice_mult = $ICNC_SIP_scaling_factors_k, q_sno = $prog_pr_q_sno_k, massflux = $massflux_N_i_k, dTdz = $aux_up_i_dTdz_k, w_i = $aux_up_i_term_vel_ice_k, apply_massflux_boost=false, apply_sedimentation_boost=$apply_sedimentation_boost)
+@code_warntype TC.get_τs_and_Ns(param_set, microphys_params, scheme, q, T, p, ρ, w; N_INP_top, f_ice_mult, q_sno, massflux, dTdz, w_i, apply_massflux_boost=false, apply_sedimentation_boost=false)
+
+
+
+
+
+# calculate_sedimentation_velocity(
+# 1812			                            param_set,
+# 1813			                            q_effective_nan_N_safe(param_set, liq_type, aux_up[i].q_liq[k], aux_up[i].N_l[k]; monodisperse = true), # if N is NaN this just returns q, which should be fine? the Chen2022Type makes some assumption about what N is... which is probably trustworthy? assume no NaNs in the vector...
+# 1814			                            ρ_c[k], # air density
+# 1815			                            liq_type,
+# 1816			                            aux_up[i].N_l[k]; # broadcasting is using _first and not going through properly for some reason...
+# 1817			                            velo_scheme = edmf.cloud_sedimentation_model.liq_terminal_velocity_scheme,
+# 1818			                            # Dmax = edmf.cloud_sedimentation_model.liq_Dmax,
+# 1819			                            Dmax = FT(Inf), # testing [ i think it is better ]
+# 1820			                        ) .* edmf.cloud_sedimentation_model.liq_sedimentation_scaling_factor
+
+
+liq_terminal_velocity_scheme = TC.Chen2022Vel; velo_scheme = liq_terminal_velocity_scheme; N_l = FT(200.0); q_liq = FT(1e-6); ρ = FT(1.0); liq_type = TC.liq_type; Dmax = FT(Inf); Dmax = FT(Inf);  
+
+q_effective_nan_N_safe = TC.q_effective_nan_N_safe(param_set, liq_type, q_liq, N_l; monodisperse = true); monodisperse = true
+@btime TC.q_effective_nan_N_safe($param_set, $liq_type, $q_liq, $N_l; monodisperse = $monodisperse)
+@code_warntype TC.q_effective_nan_N_safe(param_set, liq_type, q_liq, N_l; monodisperse=monodisperse)
+
+liq_type = TC.liq_type
+@btime TC.calculate_sedimentation_velocity($param_set, $q_effective_nan_N_safe, $ρ, $liq_type, $N_l; velo_scheme = $liq_terminal_velocity_scheme, Dmax = $Dmax)
+@code_warntype TC.calculate_sedimentation_velocity(param_set, q_effective_nan_N_safe ,ρ, liq_type, N_l; velo_scheme, Dmax)
+
+# w = my_terminal_velocity(param_set, rain_type, velo_scheme, ρ, q; Dmax = Dmax, Nt = Nt) # testing [ this version makes you pass in raintype to avoid creating another object] [ rain_type is avilable from a global]
+rain_type = TC.rain_type
+Nt = FT(250e6)
+@btime TC.my_terminal_velocity($param_set, $rain_type, $liq_terminal_velocity_scheme, $ρ, $q_effective_nan_N_safe; Dmax = $Dmax, Nt = $Nt)
+@code_warntype TC.my_terminal_velocity(param_set, rain_type, velo_scheme, ρ, q_effective_nan_N_safe; Dmax=Dmax, Nt = Nt)
+
+
+
+
+# ================================================ PROFILING one call Only ============================== #
+using Profile
+using Profile.Allocs
+using PProf
+
+# Clear previous allocation profile
+Profile.Allocs.clear()
+
+# Run your function under the allocation profiler
+Profile.Allocs.@profile sample_rate=1.0 begin
+    # TC.do_standard_fallback(
+    #     milestone_t, milestone, time_tolerance,
+    #     S_ql, S_qi, q_liq, q_ice, δ_eq, δi_eq, dδdt_no_S,
+    #     Γ_l, Γ_i, regime, param_set, area, ρ, p, T, w,
+    #     τ_liq, τ_ice, δ_0, δ_0i, q, q_eq, Δt, ts;
+    #     use_fix=use_fix,
+    #     return_mixing_ratio=true,
+    #     depth=0,
+    #     dqvdt=dqvdt,
+    #     dTdt=dTdt,
+    #     fallback_to_standard_supersaturation_limiter=fallback_to_standard_supersaturation_limiter
+    # )
+    # @btime TC.get_t_out_of_q_ice_EPA($δ_0, $A_c, $τ, $τ_ice, $q_ice, $Γ_i, $q_sl, $q_si)
+    TC.morrison_milbrandt_2015_style_exponential_part_only(new_regime, param_set, area, ρ, p, T, w, τ_liq, τ_ice, δ_0, δ_0i, new_q, q_eq, Δt_left, ts; use_fix=use_fix, return_mixing_ratio=true, dqvdt=dqvdt, dTdt=dTdt, fallback_to_standard_supersaturation_limiter=fallback_to_standard_supersaturation_limiter, time_tolerance=time_tolerance)
+end
+
+# Launch PProf web UI for the allocation profile
+PProf.Allocs.pprof(from_c=false, web=true)
+
+
+# ---- text version ------ #
+# text summary:
+
+using Profile.Allocs
+
+# Fetch allocations
+alloc_results = Profile.Allocs.fetch()   # <-- AllocResults
+alloc_vector  = alloc_results.allocs     # <-- Vector{Alloc}, iterable
+
+# Summary by allocation type
+alloc_summary = Dict{Any, Tuple{Int, Int}}()
+for a in alloc_vector
+    T = a.type
+    count, total_bytes = get(alloc_summary, T, (0, 0))
+    alloc_summary[T] = (count + 1, total_bytes + a.size)
+end
+
+println("\n=== Top 20 Allocation Types ===")
+for (T, (count, bytes)) in sort(collect(alloc_summary), by = x -> -x[2][2])[1:min(20, length(alloc_summary))]
+    println("$T: $count allocations, $bytes bytes")
+end
+
+# Summary by stacktrace
+stack_summary = Dict{String, Int}()
+for a in alloc_vector
+    stack_str = join(string.(a.stacktrace), " -> ")
+    stack_summary[stack_str] = get(stack_summary, stack_str, 0) + a.size
+end
+
+println("\n=== Top 20 Allocation Hotspots ===")
+for (stack, bytes) in sort(collect(stack_summary), by = x -> -x[2])[1:min(20, length(stack_summary))]
+    println("$bytes bytes: $stack")
+end
+
+
+
+# ------------------------------ PROFILE FULL SIMULATION and SAVE/LOAD DATA ---------------------------- #
+
+
+
+# ====== SAVING and LOADING Profile Data ====== #   
+
+
+
+
+using Profile
+using Serialization
+using StatProfilerHTML
+
+# 1. Initialize the profiler with a large buffer and short sampling interval
+Profile.clear()
+Profile.clear_malloc_data()
+Profile.init(10_000_000, 0.001)  # n = buffer size, delay = sampling interval in seconds
+
+# 2. Run your simulation while profiling
+@profile main1d(namelist)
+
+# 3. Save the raw profiling data for later
+thisdir = "/home/jbenjami/Research_Schneider/CliMA/TurbulenceConvection.jl/test/"
+profile_jls_file = joinpath(thisdir, "main1d_profile.jls")
+open(profile_jls_file, "w") do io
+    serialize(io, Profile.retrieve())
+end
+
+using PProf: PProf
+PProf.pprof()
+
+# --------------------------------- #
+
+
+# LOADING
+using Profile
+using Serialization
+using StatProfilerHTML
+# 4. Load the profiling data (on any machine)
+profile_data = nothing
+thisdir = ""
+profile_jls_file = ""
+try
+    thisdir = "/home/jbenjami/Research_Schneider/CliMA/TurbulenceConvection.jl/test/"
+    profile_jls_file = joinpath(thisdir, "main1d_profile.jls")
+    profile_data = open(profile_jls_file, "r") do io
+        deserialize(io)
+    end
+catch e
+    thisdir = "/Users/jordan/Downloads/"
+    profile_jls_file = joinpath(thisdir, "main1d_profile.jls")
+    profile_data = open(profile_jls_file, "r") do io
+        deserialize(io)
+    end
+end
+
+samples, stacktraces = profile_data
+
+# 5. Delete existing HTML file if needed
+# profile_html_file = joinpath(thisdir, "main1d_profile.html")
+profile_html_file = joinpath(thisdir, "statprof/index.html")
+if isfile(profile_html_file)
+    rm(profile_html_file)
+end
+
+# 6. Generate the HTML report
+cd(thisdir) do
+    StatProfilerHTML.statprofilehtml(samples, stacktraces)  # outputs interactive HTML in StatProfilerHTML temp dir
+end
+
+println("Profiling complete!")
+println("Raw data saved to: ", profile_jls_file)
+println("HTML report saved to: ", profile_html_file)
+
+
+
+using PProf: PProf
+PProf.pprof(samples, stacktraces; web=true)
+http://localhost:57599/ui/flamegraph?tf
+
+
+# ====== LOGGING TC Only ====== #
+
+using Logging
+using TurbulenceConvection  # your package
+
+struct ModuleFilterLogger <: AbstractLogger
+    wrapped::ConsoleLogger
+    module_name::Module
+end
+
+# Required interface: min_enabled_level
+Logging.min_enabled_level(logger::ModuleFilterLogger) = Logging.min_enabled_level(logger.wrapped)
+
+# Filter by module
+function Logging.shouldlog(logger::ModuleFilterLogger, level, _module, group, id)
+    _module === logger.module_name && level >= Logging.min_enabled_level(logger)
+end
+
+# Handle messages
+function Logging.handle_message(logger::ModuleFilterLogger, level, message, _module, group, id, file, line; kwargs...)
+    if Logging.shouldlog(logger, level, _module, group, id)
+        Logging.handle_message(logger.wrapped, level, message, _module, group, id, file, line; kwargs...)
+    end
+end
+
+# Activate it
+global_logger(ModuleFilterLogger(ConsoleLogger(stderr, Logging.Debug), TurbulenceConvection))
+
+# Run your simulation
+main1d(namelist)
+
+
+
+# =================== LOGGING TC and SpecialFunctions ====== #
+
+using Logging
+
+struct ModuleFilterExcludeLogger <: AbstractLogger
+    logger::AbstractLogger
+    excluded_modules::Set{Module}
+end
+
+Logging.min_enabled_level(m::ModuleFilterExcludeLogger) = Logging.min_enabled_level(m.logger)
+Logging.shouldlog(m::ModuleFilterExcludeLogger, level, _module, group, id) =
+    !(_module in m.excluded_modules) && Logging.shouldlog(m.logger, level, _module, group, id)
+Logging.handle_message(m::ModuleFilterExcludeLogger, level, message, _module, group, id, file, line; kwargs...) =
+    Logging.handle_message(m.logger, level, message, _module, group, id, file, line; kwargs...)
+Logging.catch_exceptions(m::ModuleFilterExcludeLogger) = Logging.catch_exceptions(m.logger)
+
+# Exclude NCDatasets logging
+global_logger(ModuleFilterExcludeLogger(ConsoleLogger(stderr, Logging.Debug), Set([NCDatasets])))
+
+# Now your debug/info/warn messages from your code in Main and TurbulenceConvection will print,
+# but NCDatasets (or any other module you add to the set) is suppressed
+main1d(namelist)
+
+
+
+
+
