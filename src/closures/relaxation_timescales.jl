@@ -48,11 +48,6 @@ function get_τs(param_set::APS, microphys_params::ACMP, relaxation_timescale::A
         τ_ice = clamp(τ_ice, relaxation_timescale.args.min_τ_ice * scaling_factor, relaxation_timescale.args.max_τ_ice * scaling_factor)
     end
 
-    if rand() < 1e-5
-        @warn "something is wrong with updraft τ_ice at t = 0..... it is so much faster than env and isn't 9 on RF13.... We also need to propagate this scaling thingy through to N relaxation args"
-    end
-
-
 
     if isnan(τ_liq) || isnan(τ_ice)  # chasing down NaNs
         error("Timescale calculation failed. Got τ_liq: $τ_liq, τ_ice: $τ_ice for inputs q = $q; T = $T; p = $p; ρ = $ρ; w = $w; relaxation_timescale = $relaxation_timescale; N_l = $N_l; N_i_raw = $N_i_raw; N_i_adjusted = $N_i_adjusted; N_INP_top = $N_INP_top; f_ice_mult = $f_ice_mult; q_sno = $q_sno; massflux = $massflux; dTdz = $dTdz; w_i = $w_i; apply_massflux_boost = $apply_massflux_boost; apply_sedimentation_boost = $apply_sedimentation_boost")
