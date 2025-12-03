@@ -129,19 +129,14 @@ function set_thermo_state_from_prog!(state::TC.State, moisture_model::TC.Abstrac
         else
             error("Something went wrong. The moisture_model options are equilibrium or nonequilibrium")
         end
-
-
-        ts_gm[k] = TC.thermo_state_pθq(
-            param_set,
-            p_c[k],
-            prog_gm.ρθ_liq_ice[k] / ρ_c[k],
-            prog_gm.ρq_tot[k] / ρ_c[k],
-            thermo_args...,
-        )
+        ts_gm[k] = TC.thermo_state_pθq(param_set, p_c[k], prog_gm.ρθ_liq_ice[k] / ρ_c[k], prog_gm.ρq_tot[k] / ρ_c[k], thermo_args..., )
     end
     return nothing
 end
 
+"""
+This function is only used for initializatoin
+"""
 function set_thermo_state_from_aux!(state, moisture_model, param_set)
     grid = TC.Grid(state)
     ts_gm = TC.center_aux_grid_mean(state).ts
@@ -152,10 +147,13 @@ function set_thermo_state_from_aux!(state, moisture_model, param_set)
         thermo_args = if moisture_model isa TC.EquilibriumMoisture
             ()
         elseif moisture_model isa TC.NonEquilibriumMoisture
-            (prog_gm.q_liq[k], prog_gm.q_ice[k])
+            # (prog_gm.q_liq[k], prog_gm.q_ice[k])
+            (aux_gm.q_liq[k], aux_gm.q_ice[k])
         else
             error("Something went wrong. The moisture_model options are equilibrium or nonequilibrium")
         end
+        prog_gm.q_liq[k] = aux_gm.q_liq[k] # make sure they agree
+        prog_gm.q_ice[k] = aux_gm.q_ice[k] # make sure they agree
         ts_gm[k] = TC.thermo_state_pθq(param_set, p_c[k], aux_gm.θ_liq_ice[k], aux_gm.q_tot[k], thermo_args...)
     end
     return nothing

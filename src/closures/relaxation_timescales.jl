@@ -28,12 +28,31 @@ function calculate_τ(D::FT, N::FT, r::FT, ρ::FT;
 end
 # ======================================================================================================================================== #
 
-function get_τs(param_set::APS, microphys_params::ACMP, relaxation_timescale::AbstractRelaxationTimescaleType, q::TD.PhasePartition, T::FT, p::FT, ρ::FT, w::FT; N_l::FT = FT(NaN), N_i_raw::FT = FT(NaN), N_i_adjusted::FT = FT(NaN), N_INP_top::FT = FT(NaN), f_ice_mult::FT=FT(1), q_sno::FT = FT(0), massflux::FT=FT(0), dTdz::FT = FT(0), w_i::FT=FT(0), apply_massflux_boost::Bool=false, apply_sedimentation_boost::Bool=false) where {FT}
+function get_τs(param_set::APS, microphys_params::ACMP, relaxation_timescale::AbstractRelaxationTimescaleType, q::TD.PhasePartition, T::FT, p::FT, ρ::FT, w::FT; N_l::FT = FT(NaN), N_i_raw::FT = FT(NaN), N_i_adjusted::FT = FT(NaN), N_INP_top::FT = FT(NaN), f_ice_mult::FT=FT(1), q_sno::FT = FT(0), massflux::FT=FT(0), dTdz::FT = FT(0), w_i::FT=FT(0), apply_massflux_boost::Bool=false, apply_sedimentation_boost::Bool=false, apply_supersaturation_scaling=true) where {FT}
     τ_liq, τ_ice = get_τ_helper(param_set, microphys_params, relaxation_timescale, q, T, p, ρ, w; N_l = N_l, N_i_raw = N_i_raw, N_i_adjusted = N_i_adjusted, N_INP_top = N_INP_top, f_ice_mult = f_ice_mult, q_sno = q_sno, massflux = massflux, dTdz = dTdz, w_i = w_i, apply_massflux_boost = apply_massflux_boost, apply_sedimentation_boost = apply_sedimentation_boost)
 
     # limit effective tau to at least one second for stability (stable with dt == limit timescale is unstable, gotta go faster... change to be dt related) [used to have FT(1)]
     τ_liq = clamp(τ_liq, relaxation_timescale.args.min_τ_liq, relaxation_timescale.args.max_τ_liq)
     τ_ice = clamp(τ_ice, relaxation_timescale.args.min_τ_ice, relaxation_timescale.args.max_τ_ice)
+
+    # if we're below critical subsat, tau_ice can go to in regardless of max_τ_ice
+    # r0_activation = FT(10e-6) # 10 μm particle post activation, matches https://github.com/DOI-USGS/COAWST/blob/6419fc46d737b9703f31206112ff5fba65be400d/WRF/phys/module_mp_morr_two_moment.F#L1089
+    # m0_activation = particle_mass(param_set, ice_type, r0_activation)
+
+    if apply_supersaturation_scaling # need to do to Ns too
+        thermo_params::TDPS = TCP.thermodynamics_params(param_set)
+        S_i = TD.supersaturation(thermo_params, q, ρ, T, TD.Ice())
+        scaling_factor = INP_supersaturation_scaling_factor(param_set, S_i, q.ice, FT(Inf)) # never saturation q_ice_threshold so that we are never forced to 1
+        # N_INP *= INP_supersaturation_scaling_factor(param_set, S_i, q.ice, N_INP * m0_activation)
+        scaling_factor = iszero(scaling_factor) ? FT(Inf) : 1/scaling_factor
+        τ_ice = clamp(τ_ice, relaxation_timescale.args.min_τ_ice * scaling_factor, relaxation_timescale.args.max_τ_ice * scaling_factor)
+    end
+
+    if rand() < 1e-5
+        @warn "something is wrong with updraft τ_ice at t = 0..... it is so much faster than env and isn't 9 on RF13.... We also need to propagate this scaling thingy through to N relaxation args"
+    end
+
+
 
     if isnan(τ_liq) || isnan(τ_ice)  # chasing down NaNs
         error("Timescale calculation failed. Got τ_liq: $τ_liq, τ_ice: $τ_ice for inputs q = $q; T = $T; p = $p; ρ = $ρ; w = $w; relaxation_timescale = $relaxation_timescale; N_l = $N_l; N_i_raw = $N_i_raw; N_i_adjusted = $N_i_adjusted; N_INP_top = $N_INP_top; f_ice_mult = $f_ice_mult; q_sno = $q_sno; massflux = $massflux; dTdz = $dTdz; w_i = $w_i; apply_massflux_boost = $apply_massflux_boost; apply_sedimentation_boost = $apply_sedimentation_boost")

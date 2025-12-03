@@ -279,7 +279,7 @@ function compute_sgs_flux!(edmf::EDMFModel, state::State, surf::SurfaceBase, par
 
                 # supersaturated = Ifx.(supersaturated)
                 # supersaturated .= FT(0) # disable for testing  [[ It does seem to destabilize things a lot... ]]
-                @. massflux_h  = (massflux_en/2 + massflux_en_conv) * If(θ_liq_ice_en - sqrt(aux_en.Hvar)) + (massflux_en/2 - massflux_en_conv) * If(θ_liq_ice_en + sqrt(aux_en.Hvar))
+                @. massflux_h = (massflux_en/2 + massflux_en_conv) * If(θ_liq_ice_en - sqrt(aux_en.Hvar)) + (massflux_en/2 - massflux_en_conv) * If(θ_liq_ice_en + sqrt(aux_en.Hvar))
                 # @. massflux_qt = (massflux_en/2 + massflux_en_conv) * If(q_tot_en + supersaturated*sqrt(aux_en.QTvar)) + (massflux_en/2 - massflux_en_conv) * If(q_tot_en - supersaturated*sqrt(aux_en.QTvar))
 
 
@@ -287,15 +287,12 @@ function compute_sgs_flux!(edmf::EDMFModel, state::State, surf::SurfaceBase, par
                 # Instead of just flipping on mean supersat, we can weight by fraction of supersat. So at 50% area supersaturated, that half goes up and half down. At 25%, the up is 25% super and 25% sub and down is 50% sub, etc.
 
                 # @. massflux_h  = (massflux_en/2 + massflux_en_conv) * If(θ_liq_ice_en + (2*frac_supersat - 1)*sqrt(aux_en.Hvar)) + (massflux_en/2 - massflux_en_conv) * If(θ_liq_ice_en - (2*frac_supersat - 1)*sqrt(aux_en.Hvar)) # This is destabilizing
-                
 
                 if !(edmf.moisture_model isa NonEquilibriumMoisture) || ((edmf.moisture_model isa NonEquilibriumMoisture) && !edmf.convective_tke_handler.transport_conserved_by_advection) # if Eq or, despite having convective tke, not using advection for conserved quantities
                     # This is biased towards stability -- moister air goes up, drier air goes down
                     @. massflux_qt = (massflux_en/2 + massflux_en_conv) * If(q_tot_en + (2*frac_supersat - 1)*sqrt(aux_en.QTvar)) + (massflux_en/2 - massflux_en_conv) * If(q_tot_en - (2*frac_supersat - 1)*sqrt(aux_en.QTvar))
+                    # @. massflux_qt = (massflux_en/2 + massflux_en_conv) * If(q_tot_en + (0.5)*sqrt(aux_en.QTvar)) + (massflux_en/2 - massflux_en_conv) * If(q_tot_en - (0.5)*sqrt(aux_en.QTvar))
                 end
-
-            
-            
             
             end
 
@@ -311,8 +308,8 @@ function compute_sgs_flux!(edmf::EDMFModel, state::State, surf::SurfaceBase, par
                     @. qi_flux_vert_adv = massflux_qi # same here
                 else
                     # ql and qi should be correlated w/ tke. We handle prt of that in diffusivity but they shouldn't feel the netire advective force
-                    @. massflux_ql = (massflux_en/2 + massflux_en_conv) * IfRBF_q_liq_en(q_liq_en) # + (massflux_en/2 - massflux_en_conv) .* IfRBF_q_liq_en(q_liq_en) # assume liq/ice are in the upper part of the distribution, and the down side has little flux. (massflux_en is small anyway, and significant conv downdrafts should dry quickly)
-                    @. massflux_qi = (massflux_en/2 + massflux_en_conv) * IfRBF_q_ice_en(q_ice_en) # + (massflux_en/2 - massflux_en_conv) .* IfRBF_q_ice_en(q_ice_en) # assume liq/ice are in the upper part of the distribution, and the down side has little flux. (massflux_en is small anyway, and significant conv downdrafts should dry quickly)
+                    @. massflux_ql = (massflux_en/2 + massflux_en_conv) * IfRBF_q_liq_en(q_liq_en) # + (massflux_en/2 - massflux_en_conv) * IfRBF_q_liq_en(q_liq_en) # assume liq/ice are in the upper part of the distribution, and the down side has little flux. (massflux_en is small anyway, and significant conv downdrafts should dry quickly)
+                    @. massflux_qi = (massflux_en/2 + massflux_en_conv) * IfRBF_q_ice_en(q_ice_en) # + (massflux_en/2 - massflux_en_conv) * IfRBF_q_ice_en(q_ice_en) # assume liq/ice are in the upper part of the distribution, and the down side has little flux. (massflux_en is small anyway, and significant conv downdrafts should dry quickly)
 
                     @. ql_flux_vert_adv = massflux_ql # same here
                     @. qi_flux_vert_adv = massflux_qi # same here
@@ -324,6 +321,10 @@ function compute_sgs_flux!(edmf::EDMFModel, state::State, surf::SurfaceBase, par
                         @. massflux_qt = massflux_ql + massflux_qi + 
                             (massflux_en/2 + massflux_en_conv) * If((q_tot_en - q_liq_en - q_ice_en) + (2*frac_supersat - 1)*sqrt(aux_en.QTvar)) +
                             (massflux_en/2 - massflux_en_conv) * If((q_tot_en - q_liq_en - q_ice_en) - (2*frac_supersat - 1)*sqrt(aux_en.QTvar))
+
+                        # @. massflux_qt = massflux_ql + massflux_qi + 
+                        #     (massflux_en/2 + massflux_en_conv) * If((q_tot_en - q_liq_en - q_ice_en) + (0)*sqrt(aux_en.QTvar)) +
+                        #     (massflux_en/2 - massflux_en_conv) * If((q_tot_en - q_liq_en - q_ice_en) - (0)*sqrt(aux_en.QTvar))
                             
                         # @. massflux_qt = massflux_ql + massflux_qi + 
                         # If( ((Ic(massflux_en) + ρ_c * a_en/2 * sqrt(max(aux_en.tke_convective, FT(0)))) * (q_tot_en - q_liq_en - q_ice_en) + (2*frac_supersat - 1)*sqrt(aux_en.QTvar)) + 
@@ -2865,46 +2866,63 @@ function compute_en_tendencies!(
 
 
         if edmf.convective_tke_handler.transport_tke_by_advection
-
-            ℓ_mix = FT(500.0)  # mixing length for convective TKE advection
-
-            #= 
-                This is broken... It can actually completely reverse the direction of TKE advection which probably shouldn't happen...
-                I can't come up with a good way to go from buoyancy to limiting it either. we know in the saturated part the updraft is more vigorous and in the subsat part the downdraft is, but neither should preclude TKE spreading and reverse the flux...
-                If the difference is that extreme you're just generating more TKE. the updraft should advect upwards until it hits 0 velocity anyway for example and bring TKE and induce downdrafts.
-            =#
             
-            flux_up = aux_tc.temporary_1 # 1 and 2 used above but avail again
-            flux_dn = aux_tc.temporary_2
-            @. flux_up = zero(FT)
-            @. flux_dn = zero(FT)
-            eps_vel = FT(1e-6)  # minimum velocity to avoid division by zero
+            ∇f_tke = CCO.GradientC2F(bottom = CCO.SetGradient(wvec(FT(0))), top = CCO.SetGradient(wvec(FT(0))))
 
-            # --- 1. Stability-damped effective convective velocity ---
-            # w_eff = |w| * exp(-sqrt(N2)*ℓ/|w|) * sign(w)
-            w_eff = aux_tc.temporary_4 # 1 and 2 used above but avail again
-            @. w_eff = max(abs(w_convective), eps_vel) # base convective velocity
+            ℓ_mix = FT(500.0)
+            K_floor = FT(1.0) # Safety floor (m^2/s)
 
-            # --- 2. Compute first derivative of TKE using your operators (full array) ---
-            grad_tke = aux_tc.temporary_5 # 1 and 2 used above but avail again
-            @. grad_tke = ∇c(wvec(If(ρatke_convective / ρ_c)))  # ∂(TKE)/∂z, vectorized
+            # 1. Define Operator with Zero-Flux BCs
+            ∇f_tke = CCO.GradientC2F(bottom = CCO.SetGradient(wvec(FT(0))), top = CCO.SetGradient(wvec(FT(0))))
 
-            # --- 3. Compute symmetric flux (first-order) ---
-            # F_sym := 0.5 * ρatke_convective * w_eff  # up flux magnitude
+            # 2. Effective Spreading Velocity (w_eff) at Centers
+            #    (Using temporary_2)
+            #    Physics: w' = sqrt(2k). Damped by stability (Energy Partitioning).
+            w_eff = aux_tc.temporary_2 # 1 is taken by w_convective
+            @. w_eff = w_convective * (
+                k_adv / sqrt(1 + ((sqrt(max(aux_tc.∂b∂z, 0)) * ℓ_mix) / max(w_convective, eps(FT)))^2)
+            )
 
-            # --- 4. Compute second-order Lax–Wendroff correction ---
-            # F_corr :=  0.5 * Δt * w_eff^2 * grad_tke
+            # 3. Base Fluxes (Scalar) at Centers
+            #    (Using temporary_4 and 5)
+            flux_up = aux_tc.temporary_4 # 3 is taken by tke_max
+            @. flux_up = 0.5 * ρatke_convective * w_eff
 
-            f_stab = aux_tc.temporary_6 # 1 and 2 used above but avail again
-            @. f_stab = exp(-sqrt(max(aux_tc.∂b∂z, 0)) * ℓ_mix / max(abs(w_convective), eps_vel))
+            flux_dn = aux_tc.temporary_5
+            @. flux_dn = 0.5 * ρatke_convective * (-w_eff)
 
-            # --- 5. Assemble up/down fluxes ---
-            @. flux_up = +(k_adv*f_stab)*((0.5 * ρatke_convective * w_eff) - (0.5 * Δt * w_eff^2 * grad_tke)) # w_sym - correction
-            @. flux_dn = -(k_adv*f_stab)*((0.5 * ρatke_convective * w_eff) + (0.5 * Δt * w_eff^2 * grad_tke)) # -w_sym + correction
+            # --- Option A: First-Order Upwind (Diffusive but Monotonic) ---
+            # Advection: Handled by LBw/RBw.
+            # Diffusion: Handled by explicitly subtracting the background flux.
+            #
+            # @. ρatke_convective_advection = - (
+            #      ∇c(
+            #         wvec(LBw(flux_up)) + wvec(RBw(flux_dn)) - 
+            #         wvec(
+            #             (ρ_f * ᶠinterp_a(a_en) * (Ifx(aux_tc.KM) + K_floor)) * #             ∇f_tke(ρatke_convective / (ρ_c * a_en))
+            #         )
+            #      )
+            # )
 
-            # --- 6. Compute flux divergence (TKE tendency) ---
-            # @. ρatke_convective_advection = - (∇c(wvec(Ifw(flux_up))) + ∇c(wvec(Ifw(flux_dn)))) / (ρ_c * a_en)
-            @. ρatke_convective_advection = - (∇c(wvec(LBw(flux_up))) + ∇c(wvec(RBw(flux_dn)))) / (ρ_c * a_en)
+            # --- Option B: Second-Order Central + Spread (Active) ---
+            # Advection: Handled by Ifx (Central).
+            # Diffusion: Handled by Sum of Numerical Spread (0.5*dt*w^2) + Background (KM).
+            
+            @. ρatke_convective_advection = - (
+                 ∇c(
+                    wvec(Ifx(flux_up) + Ifx(flux_dn)) - 
+                    wvec(
+                        (
+                            # 1. Numerical Spread (Lax-Wendroff): 0.5 * dt * w^2
+                            (0.5 * ρ_f * ᶠinterp_a(a_en) * Δt * (If(w_eff)^2)) +
+                            
+                            # 2. Physical Background: ρ * a * (KM + Floor)
+                            (ρ_f * ᶠinterp_a(a_en) * (Ifx(aux_tc.KM) + K_floor))
+                            
+                        ) * ∇f_tke(ρatke_convective / (ρ_c * a_en))
+                    )
+                 )
+            )
 
 
         else # :: Diffusion (more stable in principle) K reduction in stable areas
@@ -2928,16 +2946,29 @@ function compute_en_tendencies!(
             # --- 4. Pre-calculate the one repeated value ---
             @. w_conv_f = Ifx(w_convective)
 
-            # --- 5. Calculate the Final Tendency (at CENTERS) ---
-            #
-            # This is the fully fused, inlined calculation.
-            # It does NOT allocate tke_c or dk_dz_f.
-            #
-            @. ρatke_convective_advection = -∇c(wvec(  # This is the flux, F = -ρ * a * K * ∇f(k)
-                -ρ_f * ᶠinterp_a(a_en) * (k_adv * (ℓ_mix * exp(- (Ifx(sqrt(max(aux_tc.∂b∂z, zero(FT)))) * ℓ_mix) /
-                max(w_conv_f, eps(FT)))) * w_conv_f) * # This is ∇f(k)
-                ∇f_tke(ρatke_convective / ρ_c))) / (ρ_c * a_en)
-            # ========================================================================================================= #
+
+            # --- 4. Calculate Final Tendency (Fully Fused) ---
+            K_floor = FT(0.1)
+
+            @. ρatke_convective_advection = -∇c(wvec(
+                -ρ_f * ᶠinterp_a(a_en) * # Density * Area
+                min(
+                    # --- TOTAL DIFFUSIVITY ---
+                    # 1. Convective (Goes to 0 cleanly if w=0)
+                    (k_adv * (ℓ_mix * w_conv_f^2) / 
+                    (max(w_conv_f, FT(0)) + ℓ_mix * Ifx(sqrt(max(aux_tc.∂b∂z, zero(FT)))) + eps(FT)))
+                    
+                    # 2. Environmental
+                    + Ifx(aux_tc.KM) 
+                    
+                    # 3. Floor (The new safety net)
+                    + K_floor,
+
+                    FT(500.0)
+                ) *
+                ∇f_tke(ρatke_convective / (ρ_c * a_en))
+            ))
+            # # ========================================================================================================= #
 
         end
 
@@ -2959,7 +2990,7 @@ function compute_en_tendencies!(
 
         # self dissipation [[ calculated in  `compute_covariance_dissipation()`.. we apply here or else tke can build up for the entire run if it's not advected away ]]
         k_self_diss::FT = edmf.convective_tke_handler.self_dissipation_coeff
-        @. ρatke_convective_dissipation += k_self_diss * ρ_c * area_en * max(aux_en.tke_convective, 0)^FT(3/2) / ℓ # should have mixing_length maybe 1000+ . For them, c_d was < 1 so this made dissipation smaller... unclear where our c_d lands... but it's bigger but we want less disipation I think..
+        @. ρatke_convective_dissipation += k_self_diss * ρ_c * area_en * max( (ρatke_convective/(ρ_c * area_en)), 0)^FT(3/2) / ℓ # should have mixing_length maybe 1000+ . For them, c_d was < 1 so this made dissipation smaller... unclear where our c_d lands... but it's bigger but we want less disipation I think..
 
         # -- limit production to enforce tke max -- #
         # limit production and net if we're exceeding tke max (smooth limiter that ramps on as we exceed tke max)

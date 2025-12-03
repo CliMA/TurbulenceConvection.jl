@@ -327,7 +327,7 @@ function io_dictionary_aux(edmf) # added EDMF as an argument so we can have thin
         "qt_mean_diff" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_turbconv(state).diffusive_tendency_qt), # this is the diffusive tendency of qt, not including  massflux tendency
 
         #
-
+        "qt_mean_vert_adv" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_turbconv(state).massflux_tendency_qt),
         "qt_mean_ls_vert_adv" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_grid_mean(state).qt_tendency_ls_vert_adv),
 
         "qr_mean_vert_adv" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_grid_mean(state).qr_tendency_vert_adv),

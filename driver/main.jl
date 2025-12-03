@@ -338,8 +338,10 @@ function initialize(sim::Simulation1d)
         Cases.initialize_radiation(case, radiation, state, param_set; aux_data_kwarg...)
         initialize_edmf(edmf, state, surf_params, param_set, t, case)
 
-        # callback_call_update_aux_caller! = sim.TS.use_tendency_timestep_limiter ? () : (SciMLBase.DiscreteCallback(condition_every_iter, call_update_aux_caller!; save_positions = (false, false)),)
-        # call_update_aux_caller!(integrator)
+        cfl_limit = sim.cfl_limit
+        surf = get_surface(surf_params, state, t, param_set)
+        Δt = sim.TS.dt
+        TC.update_aux!(edmf, state, surf, param_set, Δt, cfl_limit) # set aux values # added 12/01/2025, since now it isn't part of the default initialization dudt fcn [[ this is not actually unimportant -- the evolution of something like tke at t=0 is strongly constrained by the tendencies being correct, so this is not just for io, but is crucial for the initial model evolution to be correct!]]
 
         if !skip_io
             stats = Stats[colidx]
@@ -355,7 +357,7 @@ function initialize(sim::Simulation1d)
 
     open_files(sim)
     try
-        call_update_aux_caller!(integrator) # set aux values # added 12/01/2025, since now it isn't part of the default initialization dudt fcn [[ this is not actually unimportant -- the evolution of something like tke at t=0 is strongly constrained by the tendencies being correct, so this is not just for io, but is crucial for the initial model evolution to be correct!]]
+        # call_update_aux_caller!(integrator) # set aux values # added 12/01/2025, since now it isn't part of the default initialization dudt fcn [[ this is not actually unimportant -- the evolution of something like tke at t=0 is strongly constrained by the tendencies being correct, so this is not just for io, but is crucial for the initial model evolution to be correct!]] [[ moved call up to above]]
         affect_io!(integrator)
     catch e
         if truncate_stack_trace

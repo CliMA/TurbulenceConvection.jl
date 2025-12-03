@@ -229,25 +229,25 @@ function update_aux!(edmf::EDMFModel, state::State, surf::SurfaceBase, param_set
 
         # remove TKE from convective TKE
          # remove updraft and/or udpraft cloak from convective tke since they double count
-        TKE = FT(0)
-        thermo_params = TCP.thermodynamics_params(param_set)
-        @inbounds for i in 1:n_updrafts(edmf)
-            TKE += FT(0.5) * TD.air_density(thermo_params, aux_up[i].ts[k]) * aux_up[i].area[k] * Ic.(aux_up_f[i].w)[k]^2
-        end
+        # TKE = FT(0)
+        # thermo_params = TCP.thermodynamics_params(param_set)
+        # @inbounds for i in 1:n_updrafts(edmf)
+        #     TKE += FT(0.5) * TD.air_density(thermo_params, aux_up[i].ts[k]) * aux_up[i].area[k] * Ic.(aux_up_f[i].w)[k]^2
+        # end
 
-        if edmf.area_partition_model isa CoreCloakAreaPartitionModel
-            # upcloak
-            TKE += FT(0.5) * TD.air_density(thermo_params, aux_en.ts_cloak_up[k]) * (aux_en.a_cloak_up[k]) * Ic.(aux_en_f.w_cloak_up)[k]^2
-            # downcloak
-            TKE += FT(0.5) * TD.air_density(thermo_params, aux_en.ts_cloak_dn[k]) * (aux_en.a_cloak_dn[k]) * Ic.(aux_en_f.w_cloak_dn)[k]^2
-            # env_remaining
-            TKE += FT(0.5) * TD.air_density(thermo_params, aux_en.ts_en_remaining[k]) * (aux_en.a_en_remaining[k]) * Ic.(aux_en_f.w_en_remaining)[k]^2
-        else # Remove env KE
-            TKE += FT(0.5) * TD.air_density(thermo_params, aux_en.ts[k]) * (aux_en.area[k]) * Ic.(aux_en_f.w)[k]^2
-        end
+        # if edmf.area_partition_model isa CoreCloakAreaPartitionModel
+        #     # upcloak
+        #     TKE += FT(0.5) * TD.air_density(thermo_params, aux_en.ts_cloak_up[k]) * (aux_en.a_cloak_up[k]) * Ic.(aux_en_f.w_cloak_up)[k]^2
+        #     # downcloak
+        #     TKE += FT(0.5) * TD.air_density(thermo_params, aux_en.ts_cloak_dn[k]) * (aux_en.a_cloak_dn[k]) * Ic.(aux_en_f.w_cloak_dn)[k]^2
+        #     # env_remaining
+        #     TKE += FT(0.5) * TD.air_density(thermo_params, aux_en.ts_en_remaining[k]) * (aux_en.a_en_remaining[k]) * Ic.(aux_en_f.w_en_remaining)[k]^2
+        # else # Remove env KE
+        #     TKE += FT(0.5) * TD.air_density(thermo_params, aux_en.ts[k]) * (aux_en.area[k]) * Ic.(aux_en_f.w)[k]^2. # we dont graft anymore rn also it's hard to separate what's graf and wahts not. finally separating it out makes it hard for advection etc. to work right
+        # end
 
-        tke_convective = max(prog_en.ρatke_convective[k] - TKE, FT(0)) / (ρ_c[k] * aux_en.area[k]) # ensure non-negative convective tke
-
+        # tke_convective = max(prog_en.ρatke_convective[k] - TKE, FT(0)) / (ρ_c[k] * aux_en.area[k]) # ensure non-negative convective tke # we dont graft anymore rn
+        tke_convective = max(prog_en.ρatke_convective[k], FT(0)) # ensure non-negative convective tke 
 
         if edmf.convective_tke_handler isa ConvectiveTKE # rn this one keeps them separate but we need to add tke's so it acts on the real qt etc... i think just doing it to ρatke is enough.. not sure
             #= these have to be combined to generate variance etc correctly
