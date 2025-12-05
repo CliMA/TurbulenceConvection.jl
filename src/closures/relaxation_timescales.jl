@@ -42,9 +42,18 @@ function get_τs(param_set::APS, microphys_params::ACMP, relaxation_timescale::A
     if apply_supersaturation_scaling # need to do to Ns too
         thermo_params::TDPS = TCP.thermodynamics_params(param_set)
         S_i = TD.supersaturation(thermo_params, q, ρ, T, TD.Ice())
-        scaling_factor = INP_supersaturation_scaling_factor(param_set, S_i, q.ice, FT(Inf)) # never saturation q_ice_threshold so that we are never forced to 1
-        # N_INP *= INP_supersaturation_scaling_factor(param_set, S_i, q.ice, N_INP * m0_activation)
-        scaling_factor = iszero(scaling_factor) ? FT(Inf) : 1/scaling_factor
+        if S_i > zero(FT)
+            # we use FT(Inf) instead of q_ice_threshold so that we are never forced to 1 :: This is useful because ??
+            # This is bad because even when we have plenty of q, the timescale can get decimated....
+            # Also isn't N already adjusted? Why do we need to readjust based on supersaturation again? At least for INP_Aware_Timescales?
+            r0_activation = FT(10e-6) # 10 microns
+            m0_activation = particle_mass(param_set, ice_type, r0_activation)
+            # scaling_factor = INP_supersaturation_scaling_factor(param_set, S_i, q.ice, FT(Inf)) # never saturation q_ice_threshold so that we are never forced to 1 [[ is this a mistake? ]]
+            scaling_factor = INP_supersaturation_scaling_factor(param_set, S_i, q.ice, m0_activation) # never saturation q_ice_threshold so that we are never forced to 1 [[ is this a mistake? ]]
+            scaling_factor = iszero(scaling_factor) ? FT(Inf) : 1/scaling_factor
+        else
+            scaling_factor = one(FT)
+        end
         τ_ice = clamp(τ_ice, relaxation_timescale.args.min_τ_ice * scaling_factor, relaxation_timescale.args.max_τ_ice * scaling_factor)
     end
 
