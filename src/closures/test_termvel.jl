@@ -169,7 +169,7 @@ use_symlog = true
 if use_symlog
     scale_func = x -> symlog(x; n=linthreshy)
 else
-    scale_func = x -> x
+    scale_func = Base.identity
 end
 
 # -------------------------------------------------------------------- #

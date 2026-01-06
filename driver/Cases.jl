@@ -1432,7 +1432,7 @@ function initialize_profiles(case::SOCRATES, param_set, state; kwargs...) # Reli
             Initializing tke as 0 is bad because it prevents further tke generation, since buoyancy tke production is tied to tke existence (not sure it has to be that way)
             We have a couple options. Atlas LES suggests TKE peaks about about 2 m²/s² near cloud top for RF09, but we can try mediate based on stability... idk
         =#
-        aux_gm.tke[k] = FT(1) 
+        aux_gm.tke[k] = FT(1e-3)  # small nonzero tke to allow consistent intitial growth
     end
     prog_gm_uₕ = TC.grid_mean_uₕ(state) # not too well versed in the details here but this should set the wind profiles IC
     @. prog_gm_uₕ = CCG.Covariant12Vector(CCG.UVVector(prog_gm_u, prog_gm_v))

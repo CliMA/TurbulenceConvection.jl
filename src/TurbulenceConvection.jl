@@ -85,7 +85,10 @@ end
 
 # resolve_inf(x::FT; val::FT=FT(NaN)) where {FT} = isinf(x) ? val : x # replace inf with NaN
 
-full_print(x) = show(IOContext(stdout, :limit => false), "text/plain", x)
+full_print(x) = show(IOContext(stdout, :limit => false), "text/plain", x) # prints directly to io
+# full_print_inline(x) = sprint(io -> show(IOContext(io, :limit => false), "text/plain", x)) # returns string
+# gpt_full_print_inline(x) = Ref(sprint(io -> show(IOContext(io, :limit => false), "text/plain", x)))
+
 
 """
 Maybe i'm dumb but i can't find the constructor to create a StrideArray from an existing array

@@ -366,7 +366,9 @@ struct StalledUpdraftDetrainDowndrafts <: AbstractStalledUpdraftHandler end # if
 
 abstract type AbstractConvectiveTKEHandler end
 struct NoConvectiveTKE <: AbstractConvectiveTKEHandler end
-struct ConvectiveTKE{FT} <: AbstractConvectiveTKEHandler
+abstract type AbstractYesConvectiveTKEHandler <: AbstractConvectiveTKEHandler end
+
+struct ConvectiveTKE{FT} <: AbstractYesConvectiveTKEHandler
     "buoyancy_coeff::FT"
     buoyancy_coeff::FT
     "advection_coeff::FT"
@@ -416,6 +418,39 @@ function ConvectiveTKE(param_set::APS, namelist)
         transport_conserved_by_advection,
         entr_detr_rate_inv_s,
     )            
+end
+
+struct ConvectiveTKEProductionAndGraftOnly{FT} <: AbstractYesConvectiveTKEHandler # Only calculates convective tke production, and grafts it onto the updraft
+    "buoyancy_coeff::FT"
+    buoyancy_coeff::FT
+    "entr_detr_rate_inv_s::FT"
+    entr_detr_rate_inv_s::FT # Time rate for grafting onto updraft
+end
+function ConvectiveTKEProductionAndGraftOnly(param_set::APS, namelist)
+    FT = eltype(param_set)
+    buoyancy_coeff = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "convective_tke_buoyancy_coeff"; default = FT(1.0))
+    entr_detr_rate_inv_s = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "tke_conv_entr_detr_rate_inv_s"; default = FT(0)) # default 0 means no grafting onto updraft (infinite time scale)
+    return ConvectiveTKEProductionAndGraftOnly{FT}(
+        buoyancy_coeff,
+        entr_detr_rate_inv_s,
+    )            
+end
+
+function get_ConvectiveTKE(param_set::APS, namelist)
+    use_convective_tke = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "use_convective_tke"; default = false, valid_options = [true, false])
+    if use_convective_tke
+        convective_tke_model_type = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "convective_tke_model_type"; default = "convective_tke", valid_options = ["convective_tke", "convective_tke_production_and_graft_only"])
+        if convective_tke_model_type == "convective_tke"
+            return ConvectiveTKE(param_set, namelist)
+        elseif convective_tke_model_type == "convective_tke_production_and_graft_only"
+            return ConvectiveTKEProductionAndGraftOnly(param_set, namelist)
+        else
+            error("Unknown convective_tke_model_type: $convective_tke_model_type")
+        end
+        
+    else
+        return NoConvectiveTKE()
+    end
 end
 
 # ========== Entrainment/Detrainment Models ============================================================================== #
@@ -1751,7 +1786,7 @@ function EDMFModel(::Type{FT}, namelist, precip_model, rain_formation_model, par
     # -- Convective TKE ---------------------------------------------------------------- #
 
     use_convective_tke = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "use_convective_tke"; default = false, valid_options = [true, false])
-    convective_tke = use_convective_tke ? ConvectiveTKE(param_set, namelist) : NoConvectiveTKE()
+    convective_tke = use_convective_tke ? get_ConvectiveTKE(param_set, namelist) : NoConvectiveTKE()
 
 
     # -- Entrainment Type --------------------------------------------------------------- #

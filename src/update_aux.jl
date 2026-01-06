@@ -226,43 +226,44 @@ function update_aux!(edmf::EDMFModel, state::State, surf::SurfaceBase, param_set
         aux_en.area[k] = 1 - aux_bulk.area[k]
         aux_en.tke[k] = prog_en.ρatke[k] / (ρ_c[k] * aux_en.area[k])
 
-
-        # remove TKE from convective TKE
-         # remove updraft and/or udpraft cloak from convective tke since they double count
-        # TKE = FT(0)
-        # thermo_params = TCP.thermodynamics_params(param_set)
-        # @inbounds for i in 1:n_updrafts(edmf)
-        #     TKE += FT(0.5) * TD.air_density(thermo_params, aux_up[i].ts[k]) * aux_up[i].area[k] * Ic.(aux_up_f[i].w)[k]^2
-        # end
-
-        # if edmf.area_partition_model isa CoreCloakAreaPartitionModel
-        #     # upcloak
-        #     TKE += FT(0.5) * TD.air_density(thermo_params, aux_en.ts_cloak_up[k]) * (aux_en.a_cloak_up[k]) * Ic.(aux_en_f.w_cloak_up)[k]^2
-        #     # downcloak
-        #     TKE += FT(0.5) * TD.air_density(thermo_params, aux_en.ts_cloak_dn[k]) * (aux_en.a_cloak_dn[k]) * Ic.(aux_en_f.w_cloak_dn)[k]^2
-        #     # env_remaining
-        #     TKE += FT(0.5) * TD.air_density(thermo_params, aux_en.ts_en_remaining[k]) * (aux_en.a_en_remaining[k]) * Ic.(aux_en_f.w_en_remaining)[k]^2
-        # else # Remove env KE
-        #     TKE += FT(0.5) * TD.air_density(thermo_params, aux_en.ts[k]) * (aux_en.area[k]) * Ic.(aux_en_f.w)[k]^2. # we dont graft anymore rn also it's hard to separate what's graf and wahts not. finally separating it out makes it hard for advection etc. to work right
-        # end
-
-        # tke_convective = max(prog_en.ρatke_convective[k] - TKE, FT(0)) / (ρ_c[k] * aux_en.area[k]) # ensure non-negative convective tke # we dont graft anymore rn
-        tke_convective = max(prog_en.ρatke_convective[k], FT(0)) # ensure non-negative convective tke 
-
         if edmf.convective_tke_handler isa ConvectiveTKE # rn this one keeps them separate but we need to add tke's so it acts on the real qt etc... i think just doing it to ρatke is enough.. not sure
+
+            # remove TKE from convective TKE
+            # remove updraft and/or udpraft cloak from convective tke since they double count
+            # TKE = FT(0)
+            # thermo_params = TCP.thermodynamics_params(param_set)
+            # @inbounds for i in 1:n_updrafts(edmf)
+            #     TKE += FT(0.5) * TD.air_density(thermo_params, aux_up[i].ts[k]) * aux_up[i].area[k] * Ic.(aux_up_f[i].w)[k]^2
+            # end
+
+            # if edmf.area_partition_model isa CoreCloakAreaPartitionModel
+            #     # upcloak
+            #     TKE += FT(0.5) * TD.air_density(thermo_params, aux_en.ts_cloak_up[k]) * (aux_en.a_cloak_up[k]) * Ic.(aux_en_f.w_cloak_up)[k]^2
+            #     # downcloak
+            #     TKE += FT(0.5) * TD.air_density(thermo_params, aux_en.ts_cloak_dn[k]) * (aux_en.a_cloak_dn[k]) * Ic.(aux_en_f.w_cloak_dn)[k]^2
+            #     # env_remaining
+            #     TKE += FT(0.5) * TD.air_density(thermo_params, aux_en.ts_en_remaining[k]) * (aux_en.a_en_remaining[k]) * Ic.(aux_en_f.w_en_remaining)[k]^2
+            # else # Remove env KE
+            #     TKE += FT(0.5) * TD.air_density(thermo_params, aux_en.ts[k]) * (aux_en.area[k]) * Ic.(aux_en_f.w)[k]^2. # we dont graft anymore rn also it's hard to separate what's graf and wahts not. finally separating it out makes it hard for advection etc. to work right
+            # end
+
             #= these have to be combined to generate variance etc correctly
             I don't want to rewrite all that code separately.. idk.
 
             We could separate out the variance generating part in `compute_en_tendencies!()` but we'd also have to fix entrainment and detrainment...
             =#
-            # aux_en.tke[k] += tke_convective  # test not using this
-        end
 
-        # aux_en.tke_convective[k] = prog_en.ρatke_convective[k] / (ρ_c[k] * aux_en.area[k])
-        aux_en.tke_convective[k] = tke_convective
-        # aux_en.tke_convective_production[k] = aux_en.tke_convective_production[k] / (ρ_c[k] * aux_en.area[k]) # for some reason these have ρa in ρatke but are named this way so we follow
-        # aux_en.tke_convective_advection[k] = aux_en.tke_convective_advection[k] / (ρ_c[k] * aux_en.area[k]) # for some reason these have ρa in ρatke but are named this way so we follow
-        # aux_en.tke_convective_dissipation[k] = aux_en.tke_convective_dissipation[k] / (ρ_c[k] * aux_en.area[k]) # for some reason these have ρa in ρatke but are named this way so we follow
+            # tke_convective = max(prog_en.ρatke_convective[k] - TKE, FT(0)) / (ρ_c[k] * aux_en.area[k]) # ensure non-negative convective tke # we dont graft anymore rn
+            tke_convective = max(prog_en.ρatke_convective[k], FT(0)) # ensure non-negative convective tke 
+
+            # aux_en.tke[k] += tke_convective  # test not using this
+
+            # aux_en.tke_convective[k] = prog_en.ρatke_convective[k] / (ρ_c[k] * aux_en.area[k])
+            aux_en.tke_convective[k] = tke_convective
+            # aux_en.tke_convective_production[k] = aux_en.tke_convective_production[k] / (ρ_c[k] * aux_en.area[k]) # for some reason these have ρa in ρatke but are named this way so we follow
+            # aux_en.tke_convective_advection[k] = aux_en.tke_convective_advection[k] / (ρ_c[k] * aux_en.area[k]) # for some reason these have ρa in ρatke but are named this way so we follow
+            # aux_en.tke_convective_dissipation[k] = aux_en.tke_convective_dissipation[k] / (ρ_c[k] * aux_en.area[k]) # for some reason these have ρa in ρatke but are named this way so we follow
+        end
 
         if edmf.thermo_covariance_model isa PrognosticThermoCovariances
             aux_en.Hvar[k] = prog_en.ρaHvar[k] / (ρ_c[k] * aux_en.area[k])
@@ -1183,6 +1184,7 @@ function update_aux!(edmf::EDMFModel, state::State, surf::SurfaceBase, param_set
             ∇b = bg,
             Shear² = Shear²[k],
             tke = aux_en.tke[k],
+            # tke = (edmf.convective_tke_handler isa ConvectiveTKE) ? (aux_en.tke[k] + aux_en.tke_convective[k]) : aux_en.tke[k], # we do need correct mixing lengths in general though
             b_exch = b_exch[k],
         )
 
@@ -1192,6 +1194,10 @@ function update_aux!(edmf::EDMFModel, state::State, surf::SurfaceBase, param_set
         aux_tc.ml_ratio[k] = ml.ml_ratio
 
         KM[k] = c_m * ml.mixing_length * sqrt(max(aux_en.tke[k], 0))
+        # if edmf.convective_tke_handler isa ConvectiveTKE
+            # f_c_m::FT = FT(edmf.convective_tke_handler.ed_scaling_factor)
+            # KM[k] += c_m * f_c_m * ml.mixing_length * sqrt(max(aux_en.tke_convective[k], 0))  # Maybe don't do this because we do transport seprately for convective tke
+        # end
         KH[k] = KM[k] / aux_tc.prandtl_nvec[k]
         KQ[k] = KH[k] / Le
 
@@ -1309,9 +1315,7 @@ function update_aux!(edmf::EDMFModel, state::State, surf::SurfaceBase, param_set
             # don't let STD of θ_liq_ice be larger than half the mean value
             aux_en.Hvar[k] = clamp(aux_en.Hvar[k], FT(0), (aux_en.θ_liq_ice[k]/2)^2)
             aux_en.QTvar[k] = clamp(aux_en.QTvar[k], FT(0), (aux_en.q_tot[k]/2)^2)
-
-            aux_en.HQTcov[k] = max(aux_en.HQTcov[k], -sqrt(aux_en.Hvar[k] * aux_en.QTvar[k]))
-            aux_en.HQTcov[k] = min(aux_en.HQTcov[k], sqrt(aux_en.Hvar[k] * aux_en.QTvar[k]))
+            aux_en.HQTcov[k] = clamp(aux_en.HQTcov[k], -sqrt(aux_en.Hvar[k] * aux_en.QTvar[k]), sqrt(aux_en.Hvar[k] * aux_en.QTvar[k]))
         end
         ae_surf = 1 - aux_bulk.area[kc_surf]
         aux_en.Hvar[kc_surf] = ae_surf * get_surface_variance(flux1 / ρLL, flux1 / ρLL, ustar, zLL, oblength)
@@ -1353,6 +1357,18 @@ function update_aux!(edmf::EDMFModel, state::State, surf::SurfaceBase, param_set
         σ_X = sqrt(max(σ2_X, 0.0))
         frac_supersat = σ_X > 0 ? 1 - Distributions.cdf(Distributions.Normal(0, σ_X), -μ_X) : (μ_X > 0 ? one(FT) : zero(FT)) # fraction supersaturated
         aux_en.frac_supersat[k] = frac_supersat # for debugging
+
+        # Store liq separately
+        q_vap_sat_liq = TD.q_vap_saturation_generic(thermo_params, T, TD.air_density(thermo_params, ts), TD.Liquid())
+        dq_sat_dT_liq = L_v * q_vap_sat_liq / (R_v * T^2) # Clausius–Clapeyron slope for linearization
+        α_liq = dq_sat_dT_liq * β
+        μ_X_liq = qt_mean - q_vap_sat_liq # linear combination mean and variance
+        σ2_X_liq = qt_std^2 + (α_liq*θli_std)^2 - 2*α_liq*cov_qtθ
+        σ_X_liq = sqrt(max(σ2_X_liq, 0.0))
+        frac_supersat_liq = σ_X_liq > 0 ? 1 - Distributions.cdf(Distributions.Normal(0, σ_X_liq), -μ_X_liq) : (μ_X_liq > 0 ? one(FT) : zero(FT)) # fraction supersaturated
+        aux_en.frac_supersat_liq[k] = frac_supersat_liq
+
+
     end
     # =================================== #
 

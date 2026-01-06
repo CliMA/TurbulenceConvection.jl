@@ -22,6 +22,10 @@ toscalar(x::CCG.Covariant3Vector) = x.u₃
 toscalar(x::CCG.Contravariant3Vector) = x.u³ # from dennis., not sure precisely why it works... or why it needs to wvector... [ think method might not exist properly like this]
 toscalar(x::CCG.WVector) = x.w # see https://github.com/CliMA/ClimaAtmos.jl/pull/2179#discussion_r1411416543
 
+# function toscalar(x::CCG.Wvector)
+#     return LinearAlgebra.dot.(x, Ref(ClimaCore.Geometry.WVector(1.0)))
+# end
+
 const lazy = CC.MatrixFields.lazy
 # const @lazy = CC.MatrixFields.@lazy
 

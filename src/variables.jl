@@ -308,6 +308,7 @@ cent_aux_vars_edmf(::Type{FT}, local_geometry, edmf, calibrate_io_val::Val{calib
             instability = FT(0),
             stability = FT(0),
             frac_supersat = FT(0),
+            frac_supersat_liq = FT(0),
             #
             Hvar = FT(0),
             QTvar = FT(0),

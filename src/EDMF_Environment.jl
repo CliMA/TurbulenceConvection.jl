@@ -199,7 +199,7 @@ function microphysics!(
             if en_thermo isa SGSMean
 
                 do_cloak = (edmf.area_partition_model isa CoreCloakAreaPartitionModel) && (edmf.area_partition_model.apply_cloak_to_condensate_formation) && (aux_bulk.area[k] > edmf.minimum_area)
-                # (region_area, w_region, T, ts, cloak_up) 
+                # ::: (region_area, w_region, T, ts, cloak_up) ::: #
                 if !do_cloak
                     regions = ((aux_en.area[k], w[k], aux_en.T[k], ts_env[k], Env),)
                 else
@@ -244,7 +244,6 @@ function microphysics!(
                     if (edmf.convective_tke_handler isa ConvectiveTKE) && (region isa EnvDomain)
                         # assume the condensate is in the tke part going up KE = 1/2 ρ w^2. critical to generating condensate
                         w_noneq = sqrt(2 * aux_en.tke[k] / ρ)
-                        
                         # Now, we assume liq is biased with covariance, when we add this eddy mixing so we go up and down 1SD, but assume liq is tied to +1 SD
                     else
                         w_noneq = w[k]
@@ -262,8 +261,13 @@ function microphysics!(
                         end
                     end
 
-
                     mph_neq_here = noneq_moisture_sources(param_set, nonequilibrium_moisture_scheme, moisture_sources_limiter, region_area, ρ_c[k], aux_en.p[k], T, Δt + ε, ts, w_noneq, q_vap_sat_liq, q_vap_sat_ice, dqvdt, dTdt, τ_liq_here, τ_ice_here)
+                    
+                    # prevent excess losses when not using quadrature
+                    mph_neq_here = NoneqMoistureSources(
+                        max(mph_neq_here.ql_tendency, -(aux_en.q_liq[k] * aux_en.frac_supersat_liq[k]) / (Δt + ε)), # cannot remove more liq than exists subsaturated
+                        max(mph_neq_here.qi_tendency, -(aux_en.q_ice[k] * max(aux_en.frac_supersat[k], aux_en.frac_supersat_liq[k])) / (Δt + ε)), # cannot remove more ice than exists subsaturated
+                    )
 
                     if region isa EnvRemainingDomain
                         aux_en.qi_tendency_sub_dep_en_remaining[k] = mph_neq_here.qi_tendency
@@ -1381,6 +1385,8 @@ function microphysics!(
             q = TD.PhasePartition(thermo_params, ts)
             ρ = TD.air_density(thermo_params, ts)
 
+            S_i = TD.supersaturation(thermo_params, q, ρ, aux_en.T[k], TD.Ice())
+
             vars::QuadratureVarsType{FT} = (;
                 qt′qt′ = aux_en.QTvar[k],
                 qt_mean = aux_en.q_tot[k],
@@ -1423,7 +1429,7 @@ function microphysics!(
                 dqvdt = aux_tc.dqvdt[k],
                 dTdt = aux_tc.dTdt[k],
                 #
-                S_i = (moisture_model isa NonEquilibriumMoisture) ? TD.supersaturation(thermo_params, q, ρ, aux_en.T[k], TD.Ice()) : FT(NaN), # only needed for NonEq
+                S_i = (moisture_model isa NonEquilibriumMoisture) ? S_i : FT(NaN), # only needed for NonEq
                 N_INP = (moisture_model isa NonEquilibriumMoisture) ? get_INP_concentration(param_set, moisture_model.scheme, q, aux_en.T[k], ρ, w[k], S_i) : FT(NaN), # only needed for NonEq
                 τ_liq = aux_en.τ_liq[k], # only needed for NonEq
                 τ_ice = aux_en.τ_ice[k], # only needed for NonEq

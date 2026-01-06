@@ -75,6 +75,7 @@ function io_dictionary_aux(edmf) # added EDMF as an argument so we can have thin
         "instability" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_environment(state).instability),
         "stability" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_environment(state).stability),
         "frac_supersat" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_environment(state).frac_supersat),
+        "frac_supersat_liq" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_environment(state).frac_supersat_liq),
 
         "Hvar_dissipation" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_environment_2m(state).Hvar.dissipation),
         "Hvar_entr_gain" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_environment_2m(state).Hvar.entr_gain),
@@ -159,6 +160,14 @@ function io_dictionary_aux(edmf) # added EDMF as an argument so we can have thin
         # TEMPORARY
         "diffusive_flux_qt" => (; dims = ("zf", "t"), group = "profiles", field = state -> face_aux_turbconv(state).diffusive_flux_qt),
         "massflux_qt" => (; dims = ("zf", "t"), group = "profiles", field = state -> face_aux_turbconv(state).massflux_qt),
+        "diffusive_flux_h" => (; dims = ("zf", "t"), group = "profiles", field = state -> face_aux_turbconv(state).diffusive_flux_h),
+        "massflux_h" => (; dims = ("zf", "t"), group = "profiles", field = state -> face_aux_turbconv(state).massflux_h),
+        # "KH" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_turbconv(state).KH), # see ddy diffusivity
+        # "KM" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_turbconv(state).KM), # see eddy viscosity
+        "KQ" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_turbconv(state).KQ), # moisture eddy diffusivity
+
+        "massflux_ql" => (; dims = ("zf", "t"), group = "profiles", field = state -> face_aux_turbconv(state).massflux_ql),
+        "massflux_qi" => (; dims = ("zf", "t"), group = "profiles", field = state -> face_aux_turbconv(state).massflux_qi),
 
         "ed_length_scheme" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_turbconv(state).mls),
         "mixing_length_ratio" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_turbconv(state).ml_ratio),

@@ -380,15 +380,11 @@ function compute_precipitation_sink_tendencies(
 
             # -------------------------- #
             S_i = TD.supersaturation(thermo_params, q_region, ρ_region, T_region, TD.Ice())
-            N_INP = get_INP_concentration(param_set, edmf.moisture_model.scheme, q_region, T_region, ρ_region, w, S_i)
-            # if edmf.moisture_model isa NonEquilibriumMoisture
-            #     N_INP = get_INP_concentration(param_set, edmf.moisture_model.scheme, q_region, T_region, ρ_region, w, S_i)
-            # else
-            #     # N_INP = get_N_i_Cooper_curve(T_region; clamp_N=true)
-            #     N_INP = get_INP_concentration(param_set, edmf.moisture_model.scheme, q_region, T_region, ρ_region, w, S_i)
-            # end
-
-            N_s_min = max(N_INP - N_i, FT(0)) # the fewest N,
+            N_INP = get_INP_concentration(param_set, edmf.moisture_model.scheme, q_region, T_region, ρ_region, w, S_i) # this should really be including snow in some way... e.g. below supersat limit but having snow can happen...
+            
+            r_thresh = get_r_cond_precip(param_set, ice_type) * FT(param_set.user_params.r_ice_snow_threshold_scaling_factor)
+            N_thresh = N_from_qr(param_set, ice_type, qs_region, r_thresh; monodisperse=false) # threshold N based on current qs
+            N_s_min = max(N_INP - N_i, N_thresh) # the fewest N,
             if N_s_min > FT(0) && (qs_region > 1e-9) # we could add dry aerosol mass but we don't know N, # we will do this by varying lambda...
                 _, λ_min = get_n0_lambda(param_set, snow_type, qs_region, ρ_region, N_s_min) # the largest droplets we should allow... [so lambda is smallest]
             else
