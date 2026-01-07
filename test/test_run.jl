@@ -532,8 +532,9 @@ for flight_number in flight_numbers
         # namelist["turbulence"]["EDMF_PrognosticTKE"]["convective_tke_ed_scaling_factor"] = FT(1)
         namelist["turbulence"]["EDMF_PrognosticTKE"]["tke_conv_entr_detr_rate_inv_s"] = FT(0)
 
-        namelist["turbulence"]["EDMF_PrognosticTKE"]["convective_tke_model_type"] = "convective_tke_production_and_graft_only"
+        # namelist["turbulence"]["EDMF_PrognosticTKE"]["convective_tke_model_type"] = "convective_tke_production_and_graft_only"
         # namelist["turbulence"]["EDMF_PrognosticTKE"]["convective_tke_model_type"] = "convective_tke"
+        delete!.(Ref(namelist["turbulence"]["EDMF_PrognosticTKE"]), ["convective_tke_model_type",])
 
         # namelist["user_params"]["S_ice_min_activation"] = FT(0.1) # default 0.01, higher means less ice nucleation
 

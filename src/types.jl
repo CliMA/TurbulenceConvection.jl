@@ -437,7 +437,7 @@ function ConvectiveTKEProductionAndGraftOnly(param_set::APS, namelist)
 end
 
 function get_ConvectiveTKE(param_set::APS, namelist)
-    convective_tke_model_type = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "convective_tke_model_type"; default = "convective_tke", valid_options = ["no_convective_tke", "convective_tke", "convective_tke_production_and_graft_only"])
+    convective_tke_model_type = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "convective_tke_model_type"; default = "no_convective_tke", valid_options = ["no_convective_tke", "convective_tke", "convective_tke_production_and_graft_only"])
     if convective_tke_model_type == "convective_tke"
         return ConvectiveTKE(param_set, namelist)
     elseif convective_tke_model_type == "convective_tke_production_and_graft_only"
