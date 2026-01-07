@@ -1381,6 +1381,7 @@ function compute_domain_interaction_microphysics_tendencies!(
     aux_bulk_f = face_aux_bulk(state)
     prog_gm = center_prog_grid_mean(state)
     aux_gm = center_aux_grid_mean(state)
+    aux_tc = center_aux_temporary_cache(state)
     ρ_c = prog_gm.ρ
     # precip_fraction = compute_precip_fraction(edmf, state)
     N_up = n_updrafts(edmf)

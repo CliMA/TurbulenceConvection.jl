@@ -128,7 +128,7 @@ function saturation_adjustment_given_pθq_and_liquid_fraction(
         maxiter,
     )
     if !sol.converged
-        if print_warning()
+        if TD.print_warning()
             TD.KA.@print("-----------------------------------------\n")
             TD.KA.@print("maxiter reached in saturation_adjustment_given_pθq:\n")
             TD.print_numerical_method(sat_adjust_method)
