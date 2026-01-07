@@ -516,7 +516,6 @@ for flight_number in flight_numbers
         # namelist["turbulence"]["EDMF_PrognosticTKE"]["fraction_of_area_above_max_area_allowed_in_cloak"] = 0.0
         # namelist["turbulence"]["EDMF_PrognosticTKE"]["l_max"] = 1e4 # default was 1e6
 
-        # namelist["turbulence"]["EDMF_PrognosticTKE"]["use_convective_tke"] = false
 
 
         namelist["turbulence"]["EDMF_PrognosticTKE"]["convective_tke_buoyancy_coeff"] = FT(.05)
@@ -539,7 +538,7 @@ for flight_number in flight_numbers
         # namelist["user_params"]["S_ice_min_activation"] = FT(0.1) # default 0.01, higher means less ice nucleation
 
 
-        delete!.(Ref(namelist["user_params"]), ["use_convective_tke", "convective_tke_buoyancy_coeff", "convective_tke_advection_coeff", "convective_tke_dissipation_coeff", "convective_tke_self_dissipation_coeff", "entr_detr_rate_inv_s", "convective_tke_ed_scaling_factor", "tke_conv_entr_inv_s"])
+        delete!.(Ref(namelist["user_params"]), ["convective_tke_buoyancy_coeff", "convective_tke_advection_coeff", "convective_tke_dissipation_coeff", "convective_tke_self_dissipation_coeff", "entr_detr_rate_inv_s", "convective_tke_ed_scaling_factor", "tke_conv_entr_inv_s"])
 
         # namelist["user_params"]["apply_nudging_to_updraft"] = true # if this is true, the updraft will feel the nudging just as much as the environment, otherwise the env would feel all of it... I think we need this. The LES updraft for RF09 doesn't go that high. without this i think we risk overshoots when say a warm updraft impinges, the environment takes the nudging cooling in response, and the updraft continues to accelerate.
         # namelist["user_params"]["condensate_qt_SD"] = -.26

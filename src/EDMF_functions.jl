@@ -358,8 +358,7 @@ function compute_sgs_flux!(edmf::EDMFModel, state::State, surf::SurfaceBase, par
                         perturbation = aux_tc_f.temporary_f2
                         @. perturbation = clamp(-1 * ℓ_mix * toscalar(wvec(∇f(q_tot_en - q_liq_en - q_ice_en))), -sqrt(max(If(aux_en.QTvar), 0)), sqrt(max(If(aux_en.QTvar), 0))) # Value: -1 * L * Gradient_at_Face | Min/Max: Interp Center -> Face
 
-                        # efficiency = FT(0.25)
-                        efficiency = FT(1)
+                        efficiency = FT(0.25)
                         # @. massflux_qt = massflux_ql + massflux_qi + 
                         #     # --- Stream 1, 2 Advection ---
                         #     (massflux_en_conv * efficiency) * If((q_tot_en - q_liq_en - q_ice_en) + perturbation_old) +
@@ -2961,6 +2960,7 @@ function compute_en_tendencies!(
         c_p     = TCP.cp_d(param_set)
         R_d     = TCP.R_d(param_set)
         ℓ_mix   = FT(500) 
+
 
         @inbounds for k in real_center_indices(grid)
             
