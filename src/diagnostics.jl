@@ -166,6 +166,8 @@ function io_dictionary_aux(edmf) # added EDMF as an argument so we can have thin
         # "KM" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_turbconv(state).KM), # see eddy viscosity
         "KQ" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_turbconv(state).KQ), # moisture eddy diffusivity
 
+        "diffusive_flux_ql" => (; dims = ("zf", "t"), group = "profiles", field = state -> face_aux_turbconv(state).diffusive_flux_ql),
+        "diffusive_flux_qi" => (; dims = ("zf", "t"), group = "profiles", field = state -> face_aux_turbconv(state).diffusive_flux_qi),
         "massflux_ql" => (; dims = ("zf", "t"), group = "profiles", field = state -> face_aux_turbconv(state).massflux_ql),
         "massflux_qi" => (; dims = ("zf", "t"), group = "profiles", field = state -> face_aux_turbconv(state).massflux_qi),
 

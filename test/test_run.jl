@@ -518,11 +518,11 @@ for flight_number in flight_numbers
 
 
 
-        namelist["turbulence"]["EDMF_PrognosticTKE"]["convective_tke_buoyancy_coeff"] = FT(.05)
-        namelist["turbulence"]["EDMF_PrognosticTKE"]["convective_tke_advection_coeff"] = FT(0.1)
-        namelist["turbulence"]["EDMF_PrognosticTKE"]["convective_tke_dissipation_coeff"] = FT(0.05) # smaller than generation
-        namelist["turbulence"]["EDMF_PrognosticTKE"]["convective_tke_self_dissipation_coeff"] = FT(0.002) # extra dissipation when tke is convectively generated [ this one is the problem ]
-        namelist["turbulence"]["EDMF_PrognosticTKE"]["convective_tke_transport_tke_by_advection"] = true
+        # namelist["turbulence"]["EDMF_PrognosticTKE"]["convective_tke_buoyancy_coeff"] = FT(.05)
+        # namelist["turbulence"]["EDMF_PrognosticTKE"]["convective_tke_advection_coeff"] = FT(0.1)
+        # namelist["turbulence"]["EDMF_PrognosticTKE"]["convective_tke_dissipation_coeff"] = FT(0.05) # smaller than generation
+        # namelist["turbulence"]["EDMF_PrognosticTKE"]["convective_tke_self_dissipation_coeff"] = FT(0.002) # extra dissipation when tke is convectively generated [ this one is the problem ]
+        # namelist["turbulence"]["EDMF_PrognosticTKE"]["convective_tke_transport_tke_by_advection"] = true
         # namelist["turbulence"]["EDMF_PrognosticTKE"]["convective_tke_transport_conserved_by_advection"] = true
         # namelist["turbulence"]["EDMF_PrognosticTKE"]["convective_tke_transport_condensed_by_advection"] = true
 
@@ -530,11 +530,10 @@ for flight_number in flight_numbers
         # namelist["turbulence"]["EDMF_PrognosticTKE"]["convective_tke_ed_scaling_factor"] = (1/(namelist["turbulence"]["EDMF_PrognosticTKE"]["tke_ed_coeff"])) / 2 # so that ed is same as default at max convective tke
         # namelist["turbulence"]["EDMF_PrognosticTKE"]["convective_tke_ed_scaling_factor"] = FT(20)
         # namelist["turbulence"]["EDMF_PrognosticTKE"]["convective_tke_ed_scaling_factor"] = FT(1)
-        namelist["turbulence"]["EDMF_PrognosticTKE"]["tke_conv_entr_detr_rate_inv_s"] = FT(0)
+        # namelist["turbulence"]["EDMF_PrognosticTKE"]["tke_conv_entr_detr_rate_inv_s"] = FT(0)
 
         # namelist["turbulence"]["EDMF_PrognosticTKE"]["convective_tke_model_type"] = "convective_tke_production_and_graft_only"
         # namelist["turbulence"]["EDMF_PrognosticTKE"]["convective_tke_model_type"] = "convective_tke"
-        delete!.(Ref(namelist["turbulence"]["EDMF_PrognosticTKE"]), ["convective_tke_model_type",])
 
         # namelist["user_params"]["S_ice_min_activation"] = FT(0.1) # default 0.01, higher means less ice nucleation
 
@@ -560,18 +559,23 @@ for flight_number in flight_numbers
         # namelist["turbulence"]["EDMF_PrognosticTKE"]["tke_diss_coeff"] = 0.01
         # namelist["user_params"]["initial_profile_updraft_area"] = FT(0.9*namelist["turbulence"]["EDMF_PrognosticTKE"]["max_area"]) * 0.0001
         # namelist["turbulence"]["EDMF_PrognosticTKE"]["max_area"] = FT(0.6) # stability (maybe we need to use the limiter instead tho to not get flat cloud tops?)
-        namelist["turbulence"]["EDMF_PrognosticTKE"]["tke_conv_entr_detr_rate_inv_s"] = FT(1/(0.0100*3600.0)) # 6 minutes
-        namelist["turbulence"]["EDMF_PrognosticTKE"]["tke_conv_entr_detr_rate_inv_s"] = FT(1e-2)
-        namelist["turbulence"]["EDMF_PrognosticTKE"]["tke_conv_entr_detr_rate_inv_s"] = FT(10)
+        # namelist["turbulence"]["EDMF_PrognosticTKE"]["tke_conv_entr_detr_rate_inv_s"] = FT(1/(0.0100*3600.0)) # 6 minutes
+        # namelist["turbulence"]["EDMF_PrognosticTKE"]["tke_conv_entr_detr_rate_inv_s"] = FT(1e-2)
+        # namelist["turbulence"]["EDMF_PrognosticTKE"]["tke_conv_entr_detr_rate_inv_s"] = FT(10)
         # namelist["turbulence"]["EDMF_PrognosticTKE"]["tke_conv_entr_detr_rate_inv_s"] = FT(0)
 
         # parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "tke_ed_coeff")
         # namelist["turbulence"]["EDMF_PrognosticTKE"]["tke_ed_coeff"] = 0.1
         # namelist["user_params"]["stable_updraft_area_reduction_factor"] = FT(5.0)
-        namelist["microphysics"]["microph_scaling_dep_sub"] = FT(4.0)
+        # namelist["microphysics"]["microph_scaling_dep_sub"] = FT(4.0)
         # namelist["microphysics"]["microph_scaling_melt"] = FT(1)
         # namelist["user_params"]["q_min"] = eps(FT)
 
+        namelist["turbulence"]["EDMF_PrognosticTKE"]["c_KQl"] = FT(1)
+        namelist["turbulence"]["EDMF_PrognosticTKE"]["c_KQi"] = FT(1)
+
+        namelist["turbulence"]["EDMF_PrognosticTKE"]["c_KTKEql"] = FT(.1)
+        namelist["turbulence"]["EDMF_PrognosticTKE"]["c_KTKEqi"] = FT(.1)
 
         # namelist["user_args"]["snow_terminal_velocity_scheme"] = "Blk1MVel"
 

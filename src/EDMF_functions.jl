@@ -313,8 +313,6 @@ function compute_sgs_flux!(edmf::EDMFModel, state::State, surf::SurfaceBase, par
 
                 # -=-=-=-=-==-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=- #
 
-
-
                 if !(edmf.moisture_model isa NonEquilibriumMoisture) || ((edmf.moisture_model isa NonEquilibriumMoisture) && !edmf.convective_tke_handler.transport_conserved_by_advection) # if Eq or, despite having convective tke, not using advection for conserved quantities
                     # This is biased towards stability -- moister air goes up, drier air goes down
                     # @. massflux_qt = (massflux_en_conv) * If(q_tot_en + (2*frac_supersat - 1)*sqrt(aux_en.QTvar)) + (massflux_en - massflux_en_conv) * If(q_tot_en - (2*frac_supersat - 1)*sqrt(aux_en.QTvar))
@@ -936,11 +934,15 @@ function compute_diffusive_fluxes(edmf::EDMFModel, state::State, surf::SurfaceBa
             # @. aux_tc_f.diffusive_flux_qt = Ifx(-Ic(aux_tc_f.ρ_ae_KQ * f_K_tke) * ∇qc(wvec(Ifx(aux_en.q_tot)))) # convective tke removed from eddy diffusivity
 
             if edmf.moisture_model isa NonEquilibriumMoisture
-                @. aux_tc_f.diffusive_flux_ql = -aux_tc_f.ρ_ae_KQ * f_K_tke * ∇q_liq_en(wvec(aux_en.q_liq))
-                @. aux_tc_f.diffusive_flux_qi = -aux_tc_f.ρ_ae_KQ * f_K_tke * ∇q_ice_en(wvec(aux_en.q_ice))
+                c_KQl = mixing_length_params(edmf).c_KQl
+                c_KQi = mixing_length_params(edmf).c_KQi
+                @. aux_tc_f.diffusive_flux_ql = -(c_KQl * aux_tc_f.ρ_ae_KQ * f_K_tke) * ∇q_liq_en(wvec(aux_en.q_liq))
+                @. aux_tc_f.diffusive_flux_qi = -(c_KQi * aux_tc_f.ρ_ae_KQ * f_K_tke) * ∇q_ice_en(wvec(aux_en.q_ice))
             end
-            @. aux_tc_f.diffusive_flux_qr = -aux_tc_f.ρ_ae_KQ * f_K_tke * ∇q_rai_en(wvec(prog_pr.q_rai)) # add diffusive (SGS) flux for rain
-            @. aux_tc_f.diffusive_flux_qs = -aux_tc_f.ρ_ae_KQ * f_K_tke * ∇q_sno_en(wvec(prog_pr.q_sno)) # add diffusive (SGS) flux for snow
+            c_KQr = mixing_length_params(edmf).c_KQr
+            c_KQs = mixing_length_params(edmf).c_KQs
+            @. aux_tc_f.diffusive_flux_qr = -(c_KQr * aux_tc_f.ρ_ae_KQ * f_K_tke) * ∇q_rai_en(wvec(prog_pr.q_rai)) # add diffusive (SGS) flux for rain
+            @. aux_tc_f.diffusive_flux_qs = -(c_KQs * aux_tc_f.ρ_ae_KQ * f_K_tke) * ∇q_sno_en(wvec(prog_pr.q_sno)) # add diffusive (SGS) flux for snow
         else # diffusion [ # we also need to add in convective tke contributions separately to this diffusion ]
 
             if edmf.moisture_model isa NonEquilibriumMoisture
@@ -952,8 +954,10 @@ function compute_diffusive_fluxes(edmf::EDMFModel, state::State, surf::SurfaceBa
 
             # === Diffusive flux ql, qi === #
             if edmf.moisture_model isa NonEquilibriumMoisture
+                c_KQl = mixing_length_params(edmf).c_KQl
+                c_KQi = mixing_length_params(edmf).c_KQi
 
-                @. aux_tc_f.diffusive_flux_ql = -((aux_tc_f.ρ_ae_KQ * f_K_tke) * ∇q_liq_en(wvec(aux_en.q_liq))) -
+                @. aux_tc_f.diffusive_flux_ql = -((c_KQl * aux_tc_f.ρ_ae_KQ * f_K_tke) * ∇q_liq_en(wvec(aux_en.q_liq))) -
                 #  (f_c_m * sat_efficiency * aux_tc_f.ρ_ae_KQ * f_k_tke_conv) * ∇q_liq_en_tke_conv(wvec(aux_en.q_liq))
                     (sat_efficiency * ρ_f * IfKQconv(a_en * KMconv/(Prconv*Le))) * ∇q_liq_en_tke_conv(wvec(aux_en.q_liq))
 
@@ -964,12 +968,14 @@ function compute_diffusive_fluxes(edmf::EDMFModel, state::State, surf::SurfaceBa
 
 
             # === Diffusive flux qr, qs === #
-            @. aux_tc_f.diffusive_flux_qr = -((aux_tc_f.ρ_ae_KQ * f_K_tke) * ∇q_rai_en(wvec(prog_pr.q_rai))) -
+            c_KQr = mixing_length_params(edmf).c_KQr
+            c_KQs = mixing_length_params(edmf).c_KQs
+            @. aux_tc_f.diffusive_flux_qr = -((c_KQr * aux_tc_f.ρ_ae_KQ * f_K_tke) * ∇q_rai_en(wvec(prog_pr.q_rai))) -
             #  (f_c_m * aux_tc_f.ρ_ae_KQ * f_k_tke_conv) * ∇q_rai_en_tke_conv(wvec(prog_pr.q_rai))
                 (ρ_f * IfKQconv(a_en * KMconv/(Prconv*Le))) * ∇q_rai_en_tke_conv(wvec(prog_pr.q_rai))
 
             ∇qc = CCO.DivergenceF2C(; bottom = CCO.SetDivergence(FT(0)), top = CCO.SetDivergence(FT(0))) # placeholder
-            @. aux_tc_f.diffusive_flux_qs = -((aux_tc_f.ρ_ae_KQ * f_K_tke) * ∇q_sno_en(wvec(prog_pr.q_sno))) - 
+            @. aux_tc_f.diffusive_flux_qs = -((c_KQs * aux_tc_f.ρ_ae_KQ * f_K_tke) * ∇q_sno_en(wvec(prog_pr.q_sno))) - 
             #  (f_c_m * aux_tc_f.ρ_ae_KQ * f_k_tke_conv) * ∇q_sno_en_tke_conv(wvec(prog_pr.q_sno))
                 # (ρ_f * IfKQconv(a_en * KMconv/(Prconv*Le))) * ∇q_rai_en_tke_conv(wvec(prog_pr.q_rai)) # unstable [ needs higher K ]
                 (Ifx(ρ_c * a_en * KMconv/(Prconv*Le) * ∇qc(wvec(Ifx(prog_pr.q_sno))))) # stable [ needs higher K ]
@@ -984,11 +990,22 @@ function compute_diffusive_fluxes(edmf::EDMFModel, state::State, surf::SurfaceBa
     else # ::: Normal :::
 
         if edmf.moisture_model isa NonEquilibriumMoisture
-            @. aux_tc_f.diffusive_flux_ql = -aux_tc_f.ρ_ae_KQ * ∇q_liq_en(wvec(aux_en.q_liq))
-            @. aux_tc_f.diffusive_flux_qi = -aux_tc_f.ρ_ae_KQ * ∇q_ice_en(wvec(aux_en.q_ice))
+            c_KQl = mixing_length_params(edmf).c_KQl
+            c_KQi = mixing_length_params(edmf).c_KQi
+            @. aux_tc_f.diffusive_flux_ql = -(c_KQl * aux_tc_f.ρ_ae_KQ) * ∇q_liq_en(wvec(aux_en.q_liq))
+            @. aux_tc_f.diffusive_flux_qi = -(c_KQi * aux_tc_f.ρ_ae_KQ) * ∇q_ice_en(wvec(aux_en.q_ice))
+
+            # advective adjustment for condensible species
+            liquid_advection_factor = mixing_length_params(edmf).c_KTKEql
+            ice_advection_factor = mixing_length_params(edmf).c_KTKEqi
+            @. aux_tc_f.diffusive_flux_ql += ρ_f * Ifx(a_en * sqrt(aux_en.tke) * liquid_advection_factor * aux_en.q_liq)
+            @. aux_tc_f.diffusive_flux_qi += ρ_f * Ifx(a_en * sqrt(aux_en.tke) * ice_advection_factor * aux_en.q_ice)
+
         end
-        @. aux_tc_f.diffusive_flux_qr = -aux_tc_f.ρ_ae_KQ * ∇q_rai_en(wvec(prog_pr.q_rai)) # add diffusive (SGS) flux for rain
-        @. aux_tc_f.diffusive_flux_qs = -aux_tc_f.ρ_ae_KQ * ∇q_sno_en(wvec(prog_pr.q_sno)) # add diffusive (SGS) flux for snow
+        c_KQr = mixing_length_params(edmf).c_KQr # maybe these would be shared but I think sedimentation might change things idk
+        c_KQs = mixing_length_params(edmf).c_KQs # maybe these would be shared but I think sedimentation might change things idk
+        @. aux_tc_f.diffusive_flux_qr = -(c_KQr * aux_tc_f.ρ_ae_KQ) * ∇q_rai_en(wvec(prog_pr.q_rai)) # add diffusive (SGS) flux for rain
+        @. aux_tc_f.diffusive_flux_qs = -(c_KQs * aux_tc_f.ρ_ae_KQ) * ∇q_sno_en(wvec(prog_pr.q_sno)) # add diffusive (SGS) flux for snow
 
     end
 

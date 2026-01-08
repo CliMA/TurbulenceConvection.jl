@@ -650,6 +650,15 @@ Base.@kwdef struct MixingLengthParams{FT}
     Le::FT # Lewis number
     smin_ub::FT # lower limit for smin function
     l_max::FT
+    #
+    # My additions
+    c_KQl::FT # coefficient for liquid water effect on mixing length
+    c_KQi::FT # coefficient for ice water effect on mixing length
+    c_KQr::FT # coefficient for rain water effect on mixing length
+    c_KQs::FT # coefficient for snow water effect on mixing length
+    # advection
+    c_KTKEql::FT # coefficient for liquid water effect on TKE advection
+    c_KTKEqi::FT # coefficient for ice water effect on TKE advection
 end
 
 """
@@ -1855,6 +1864,15 @@ function EDMFModel(::Type{FT}, namelist, precip_model, rain_formation_model, par
         Le = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "Lewis_number"; default = 1.0),
         smin_ub = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "smin_ub"),
         l_max = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "l_max"; default = 1.0e6),
+        #
+        # My additions
+        c_KQl = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "c_KQl"; default = 1.0),
+        c_KQi = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "c_KQi"; default = 1.0),
+        c_KQr = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "c_KQr"; default = 1.0),
+        c_KQs = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "c_KQs"; default = 1.0),
+        # advection
+        c_KTKEql = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "c_KTKEql"; default = 1.0),
+        c_KTKEqi = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "c_KTKEqi"; default = 1.0),
     )
 
     entr_dim_scale = if entr_dim_scale == "buoy_vel"
