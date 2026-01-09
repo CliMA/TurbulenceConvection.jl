@@ -1871,8 +1871,8 @@ function EDMFModel(::Type{FT}, namelist, precip_model, rain_formation_model, par
         c_KQr = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "c_KQr"; default = 1.0),
         c_KQs = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "c_KQs"; default = 1.0),
         # advection
-        c_KTKEql = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "c_KTKEql"; default = 1.0),
-        c_KTKEqi = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "c_KTKEqi"; default = 1.0),
+        c_KTKEql = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "c_KTKEql"; default = 0.0), # off by default
+        c_KTKEqi = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "c_KTKEqi"; default = 0.0), # off by default
     )
 
     entr_dim_scale = if entr_dim_scale == "buoy_vel"

@@ -1795,11 +1795,11 @@ function N_from_qr(param_set::APS, q_type::CMTWaterTypes, q::FT, r::FT; monodisp
 
         if (iszero(Dmin) && isinf(Dmax))
             λ = (μ + FT(1)) / r # this is the scaling factor for the radius, so we can use it to get n0
-            _χm::FT = get_χm(param_set, ice_type) # this is the mass scaling factor, so we can use it to get n0
-            _m0::FT = m0(microphys_params, ice_type) # this is the mass of the ice crystal at the acnv radius
-            _r0::FT = r0(microphys_params, ice_type) # this is the radius of the ice crystal at the acnv radius
-            _me::FT = me(microphys_params, ice_type) # this is the exponent for the mass of the ice crystal
-            _Δm::FT = Δm(microphys_params, ice_type) # this is the exponent for the mass of the ice crystal
+            _χm::FT = get_χm(param_set, q_type) # this is the mass scaling factor, so we can use it to get n0
+            _m0::FT = m0(microphys_params, q_type) # this is the mass of the ice crystal at the acnv radius
+            _r0::FT = r0(microphys_params, q_type) # this is the radius of the ice crystal at the acnv radius
+            _me::FT = me(microphys_params, q_type) # this is the exponent for the mass of the ice crystal
+            _Δm::FT = Δm(microphys_params, q_type) # this is the exponent for the mass of the ice crystal
 
             Dmin = (add_dry_aerosol_mass ? max(param_set.user_params.particle_min_radius, Dmin) : Dmin)
             if iszero(Dmin)

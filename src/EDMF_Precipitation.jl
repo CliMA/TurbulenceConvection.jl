@@ -383,19 +383,35 @@ function compute_precipitation_sink_tendencies(
             N_INP = get_INP_concentration(param_set, edmf.moisture_model.scheme, q_region, T_region, ρ_region, w, S_i) # this should really be including snow in some way... e.g. below supersat limit but having snow can happen...
             
             r_thresh = get_r_cond_precip(param_set, ice_type) * FT(param_set.user_params.r_ice_snow_threshold_scaling_factor)
-            N_thresh = N_from_qr(param_set, ice_type, qs_region, r_thresh; monodisperse=false) # threshold N based on current qs
-            N_s_min = max(N_INP - N_i, N_thresh) # the fewest N,
-            if N_s_min > FT(0) && (qs_region > 1e-9) # we could add dry aerosol mass but we don't know N, # we will do this by varying lambda...
-                _, λ_min = get_n0_lambda(param_set, snow_type, qs_region, ρ_region, N_s_min) # the largest droplets we should allow... [so lambda is smallest]
+            N_thresh_max = N_from_qr(param_set, ice_type, qs_region, r_thresh; monodisperse=false) # threshold N based on current qs
+            N_thresh_max_S = N_from_qr(param_set, snow_type, qs_region, r_thresh; monodisperse=false) # threshold N based on current qs, but in snow form...
+            N_thresh_min = N_from_qr(param_set, ice_type, qs_region, r_thresh * 100; monodisperse=false) # threshold N based on current qs
+            N_thresh_min_S = N_from_qr(param_set, snow_type, qs_region, r_thresh * 100; monodisperse=false) # threshold N based on current qs, but in snow form...
+            # N_s_estimate = max(N_INP - N_i, N_thresh, N_thresh_S) # the N we will accept (to stop N_s from running off to 0, we have a lower bound)
+            N_s_estimate = clamp(N_INP - N_i, max(N_thresh_min, N_thresh_min_S), max(N_thresh_max, N_thresh_max_S)) # clamp to reasonable values based on current qs
+            # N_naive = N_from_qr(param_set, snow_type, qs_region, 1/CM1.lambda(microphys_params, snow_type, qs_region, ρ_region); monodisperse=false)
+            if N_s_estimate > FT(0) && (qs_region > 1e-9) # we could add dry aerosol mass but we don't know N, # we will do this by varying lambda...
+                _, λ_min = get_n0_lambda(param_set, snow_type, qs_region, ρ_region, N_s_estimate) # the largest droplets we should allow... [so lambda is smallest]
             else
-                λ_min = eps(FT)
+                # λ_min = eps(FT)
+                λ_min = CM1.lambda(microphys_params, snow_type, qs_region, ρ_region) # This would be the default value using default snow parameters
             end
-            λ_s = CM1.lambda(microphys_params, snow_type, qs_region, ρ_region)
-            λ_s = max(λ_s, λ_min) # so that we don't sublimate more than we have INP for
+            # λ_s = CM1.lambda(microphys_params, snow_type, qs_region, ρ_region) # This would be the default value using default snow parameters
+            # λ_s = max(λ_s, λ_min) # so that we don't sublimate more than we have INP for [[ this is the larger λ, smaller r ]]
             # λ_s = FT(NaN)
+            λ_s = λ_min
+            # λ_default = CM1.lambda(microphys_params, snow_type, qs_region, ρ_region) # This would be the default value using default snow parameters
             # -------------------------- #
 
-            tmp = α_dep_sub * my_evaporation_sublimation(microphys_params, snow_type, q_region, qs_region, ρ_region, T_region; _λ=λ_s) * precip_fraction
+            # if (qs_region > 1e-9) && (rand() < 1e-1)
+            #     # @warn "Snow deposition/sublimation active with qs = $qs_region kg/kg at T = $T_region K. N_INP = $N_INP #, N_s_estimate = $N_s_estimate, N_thresh = $N_thresh; N_thresh_S = $N_thresh_S; λ_s = $λ_s m⁻¹; r = 1/λ = $(1/λ_s) m"
+            #     @warn "Snow deposition/sublimation active with qs = $qs_region kg/kg at T = $T_region K. N_INP = $N_INP; N_s_estimate = $N_s_estimate; N_thresh_min = $N_thresh_min; N_thresh_min_S = $N_thresh_min_S; N_thresh_max = $N_thresh_max; N_thresh_max_S=$N_thresh_max_S; N_naive = $N_naive; λ_s = $λ_s m⁻¹; λ_default = $λ_default; r = 1/λ = $(1/λ_s) m"
+            # end
+
+            _n0_s = isnan(λ_s) ? n0(microphys_params, qs_region, ρ_region, snow_type) : n0(param_set, qs_region, ρ_region, snow_type, N_s_estimate)
+
+
+            tmp = α_dep_sub * my_evaporation_sublimation(microphys_params, snow_type, q_region, qs_region, ρ_region, T_region; _λ=λ_s, _n0 = _n0_s) * precip_fraction
             # tmp = α_dep_sub * CM1.evaporation_sublimation(microphys_params, snow_type, q_region, qs_region, ρ_region, T_region) * precip_fraction
 
             # Note if T makes a very low excursion (or too high) , while S*G might mostly cancel and give a real result, you can get NaN from 0 * Inf or something, but I think this is just a legitimate model crash bc those temps are super extreme.
@@ -407,9 +423,6 @@ function compute_precipitation_sink_tendencies(
             dv = FT(0)
             # dv += Δt * max(aux_tc.dqvdt[k] * aux_tc.area[k], FT(0)) # hopefully this is ok to just add like this...
 
-            
-            # δi *= 10000 # test
-
             if tmp > 0
                 δi = max(δi, FT(0)) # only consider depositional supersaturation for sublimation/deposition
                 # since we don't wanna do the noneq_moisture_sources() style thing, we'll settle for just adding dqvdt, and qt advection here. sed doesn't count.., lsadv does but is slow
@@ -420,6 +433,14 @@ function compute_precipitation_sink_tendencies(
                 δi = min(δi, FT(0)) # only consider subsaturational undersaturation for sublimation/deposition
                 S_qs_sub_dep_here = limit_tendency(ptl, tmp, max(FT(0), min(qs_region, -δi)), Δt) # Hard to use dv here because gains in vapor are fighting against sublimation.
             end
+
+            # if (T_region ≥ TCP.T_freeze(param_set))
+            #     if (δi ≤ zero(FT))
+            #         S_qs_sub_dep_here = FT(0) # M2005 does this but idk if it's correct
+            #     elseif  (S_qs_sub_dep_here > zero(FT))
+            #         S_qs_sub_dep_here = FT(0) # no deposition above freezing [[ maybe it's dependen on the snow crystal temp and we needn't disallow it...]]
+            #     end
+            # end
 
             # accumulate over regions
             S_qr_evap += area_region * S_qr_evap_here
@@ -460,7 +481,8 @@ function my_evaporation_sublimation(
     q_sno::FT,
     ρ::FT,
     T::FT;
-    _λ::FT = FT(NaN),
+    _λ::FT = FT(NaN), # you should pass neither or both of _λ and _n0 so they both agree
+    _n0::FT = FT(NaN), # you should pass neither or both of _λ and _n0 so they both agree
 ) where {FT <: Real}
     evap_subl_rate = FT(0)
     if q_sno > FT(0)
@@ -471,7 +493,7 @@ function my_evaporation_sublimation(
         _S::FT = TD.supersaturation(thermo_params, q, ρ, T, TD.Ice())
         _G::FT = CM.Common.G_func(prs, T, TD.Ice())
 
-        _n0::FT = n0(prs, q_sno, ρ, snow_type)
+        _n0::FT = isnan(_n0) ? n0(prs, q_sno, ρ, snow_type) : _n0
         _r0::FT = r0(prs, snow_type)
         _χv::FT = χv(prs, snow_type)
         _v0::FT = v0(prs, ρ, snow_type)

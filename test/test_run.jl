@@ -567,8 +567,8 @@ for flight_number in flight_numbers
         # parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "tke_ed_coeff")
         # namelist["turbulence"]["EDMF_PrognosticTKE"]["tke_ed_coeff"] = 0.1
         # namelist["user_params"]["stable_updraft_area_reduction_factor"] = FT(5.0)
-        # namelist["microphysics"]["microph_scaling_dep_sub"] = FT(4.0)
-        # namelist["microphysics"]["microph_scaling_melt"] = FT(1)
+        namelist["microphysics"]["microph_scaling_dep_sub"] = FT(2)
+        namelist["microphysics"]["microph_scaling_melt"] = FT(.1)
         # namelist["user_params"]["q_min"] = eps(FT)
 
         namelist["turbulence"]["EDMF_PrognosticTKE"]["c_KQl"] = FT(1)
