@@ -1161,7 +1161,7 @@ function update_aux!(edmf::EDMFModel, state::State, surf::SurfaceBase, param_set
         else
             error("Something went wrong. The buoyancy gradient model is not specified")
         end
-        bg = buoyancy_gradients(param_set, bg_model; is_noneq = (edmf.moisture_model isa NonEquilibriumMoisture), latent_heating = aux_en.latent_heating[k])
+        bg = buoyancy_gradients(param_set, bg_model; is_noneq = (edmf.moisture_model isa NonEquilibriumMoisture), latent_heating = aux_en.latent_heating_pos[k] + aux_en.latent_heating_neg[k]) # use raw net latent heating for mean buoyancy gradient calculation
 
         aux_tc.∂b∂z[k] = bg.∂b∂z # my addition
 
@@ -1202,6 +1202,8 @@ function update_aux!(edmf::EDMFModel, state::State, surf::SurfaceBase, param_set
         KQ[k] = KH[k] / Le
 
         aux_en_2m.tke.buoy[k] = -aux_en.area[k] * ρ_c[k] * KH[k] * bg.∂b∂z
+
+        aux_en_2m.tke.buoy[k] += aux_en.tke_convective_production[k] # test
 
         # I dont think we need this section anymore bc 1) we updated the buoyancy gradient 2) we have convective tke now... It seems to be too strong and too inflexible and leads to runaway TKE growth. Also doesnt respect latent haeting etc.
         # # 1. Calculate the normal buoyancy production [[ commenting this part out didn't make the updrafts come back...]]

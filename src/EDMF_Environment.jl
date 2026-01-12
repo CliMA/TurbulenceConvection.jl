@@ -561,10 +561,36 @@ function microphysics!(
             L_v = TD.latent_heat_vapor(thermo_params, aux_en.T[k])
             L_f = TD.latent_heat_fusion(thermo_params, aux_en.T[k])
             L_s = TD.latent_heat_sublim(thermo_params, aux_en.T[k])
-            aux_en.latent_heating[k] = L_s * (mph_neq.qi_tendency) # vapor --> Ice
-            aux_en.latent_heating[k] += L_v * (mph_neq.ql_tendency) # vapor --> liquid
-            aux_en.latent_heating[k] += L_f * (-mph_neq_other.qi_tendency_melting + mph_neq_other.qi_tendency_homogeneous_freezing + mph_neq_other.qi_tendency_heterogeneous_freezing) # Liq --> Ice
+            aux_en.latent_heating_pos[k] = FT(0)
+            aux_en.latent_heating_neg[k] = FT(0)
 
+            # aux_en.latent_heating[k] = L_s * (mph_neq.qi_tendency) # vapor --> Ice
+            if (candidate = L_s * (mph_neq.qi_tendency)) > 0
+                aux_en.latent_heating_pos[k] = candidate # vapor --> Ice
+            else
+                aux_en.latent_heating_neg[k] = -candidate # vapor --> Ice
+            end
+            # aux_en.latent_heating[k] += L_v * (mph_neq.ql_tendency) # vapor --> liquid
+            if (candidate = L_v * (mph_neq.ql_tendency)) > 0
+                aux_en.latent_heating_pos[k] += candidate # vapor --> liquid
+            else
+                aux_en.latent_heating_neg[k] -= candidate # vapor --> liquid
+            end
+            # aux_en.latent_heating[k] += L_f * (mph_neq_other.qi_tendency_melting +
+            #     mph_neq_other.qi_tendency_homogeneous_freezing + 
+            #     mph_neq_other.qi_tendency_heterogeneous_freezing) # Liq --> Ice
+            for candidate in (
+                L_f * mph_neq_other.qi_tendency_melting,
+                L_f * mph_neq_other.qi_tendency_homogeneous_freezing,
+                L_f * mph_neq_other.qi_tendency_heterogeneous_freezing,
+            )
+                if candidate > 0
+                    aux_en.latent_heating_pos[k] += candidate # Liq --> Ice
+                else
+                    aux_en.latent_heating_neg[k] -= candidate # Liq --> Ice
+                end
+            end
+            
             if any(!isfinite, (mph_neq_other.ql_tendency, mph_neq_other.qi_tendency))
                 @error "Other microphysics processes returned non-finite values: $mph_neq_other; from inputs ts = $ts; w = $w[k]; mph_neq.ql_tendency = $(mph_neq.ql_tendency); mph_neq.qi_tendency = $(mph_neq.qi_tendency); ρ_c = $(ρ_c[k]); aux_en.area = $(aux_en.area[k])"
                 error("Other microphysics processes returned non-finite values")
@@ -769,10 +795,26 @@ function microphysics!(
         L_v = TD.latent_heat_vapor(thermo_params, aux_en.T[k])
         L_s = TD.latent_heat_sublim(thermo_params, aux_en.T[k])
         # latent heating from precip formation
-        aux_en.latent_heating[k] += L_f * mph_precip.qi_tendency_accr_ice_liq # fusion from liquid to ice [[ check sign on ice-rai ]]
+        # aux_en.latent_heating[k] += L_f * mph_precip.qi_tendency_accr_ice_liq # fusion from liquid to ice [[ check sign on ice-rai ]]
+        if (candidate = L_f * mph_precip.qi_tendency_accr_ice_liq) > 0
+            aux_en.latent_heating_pos[k] += candidate # fusion from liquid to ice [[ check sign on ice-rai ]]
+        else
+            aux_en.latent_heating_neg[k] -= candidate # fusion from liquid to ice [[ check sign on ice-rai ]]
+        end
+
         # add precip terms (these are from last timestep with current order of operations, and we dont zero them out, so hopefully that's ok...)
-        aux_en.latent_heating[k] += L_v * (aux_tc.qr_tendency_evap[k]) # liq + rai # area won't be 0
-        aux_en.latent_heating[k] += L_s * (aux_tc.qs_tendency_dep_sub[k]) # ice + sno
+        # aux_en.latent_heating[k] += L_v * (aux_tc.qr_tendency_evap[k]) # liq + rai # area won't be 0
+        if (candidate = L_v * (aux_tc.qr_tendency_evap[k])) > 0
+            aux_en.latent_heating_pos[k] += candidate # liq + rai
+        else
+            aux_en.latent_heating_neg[k] -= candidate # liq + rai
+        end
+        # aux_en.latent_heating[k] += L_s * (aux_tc.qs_tendency_dep_sub[k]) # ice + sno
+        if (candidate = L_s * (aux_tc.qs_tendency_dep_sub[k])) > 0
+            aux_en.latent_heating_pos[k] += candidate # ice + sno
+        else
+            aux_en.latent_heating_neg[k] -= candidate # ice + sno
+        end
     end
 
 

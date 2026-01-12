@@ -71,7 +71,8 @@ function io_dictionary_aux(edmf) # added EDMF as an argument so we can have thin
         "tke_convective_production" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_environment(state).tke_convective_production),
         "tke_convective_advection" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_environment(state).tke_convective_advection),
         "tke_convective_dissipation" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_environment(state).tke_convective_dissipation),
-        "latent_heating" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_environment(state).latent_heating),
+        "latent_heating_pos" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_environment(state).latent_heating_pos),
+        "latent_heating_neg" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_environment(state).latent_heating_neg),
         "instability" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_environment(state).instability),
         "stability" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_environment(state).stability),
         "frac_supersat" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_environment(state).frac_supersat),
@@ -162,7 +163,7 @@ function io_dictionary_aux(edmf) # added EDMF as an argument so we can have thin
         "massflux_qt" => (; dims = ("zf", "t"), group = "profiles", field = state -> face_aux_turbconv(state).massflux_qt),
         "diffusive_flux_h" => (; dims = ("zf", "t"), group = "profiles", field = state -> face_aux_turbconv(state).diffusive_flux_h),
         "massflux_h" => (; dims = ("zf", "t"), group = "profiles", field = state -> face_aux_turbconv(state).massflux_h),
-        # "KH" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_turbconv(state).KH), # see ddy diffusivity
+        # "KH" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_turbconv(state).KH), # see eddy diffusivity
         # "KM" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_turbconv(state).KM), # see eddy viscosity
         "KQ" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_turbconv(state).KQ), # moisture eddy diffusivity
 

@@ -921,8 +921,36 @@ function compute_diffusive_fluxes(edmf::EDMFModel, state::State, surf::SurfaceBa
 
         end
     else # ::: Normal :::
+        # @. aux_tc_f.diffusive_flux_qt = -aux_tc_f.ρ_ae_KQ * ∇q_tot_en(wvec(aux_en.q_tot))
+        # @. aux_tc_f.diffusive_flux_h = -aux_tc_f.ρ_ae_KH * ∇θ_liq_ice_en(wvec(aux_en.θ_liq_ice))
+        corr_w_qt = FT(+1.0) # correlation between w and qt fluctuations
+        corr_w_h  = FT(-1.0) # correlation between w and h fluctuations
+        # We assume QTvar includes the induced correlations by edies. if QTvar is smaller than that would imply, then we assume there's some upgradient process.
+        # Flux = w'q' which we assume to be K -∂q/∂z where eddies are inducing transport in accordance with displacements over mixing length l_mix with background gradient ∂q/∂z.
+        # At the same time we prognose/diagnose some existing QTvar. if that exceeds what eddies would induce, then our flux is not high enough, if it does not exceed, then our flux is too high and there's some upgradient process going on..
+        # σ_explained should be propotional to K / σ_w * ∂q/∂z = K/sqrt(2 * tke)/(∂q/∂z), where tke ≈ 1/2 w'w' = 1/2 σ_w^2, but K / σ_w should be roughly l_mix.
+
         @. aux_tc_f.diffusive_flux_qt = -aux_tc_f.ρ_ae_KQ * ∇q_tot_en(wvec(aux_en.q_tot))
+        # correction but dont allow sign change from down gradient
+        @. aux_tc_f.diffusive_flux_qt += ifelse(aux_tc_f.diffusive_flux_qt > 0,
+            max(corr_w_qt * Ifx(ρ_c * a_en * sqrt(aux_en.tke) * sqrt(max(aux_en.QTvar, zero(FT)))), -aux_tc_f.diffusive_flux_qt),
+            min(corr_w_qt * Ifx(ρ_c * a_en * sqrt(aux_en.tke) * sqrt(max(aux_en.QTvar, zero(FT)))), -aux_tc_f.diffusive_flux_qt)
+        )
+
         @. aux_tc_f.diffusive_flux_h = -aux_tc_f.ρ_ae_KH * ∇θ_liq_ice_en(wvec(aux_en.θ_liq_ice))
+        # correction but dont allow sign change from down gradient
+        @. aux_tc_f.diffusive_flux_h += ifelse(aux_tc_f.diffusive_flux_h > 0,
+            max(corr_w_h * Ifx(ρ_c * a_en * sqrt(aux_en.tke) * sqrt(max(aux_en.Hvar, zero(FT)))), -aux_tc_f.diffusive_flux_h),
+            min(corr_w_h * Ifx(ρ_c * a_en * sqrt(aux_en.tke) * sqrt(max(aux_en.Hvar, zero(FT)))), -aux_tc_f.diffusive_flux_h)
+        )   
+
+        water_advection_factor = mixing_length_params(edmf).c_KTKEqt
+        @. aux_tc_f.diffusive_flux_qt += ρ_f * Ifx(a_en * sqrt(aux_en.tke) * water_advection_factor * (2 * sqrt(max(aux_en.QTvar, zero(FT))))) # (mean + σ) - (mean - σ) = 2σ
+
+        h_advection_factor = mixing_length_params(edmf).c_KTKEh
+        @. aux_tc_f.diffusive_flux_h += ρ_f * Ifx(a_en * sqrt(aux_en.tke) * h_advection_factor * (2 * sqrt(max(aux_en.Hvar, zero(FT))))) # (mean + σ) - (mean - σ) = 2σ
+
+
         @. aux_tc_f.diffusive_flux_uₕ = -aux_tc_f.ρ_ae_KM * ∇uₕ_gm(prog_gm_uₕ)
     end
 
@@ -2900,7 +2928,7 @@ function compute_en_tendencies!(
             ∂b∂θv = g * (R_d * ρ_here / aux_en.p[k]) * Π_here
             ∂b∂z_raw = ∂b∂θv * aux_tc.∂θv∂z[k] # we could use bg_model but it has its own sat/unsat breakdown [[ b_grad as saved contains the moist part already ]]
 
-            latent_heating = aux_en.latent_heating[k] # to be precise you'd want a split into something in the subsat and something in the supersat part, but this is close enough for now...
+            latent_heating = aux_en.latent_heating_pos[k] + -aux_en.latent_heating_neg[k] # to be precise you'd want a split into something in the subsat and something in the supersat part, but this is close enough for now...
             latent_heating = sign(latent_heating) * min(abs(latent_heating), FT(3)) # avoid excessive latent heating (i.e. oscillations)
 
             # supersat part
@@ -3036,14 +3064,25 @@ function compute_en_tendencies!(
             # --- D. Instability Calculation ---
             # 1. Gradients
             Π_here = TD.exner_given_pressure(thermo_params, p_here, TD.PhasePartition(thermo_params, ts_here))
+            L_s = TD.latent_heat_sublim(thermo_params, T_here)
             ∂b∂θv  = g * (R_d * ρ_here / p_here) * Π_here
             N2_dry = ∂b∂θv * aux_tc.∂θv∂z[k]
             
             ∂MSE∂z_here = aux_en.∂MSE∂z[k]
+
+            # adjustment for marginal stable regions
+            ∂MSE∂z_here -= min(
+            hypot(
+                c_p * Π_here * sqrt(max(aux_en.Hvar[k],  FT(0))),
+                L_s              * sqrt(max(aux_en.QTvar[k], FT(0))),
+            ) / max(aux_tc.mixing_length[k], FT(1)),
+            FT(1e-3),
+        )
+           
             N2_moist    = (g / (c_p * T_here)) * ∂MSE∂z_here
 
             # 2. Mean Latent Heating Term [UNIT FIX]
-            latent_heating = aux_en.latent_heating[k]
+            latent_heating = aux_en.latent_heating_pos[k] + -aux_en.latent_heating_neg[k]
             latent_heating = sign(latent_heating) * min(abs(latent_heating), FT(3)) 
             
             # Correction: Multiply by tau_conv (l/w) to convert Rate (Jerk) -> Buoyancy (Acceleration)
@@ -3387,7 +3426,7 @@ function compute_en_tendencies!(
             # A. Start with the "Kick" (Latent Heat contribution)
             #    w_eff = sqrt(Q * C)
             w_eff = aux_tc.temporary_2
-            Q_latent = aux_en.latent_heating
+            Q_latent = aux_en.latent_heating_pos + -aux_en.latent_heating_neg
             @. w_eff = clamp(sqrt(abs(Q_latent) * scaling_coeff), FT(0), FT(6.0))
 
             # B. Add the Convective Velocity (Vector Sum)
