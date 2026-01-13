@@ -327,6 +327,8 @@ function compute_sgs_flux!(edmf::EDMFModel, state::State, surf::SurfaceBase, par
                     @. massflux_ql = massflux_en * IfRBF_q_liq_en(q_liq_en)
                     @. massflux_qi = massflux_en * IfRBF_q_ice_en(q_ice_en)
 
+                    # @. massflux_qi = FT(0) # test en contribution no down motion
+
                     @. ql_flux_vert_adv = massflux_ql # same here
                     @. qi_flux_vert_adv = massflux_qi # same here
                 else
@@ -2044,6 +2046,8 @@ function compute_up_tendencies!(edmf::EDMFModel, state::State, param_set::APS, �
 
             a_en_tke_conv = aux_tc.temporary_1
             @. a_en_tke_conv = FT(0.75) - aux_en.frac_supersat/2 # high supersat, smaller, stronger updrafts. bound to 0.25 to 0.75 of max area
+            # don't exceed max_area since that can clash with strong detrainment
+            @. a_en_tke_conv = min(a_en_tke_conv, edmf.max_area - aux_up[i].area)
             Δa_en_tke_conv = a_en_tke_conv # alias
             tends_ρarea_tke_conv = aux_tc.temporary_2
             zero_field!(tends_ρarea_tke_conv)
@@ -2056,6 +2060,11 @@ function compute_up_tendencies!(edmf::EDMFModel, state::State, param_set::APS, �
                 end
             end
 
+            # When we have strong limiters on updraft area, these can get out of sync and lead to weirdness where the variance blows up... if you ever reach gradient reversal
+            # In reality you'd want to enforce that youre respecting ∂θ/∂z and ∂q/∂z in the env so only truly buoyant air joins the updraft
+            ∂θ∂z = aux_tc.temporary_4
+            @. ∂θ∂z = ∇c(wvec(Ifx(ρ_c * aux_en.θ_liq_ice)))
+            ∂q∂z = aux_tc.∂qt∂z
 
             @inbounds for k in real_center_indices(grid)
 
@@ -2068,13 +2077,13 @@ function compute_up_tendencies!(edmf::EDMFModel, state::State, param_set::APS, �
 
                 # Entrain moist air
                 q_up   = prog_up[i].ρaq_tot[k] * inv_ρa
-                q_eff = aux_en.q_tot[k] + sqrt(eps(FT)) + sqrt(aux_en.QTvar[k]) * sqrt(FT(2) / FT(π))
+                q_eff = aux_en.q_tot[k] + sqrt(eps(FT)) + sqrt(aux_en.QTvar[k] * sign(∂q∂z[k] < 0)) * sqrt(FT(2) / FT(π))
                 # tends_ρaq_tot[k] += tends_ρarea_tke_conv[k] * q_eff + ṁ_mix * (q_eff - q_up)
                 tends_ρaq_tot[k] += -limit_tendency(edtl, -((tends_ρarea_tke_conv[k] * q_eff) + (ṁ_mix * (q_eff - q_up))), prog_up[i].ρaq_tot[k], Δt)
 
                 # Old existing air is likely to have -HVar due to being displaced vertically and θli increasing with height. However, new air being entrained is likely to be +HVar buoyant air.
                 θ_up   = prog_up[i].ρaθ_liq_ice[k] * inv_ρa 
-                θ_eff = aux_en.θ_liq_ice[k] - sqrt(eps(FT)) + sqrt(aux_en.Hvar[k]) * sqrt(FT(2) / FT(π)); # old air is more likely to be displaced, so it is negative like the typical thetali gradient would indicate from perturbations
+                θ_eff = aux_en.θ_liq_ice[k] - sqrt(eps(FT)) + sqrt(aux_en.Hvar[k] * sign(∂θ∂z[k] > 0)) * sqrt(FT(2) / FT(π)); # old air is more likely to be displaced, so it is negative like the typical thetali gradient would indicate from perturbations
                 # tends_ρaθ_liq_ice[k] += tends_ρarea_tke_conv[k] * θ_eff + ṁ_mix * (θ_eff - θ_up)
                 tends_ρaθ_liq_ice[k] += -limit_tendency(edtl, -((tends_ρarea_tke_conv[k] * θ_eff) + (ṁ_mix * (θ_eff - θ_up))), prog_up[i].ρaθ_liq_ice[k], Δt)
 
