@@ -946,11 +946,17 @@ function compute_diffusive_fluxes(edmf::EDMFModel, state::State, surf::SurfaceBa
             min(corr_w_h * Ifx(ρ_c * a_en * sqrt(aux_en.tke) * sqrt(max(aux_en.Hvar, zero(FT)))), -aux_tc_f.diffusive_flux_h)
         )   
 
+        # When we have strong limiters on updraft area, these can get out of sync and lead to weirdness where the variance blows up... if you ever reach gradient reversal
+        # In reality you'd want to enforce that youre respecting ∂θ/∂z and ∂q/∂z in the env so only truly buoyant air joins the updraft
+        ∂θ∂z = aux_tc.temporary_4
+        @. ∂θ∂z = ∇c(wvec(Ifx(ρ_c * aux_en.θ_liq_ice)))
+        ∂q∂z = aux_tc.∂qt∂z
+
         water_advection_factor = mixing_length_params(edmf).c_KTKEqt
-        @. aux_tc_f.diffusive_flux_qt += ρ_f * Ifx(a_en * sqrt(aux_en.tke) * water_advection_factor * (2 * sqrt(max(aux_en.QTvar, zero(FT))))) # (mean + σ) - (mean - σ) = 2σ
+        @. aux_tc_f.diffusive_flux_qt += ρ_f * Ifx(a_en * sqrt(aux_en.tke) * water_advection_factor * (2 * (∂q∂z < 0) * sqrt(max(aux_en.QTvar, zero(FT))))) # (mean + σ) - (mean - σ) = 2σ
 
         h_advection_factor = mixing_length_params(edmf).c_KTKEh
-        @. aux_tc_f.diffusive_flux_h += ρ_f * Ifx(a_en * sqrt(aux_en.tke) * h_advection_factor * (2 * sqrt(max(aux_en.Hvar, zero(FT))))) # (mean + σ) - (mean - σ) = 2σ
+        @. aux_tc_f.diffusive_flux_h += ρ_f * Ifx(a_en * sqrt(aux_en.tke) * h_advection_factor * (-2 * (∂θ∂z > 0) * sqrt(max(aux_en.Hvar, zero(FT))))) # (mean - σ) - (mean + σ) = -2σ
 
 
         @. aux_tc_f.diffusive_flux_uₕ = -aux_tc_f.ρ_ae_KM * ∇uₕ_gm(prog_gm_uₕ)
@@ -2077,13 +2083,13 @@ function compute_up_tendencies!(edmf::EDMFModel, state::State, param_set::APS, �
 
                 # Entrain moist air
                 q_up   = prog_up[i].ρaq_tot[k] * inv_ρa
-                q_eff = aux_en.q_tot[k] + sqrt(eps(FT)) + sqrt(aux_en.QTvar[k] * sign(∂q∂z[k] < 0)) * sqrt(FT(2) / FT(π))
+                q_eff = aux_en.q_tot[k] + sqrt(eps(FT)) + sqrt(aux_en.QTvar[k] * (∂q∂z[k] < 0)) * sqrt(FT(2) / FT(π))
                 # tends_ρaq_tot[k] += tends_ρarea_tke_conv[k] * q_eff + ṁ_mix * (q_eff - q_up)
                 tends_ρaq_tot[k] += -limit_tendency(edtl, -((tends_ρarea_tke_conv[k] * q_eff) + (ṁ_mix * (q_eff - q_up))), prog_up[i].ρaq_tot[k], Δt)
 
                 # Old existing air is likely to have -HVar due to being displaced vertically and θli increasing with height. However, new air being entrained is likely to be +HVar buoyant air.
                 θ_up   = prog_up[i].ρaθ_liq_ice[k] * inv_ρa 
-                θ_eff = aux_en.θ_liq_ice[k] - sqrt(eps(FT)) + sqrt(aux_en.Hvar[k] * sign(∂θ∂z[k] > 0)) * sqrt(FT(2) / FT(π)); # old air is more likely to be displaced, so it is negative like the typical thetali gradient would indicate from perturbations
+                θ_eff = aux_en.θ_liq_ice[k] - sqrt(eps(FT)) + sqrt(aux_en.Hvar[k] * (∂θ∂z[k] > 0)) * sqrt(FT(2) / FT(π)); # old air is more likely to be displaced, so it is negative like the typical thetali gradient would indicate from perturbations
                 # tends_ρaθ_liq_ice[k] += tends_ρarea_tke_conv[k] * θ_eff + ṁ_mix * (θ_eff - θ_up)
                 tends_ρaθ_liq_ice[k] += -limit_tendency(edtl, -((tends_ρarea_tke_conv[k] * θ_eff) + (ṁ_mix * (θ_eff - θ_up))), prog_up[i].ρaθ_liq_ice[k], Δt)
 
