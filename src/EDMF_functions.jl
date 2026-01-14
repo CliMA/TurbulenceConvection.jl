@@ -1043,6 +1043,16 @@ function compute_diffusive_fluxes(edmf::EDMFModel, state::State, surf::SurfaceBa
         @. aux_tc_f.diffusive_flux_qr = -(c_KQr * aux_tc_f.ρ_ae_KQ) * ∇q_rai_en(wvec(prog_pr.q_rai)) # add diffusive (SGS) flux for rain
         @. aux_tc_f.diffusive_flux_qs = -(c_KQs * aux_tc_f.ρ_ae_KQ) * ∇q_sno_en(wvec(prog_pr.q_sno)) # add diffusive (SGS) flux for snow
 
+        rain_advection_factor = mixing_length_params(edmf).c_KTKEqr # essentially represents how much up exceeds down due to correlations
+        snow_advection_factor = mixing_length_params(edmf).c_KTKEqs # essentially represents how much up exceeds down due to correlations
+        #=
+            Covariance/bias between updrafts/downdrafts and precip should arise from formation (supersaturation)
+            Snow :: Precip should inherently be biased towards the dry downdrafts far more than condensate.
+                So ideally, supersaturated and production has an up bias, subsaturated ok we can assume a downdraft bias, esp when evap
+        =#
+        @. aux_tc_f.diffusive_flux_qr += ρ_f * Ifx(a_en * sqrt(aux_en.tke) * rain_advection_factor * (aux_en.frac_supersat - FT(0.25)) * prog_pr.q_rai) # by 0% supersat, we assume no imbalance, and arguably should even start to lean towards downdrafts. however -0.5 seemed too strong
+        @. aux_tc_f.diffusive_flux_qs += ρ_f * Ifx(a_en * sqrt(aux_en.tke) * snow_advection_factor * (aux_en.frac_supersat - FT(0.25)) * prog_pr.q_sno) # by 0% supersat, we assume no imbalance, and arguably should even start to lean towards downdrafts. however -0.5 seemed too strong
+
     end
 
     return nothing
@@ -2885,11 +2895,12 @@ function compute_en_tendencies!(
     end
 
     RB = CCO.RightBiasedC2F(; top = CCO.SetValue(FT(0)))
+    c_KTKE = mixing_length_params(edmf).c_KTKE
 
     @. tend_covar =
         press + buoy + shear + entr_gain + rain_src - D_env * covar -
         (c_d * sqrt(max(tke_en, 0)) / max(mixing_length, 1)) * prog_covar - ∇c(wvec(RB(prog_covar * Ic(w_en_f)))) -
-        ∇c_turb(-1 * ρ_f * If(aeK) * ∇f(covar))
+        ∇c_turb(-1 * ρ_f * If(aeK) * c_KTKE * ∇f(covar))
 
 
     if is_tke && (edmf.convective_tke_handler isa AbstractYesConvectiveTKEHandler)
@@ -3065,8 +3076,10 @@ function compute_en_tendencies!(
                 end
             end
             # Precip
-            if prog_pr.q_rai[k] > FT(1e-9); inv_tau_micro += 1.0 / (FT(10) + eps(FT)); end
-            if prog_pr.q_sno[k] > FT(1e-9); inv_tau_micro += 1.0 / (FT(1e5) + eps(FT)); end
+            # if prog_pr.q_rai[k] > FT(1e-9); inv_tau_micro += 1.0 / (FT(10) + eps(FT)); end
+            if prog_pr.q_rai[k] > FT(1e-9); inv_tau_micro += 1.0 / ( prog_pr.q_rai[k] / max(abs(aux_tc.qr_tendency_evap[k]), eps(FT))); end
+            # if prog_pr.q_sno[k] > FT(1e-9); inv_tau_micro += 1.0 / (FT(1e5) + eps(FT)); end
+            if prog_pr.q_sno[k] > FT(1e-9); inv_tau_micro += 1.0 / ( prog_pr.q_sno[k] / max(abs(aux_tc.qs_tendency_dep_sub[k]), eps(FT))); end
 
             # Efficiency (Phi)
             if inv_tau_micro > FT(1e-12)
@@ -3101,18 +3114,25 @@ function compute_en_tendencies!(
             latent_heating = sign(latent_heating) * min(abs(latent_heating), FT(3)) 
             
             # Correction: Multiply by tau_conv (l/w) to convert Rate (Jerk) -> Buoyancy (Acceleration)
-            term_mean = (g / (c_p * T_here)) * abs(latent_heating) * tau_conv * phi
+            # term_mean = (g / (c_p * T_here)) * abs(latent_heating) * tau_conv * phi
+            term_mean = (g / (c_p * T_here)) * abs(min(aux_en.latent_heating_pos[k], FT(3)) * f_active + min(aux_en.latent_heating_neg[k], FT(3)) * (1-f_active)) * tau_conv * phi
+
 
             # 3. SGS Gradient Term [LOGIC FIX]
             f_effective = f_active * phi
             
             # Correction: Hard switch. Do not let dry stability penalize moist instability.
+            term_sgs = zero(FT)
             if f_effective > FT(1e-4)
                 # Active/Cloudy: Use MOIST gradient only.
-                term_sgs = -ℓ_mix * N2_moist
-            else
+                term_sgs += max(-ℓ_mix * N2_moist * f_active, zero(FT)) # because even if the mean latent_heating is ~0 we can't rule out that things are happening at the SGS if we're supersaturated with tke and instsability
+                # term_sgs = zero(FT)
+            end
+            if (1-f_active) * phi > FT(1e-4)
                 # Inactive/Dry: Use DRY gradient.
-                term_sgs = -ℓ_mix * N2_dry
+                # term_sgs = -ℓ_mix * N2_dry
+                term_sgs += max(-ℓ_mix * N2_dry * (1-f_active), zero(FT)) # retain some effect of dry instability even in cloudy regions
+                # term_sgs = zero(FT) # maybe ignore since we only really care about moist instability? not sure dry instability should mix out normally i think...
             end
 
             # 4. Combine

@@ -172,6 +172,9 @@ function io_dictionary_aux(edmf) # added EDMF as an argument so we can have thin
         "massflux_ql" => (; dims = ("zf", "t"), group = "profiles", field = state -> face_aux_turbconv(state).massflux_ql),
         "massflux_qi" => (; dims = ("zf", "t"), group = "profiles", field = state -> face_aux_turbconv(state).massflux_qi),
 
+        "diffusive_flux_qr" => (; dims = ("zf", "t"), group = "profiles", field = state -> face_aux_turbconv(state).diffusive_flux_qr),
+        "diffusive_flux_qs" => (; dims = ("zf", "t"), group = "profiles", field = state -> face_aux_turbconv(state).diffusive_flux_qs),
+
         "ed_length_scheme" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_turbconv(state).mls),
         "mixing_length_ratio" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_turbconv(state).ml_ratio),
         # "entdet_balance_length" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_turbconv(state).l_entdet), # Not used

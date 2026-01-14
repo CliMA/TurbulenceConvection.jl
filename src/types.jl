@@ -656,11 +656,14 @@ Base.@kwdef struct MixingLengthParams{FT}
     c_KQi::FT # coefficient for ice water effect on mixing length
     c_KQr::FT # coefficient for rain water effect on mixing length
     c_KQs::FT # coefficient for snow water effect on mixing length
+    c_KTKE::FT  # coefficient for TKE effect on mixing length
     # advection
     c_KTKEqt::FT # coefficient for total water effect on TKE advection
     c_KTKEh::FT # coefficient for moist static energy effect on TKE advection
     c_KTKEql::FT # coefficient for liquid water effect on TKE advection
     c_KTKEqi::FT # coefficient for ice water effect on TKE advection
+    c_KTKEqr::FT # coefficient for rain water effect on TKE advection
+    c_KTKEqs::FT # coefficient for snow water effect on TKE advection
 end
 
 """
@@ -1872,11 +1875,14 @@ function EDMFModel(::Type{FT}, namelist, precip_model, rain_formation_model, par
         c_KQi = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "c_KQi"; default = 1.0),
         c_KQr = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "c_KQr"; default = 1.0),
         c_KQs = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "c_KQs"; default = 1.0),
+        c_KTKE = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "c_KTKE"; default = 1.0),
         # advection
         c_KTKEqt = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "c_KTKEqt"; default = 0.0), # off by default
         c_KTKEh = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "c_KTKEh"; default = 0.0), # off by default
         c_KTKEql = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "c_KTKEql"; default = 0.0), # off by default
         c_KTKEqi = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "c_KTKEqi"; default = 0.0), # off by default
+        c_KTKEqr = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "c_KTKEqr"; default = 0.0), # off by default
+        c_KTKEqs = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "c_KTKEqs"; default = 0.0), # off by default
     )
 
     entr_dim_scale = if entr_dim_scale == "buoy_vel"
