@@ -54,7 +54,7 @@ function get_τs(param_set::APS, microphys_params::ACMP, relaxation_timescale::A
         else
             scaling_factor = one(FT)
         end
-        τ_ice = clamp(τ_ice, relaxation_timescale.args.min_τ_ice * scaling_factor, relaxation_timescale.args.max_τ_ice * scaling_factor)
+        τ_ice = clamp(τ_ice, relaxation_timescale.args.min_τ_ice * scaling_factor, relaxation_timescale.args.max_τ_ice * scaling_factor) # this can go below the lower limit as written, meaning with S_i > 0 can be slower than with < 0...
     end
 
 
@@ -1096,7 +1096,8 @@ function get_τs_and_Ns(param_set::APS, microphys_params::ACMP, relaxation_times
         Ns_no_boost = Ns
     end
     # Don't use boosted values for τs
-    τs = get_τs(param_set, microphys_params, relaxation_timescale, q, T, p, ρ, w; N_l = Ns_no_boost.N_liq, N_i_raw = Ns_no_boost.N_ice_raw, N_i_adjusted = Ns_no_boost.N_ice_adjusted, N_INP_top = N_INP_top, f_ice_mult = f_ice_mult, q_sno = q_sno, massflux = massflux, dTdz = dTdz, w_i = w_i, apply_massflux_boost = apply_massflux_boost, apply_sedimentation_boost = apply_sedimentation_boost)
+    # τs = get_τs(param_set, microphys_params, relaxation_timescale, q, T, p, ρ, w; N_l = Ns_no_boost.N_liq, N_i_raw = Ns_no_boost.N_ice_raw, N_i_adjusted = Ns_no_boost.N_ice_adjusted, N_INP_top = N_INP_top, f_ice_mult = f_ice_mult, q_sno = q_sno, massflux = massflux, dTdz = dTdz, w_i = w_i, apply_massflux_boost = apply_massflux_boost, apply_sedimentation_boost = apply_sedimentation_boost)
+    τs = get_τs(param_set, microphys_params, relaxation_timescale, q, T, p, ρ, w; N_l = Ns_no_boost.N_liq, N_i_raw = Ns_no_boost.N_ice_adjusted, N_i_adjusted = Ns_no_boost.N_ice_adjusted, N_INP_top = N_INP_top, f_ice_mult = f_ice_mult, q_sno = q_sno, massflux = massflux, dTdz = dTdz, w_i = w_i, apply_massflux_boost = apply_massflux_boost, apply_sedimentation_boost = apply_sedimentation_boost) # added 2026-01-14 :: I think our raw shouldn't be pure N_ice_raw anymore... it should be adjusted if adjust_ice_N is on... Now we have activation we dont need a shadow realm of tiny particles esp since we have supersaturation gates...
     return (; τ_liq = τs.τ_liq, τ_ice = τs.τ_ice, N_liq = Ns.N_liq, N_ice = Ns.N_ice_adjusted)
 
     # Ns = get_Ns(param_set, relaxation_timescale, q, T, ρ, w; N_INP_top = N_INP_top, f_ice_mult = f_ice_mult, q_sno = q_sno, massflux = massflux, dTdz = dTdz, w_i = w_i, apply_massflux_boost = apply_massflux_boost, apply_sedimentation_boost = apply_sedimentation_boost)

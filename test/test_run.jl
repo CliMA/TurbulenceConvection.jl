@@ -473,8 +473,11 @@ for flight_number in flight_numbers
         # namelist["meta"]["simname"] = "SOCRATES_RF01_obs_data"
         # namelist["meta"]["flight_number"] = 01
 
-        namelist["meta"]["simname"] = "SOCRATES_RF01_obs_data"
-        namelist["meta"]["flight_number"] = 01
+        namelist["meta"]["simname"] = "SOCRATES_RF09_obs_data"
+        namelist["meta"]["flight_number"] = 9
+
+        namelist["user_params"]["min_N_ice"] = FT(0)
+        namelist["user_params"]["max_τ_ice"] = FT(Inf)
 
         # namelist["user_params"]["χm_liq"] = FT(1)
         # namelist["microphysics"]["χm_ice"] = FT(1) # inv(namelist["user_params"]["mean_r_factor_ice"])^3
