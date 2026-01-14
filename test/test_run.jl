@@ -137,8 +137,8 @@ for flight_number in flight_numbers
             # NameList.convert_namelist_types_to_default!(namelist, default_namelist) # coerce remaining type
 
             # nonequilibrium_moisture_scheme = :geometric_liq__exponential_T_scaling_and_geometric_ice
-            # nonequilibrium_moisture_scheme = :geometric_liq__exponential_T_scaling_ice
-            nonequilibrium_moisture_scheme = :exponential_T_scaling_ice
+            nonequilibrium_moisture_scheme = :geometric_liq__exponential_T_scaling_ice
+            # nonequilibrium_moisture_scheme = :exponential_T_scaling_ice
             dt_string = "adapt_dt__dt_min_5.0__dt_max_10.0"
             method = "best_particle_final"
             flight_number = 9
@@ -473,8 +473,8 @@ for flight_number in flight_numbers
         # namelist["meta"]["simname"] = "SOCRATES_RF01_obs_data"
         # namelist["meta"]["flight_number"] = 01
 
-        namelist["meta"]["simname"] = "SOCRATES_RF09_obs_data"
-        namelist["meta"]["flight_number"] = 09
+        namelist["meta"]["simname"] = "SOCRATES_RF01_obs_data"
+        namelist["meta"]["flight_number"] = 01
 
         # namelist["user_params"]["χm_liq"] = FT(1)
         # namelist["microphysics"]["χm_ice"] = FT(1) # inv(namelist["user_params"]["mean_r_factor_ice"])^3
@@ -556,7 +556,7 @@ for flight_number in flight_numbers
         # namelist["turbulence"]["EDMF_PrognosticTKE"]["entr_dim_scale"] = "abs_massflux" # trying to use this intead of w_height... idk. we basically get no entrainment except at the sfc and then huge detraiment at cloud top. might explain our tiny areas. This is also bad because our diffusive flux is tied to entrainment it seems? idk...
         # namelist["turbulence"]["EDMF_PrognosticTKE"]["detr_dim_scale"] = "mf_grad"
         # namelist["turbulence"]["EDMF_PrognosticTKE"]["detr_dim_scale"] = "b_sqrt_tke"
-        namelist["turbulence"]["EDMF_PrognosticTKE"]["tke_diss_coeff"] = 0.1
+        # namelist["turbulence"]["EDMF_PrognosticTKE"]["tke_diss_coeff"] = 0.1
         # namelist["user_params"]["initial_profile_updraft_area"] = FT(0.9*namelist["turbulence"]["EDMF_PrognosticTKE"]["max_area"]) * 0.0001
         # namelist["turbulence"]["EDMF_PrognosticTKE"]["max_area"] = FT(0.6) # stability (maybe we need to use the limiter instead tho to not get flat cloud tops?)
         # namelist["turbulence"]["EDMF_PrognosticTKE"]["tke_conv_entr_detr_rate_inv_s"] = FT(1/(0.0100*3600.0)) # 6 minutes
@@ -565,7 +565,7 @@ for flight_number in flight_numbers
         # namelist["turbulence"]["EDMF_PrognosticTKE"]["tke_conv_entr_detr_rate_inv_s"] = FT(0)
 
         # parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "tke_ed_coeff")
-        namelist["turbulence"]["EDMF_PrognosticTKE"]["tke_ed_coeff"] = 0.0002
+        # namelist["turbulence"]["EDMF_PrognosticTKE"]["tke_ed_coeff"] = 0.0002
         # namelist["user_params"]["stable_updraft_area_reduction_factor"] = FT(5.0)
         # namelist["microphysics"]["microph_scaling_dep_sub"] = FT(2)
         # namelist["microphysics"]["microph_scaling_melt"] = FT(.1)
@@ -578,7 +578,7 @@ for flight_number in flight_numbers
         # namelist["turbulence"]["EDMF_PrognosticTKE"]["c_KTKEqi"] = FT(.1)
         # namelist["turbulence"]["EDMF_PrognosticTKE"]["c_KTKEqt"] = FT(.1)
         # namelist["turbulence"]["EDMF_PrognosticTKE"]["c_KTKEh"]  = FT(.1)
-        namelist["turbulence"]["EDMF_PrognosticTKE"]["c_KTKEqs"]  = FT(.5)
+        # namelist["turbulence"]["EDMF_PrognosticTKE"]["c_KTKEqs"]  = FT(.5)
         # namelist["turbulence"]["EDMF_PrognosticTKE"]["Prandtl_number_0"] = 0.001
 
         # namelist["user_args"]["snow_terminal_velocity_scheme"] = "Blk1MVel"

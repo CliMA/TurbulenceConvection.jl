@@ -265,8 +265,8 @@ function microphysics!(
                     
                     # prevent excess losses when not using quadrature
                     mph_neq_here = NoneqMoistureSources(
-                        max(mph_neq_here.ql_tendency, -(aux_en.q_liq[k] * aux_en.frac_supersat_liq[k]) / (Δt + ε)), # cannot remove more liq than exists subsaturated
-                        max(mph_neq_here.qi_tendency, -(aux_en.q_ice[k] * max(aux_en.frac_supersat[k], aux_en.frac_supersat_liq[k])) / (Δt + ε)), # cannot remove more ice than exists subsaturated
+                        max(mph_neq_here.ql_tendency, -(aux_en.q_liq[k] * (1-aux_en.frac_supersat_liq[k])) / (Δt + ε)), # cannot remove more liq than exists subsaturated
+                        max(mph_neq_here.qi_tendency, -(aux_en.q_ice[k] * min(1-aux_en.frac_supersat[k], 1-aux_en.frac_supersat_liq[k])) / (Δt + ε)), # cannot remove more ice than exists subsaturated
                     )
 
                     if region isa EnvRemainingDomain
