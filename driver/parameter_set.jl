@@ -292,6 +292,8 @@ function create_parameter_set(
     
     namelist_user_params["S_ice_min_activation"] =  TC.parse_namelist(namelist, "user_params", "S_ice_min_activation"; default = zero(FT)) # this is set no matter what
 
+    namelist_user_params["apply_nudging_to_updraft"] = TC.parse_namelist(namelist, "user_params", "apply_nudging_to_updraft"; default = true) # this is set no matter what [[ consider removing ]]
+
     # Set default CCN value (should be set in default namelist for SOCRATES)
 
     if namelist["meta"]["casename"] == "SOCRATES"

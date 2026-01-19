@@ -83,6 +83,10 @@ function reweight_noneq_moisture_sources_for_grid(
             q_vap_sat_liq_km1 = aux_domain.q_vap_sat_liq[k - 1]
             q_vap_sat_liq = aux_domain.q_vap_sat_liq[k]
             q_vap_sat_liq_kp1 = aux_domain.q_vap_sat_liq[k + 1]
+            #
+            q_vap_sat_ice_km1 = aux_domain.q_vap_sat_ice[k - 1]
+            q_vap_sat_ice = aux_domain.q_vap_sat_ice[k]
+            q_vap_sat_ice_kp1 = aux_domain.q_vap_sat_ice[k + 1]
         elseif (region isa CloakUp) # cloak up
             q_tot_km1 = aux_domain.q_tot_cloak_up[k - 1]
             q_tot = aux_domain.q_tot_cloak_up[k]
@@ -111,6 +115,10 @@ function reweight_noneq_moisture_sources_for_grid(
             q_vap_sat_liq_km1 = TD.q_vap_saturation_generic(thermo_params, T_km1, TD.air_density(thermo_params, ts_km1), TD.Liquid())
             q_vap_sat_liq = TD.q_vap_saturation_generic(thermo_params, T, TD.air_density(thermo_params, ts), TD.Liquid())
             q_vap_sat_liq_kp1 = TD.q_vap_saturation_generic(thermo_params, T_kp1, TD.air_density(thermo_params, ts_kp1), TD.Liquid())
+            #
+            q_vap_sat_ice_km1 = TD.q_vap_saturation_generic(thermo_params, T_km1, TD.air_density(thermo_params, ts_km1), TD.Ice())
+            q_vap_sat_ice = TD.q_vap_saturation_generic(thermo_params, T, TD.air_density(thermo_params, ts), TD.Ice())
+            q_vap_sat_ice_kp1 = TD.q_vap_saturation_generic(thermo_params, T_kp1, TD.air_density(thermo_params, ts_kp1), TD.Ice())
         elseif (region isa CloakDown) # cloak down
             q_tot_km1 = aux_domain.q_tot_cloak_dn[k - 1]
             q_tot = aux_domain.q_tot_cloak_dn[k]
@@ -139,6 +147,10 @@ function reweight_noneq_moisture_sources_for_grid(
             q_vap_sat_liq_km1 = TD.q_vap_saturation_generic(thermo_params, T_km1, TD.air_density(thermo_params, ts_km1), TD.Liquid())
             q_vap_sat_liq = TD.q_vap_saturation_generic(thermo_params, T, TD.air_density(thermo_params, ts), TD.Liquid())
             q_vap_sat_liq_kp1 = TD.q_vap_saturation_generic(thermo_params, T_kp1, TD.air_density(thermo_params, ts_kp1), TD.Liquid())
+            #
+            q_vap_sat_ice_km1 = TD.q_vap_saturation_generic(thermo_params, T_km1, TD.air_density(thermo_params, ts_km1), TD.Ice())
+            q_vap_sat_ice = TD.q_vap_saturation_generic(thermo_params, T, TD.air_density(thermo_params, ts), TD.Ice())
+            q_vap_sat_ice_kp1 = TD.q_vap_saturation_generic(thermo_params, T_kp1, TD.air_density(thermo_params, ts_kp1), TD.Ice())
         end
     end
 
