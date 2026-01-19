@@ -49,6 +49,10 @@ function reweight_noneq_moisture_sources_for_grid(
     ε = eps(FT)
 
 
+    kc_surf = kc_surface(grid)
+    kc_toa = kc_top_of_atmos(grid)
+
+
     # no cloak
     if !((k == kc_surf) || (k == kc_toa))
         if (region isa EnvOrUp) || (region isa EnvRemainingDomain) # no cloak
@@ -143,8 +147,7 @@ function reweight_noneq_moisture_sources_for_grid(
     # we would still need to recalculate q_vap_sat_liq and q_vap_sat_ice, but we can do that in the extrapolation step.
 
     # we can't be withn one grid point of surf or top of atm
-    kc_surf = kc_surface(grid)
-    kc_toa = kc_top_of_atmos(grid)
+    
 
     # reweight [if we reweight everywhere] OR [if we reweight extrema only, we're not at the surface or top of atm, and we have extrema in the prognostic variables]
     if (!reweight_extrema_only) || 
