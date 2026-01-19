@@ -55,7 +55,7 @@ function reweight_noneq_moisture_sources_for_grid(
 
     # no cloak
     if !((k == kc_surf) || (k == kc_toa))
-        if (region isa EnvOrUp) || (region isa EnvRemainingDomain) # no cloak
+        if (region isa EnvOrUpDomain) || (region isa EnvRemainingDomain) # no cloak
             q_tot_km1 = aux_domain.q_tot[k - 1]
             q_tot = aux_domain.q_tot[k]
             q_tot_kp1 = aux_domain.q_tot[k + 1]
@@ -227,7 +227,7 @@ function reweight_noneq_moisture_sources_for_grid(
         for scenario in scenarios
 
 
-            if (region isa EnvOrUp) || (region isa EnvRemainingDomain) # no cloak
+            if (region isa EnvOrUpDomain) || (region isa EnvRemainingDomain) # no cloak
                 area = (region isa EnvRemainingDomain) ? aux_domain.a_en_remaining : aux_domain.area
                 θ_liq_ice = aux_domain.θ_liq_ice
                 q_tot = aux_domain.q_tot
