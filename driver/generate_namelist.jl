@@ -58,6 +58,16 @@ function default_namelist(::Nothing)
     return default_namelist(case_name)
 end
 
+function reproducible_rand(set_seed, seed, ns...)
+    set_seed && Random.seed!(seed)
+    return rand(ns...)
+end
+
+function reproducible_randn(set_seed, seed, ns...)
+    set_seed && Random.seed!(seed)
+    return randn(ns...)
+end
+
 function default_namelist(
     case_name::String;
     root::String = ".",
@@ -260,16 +270,16 @@ function default_namelist(
     # m=100 random features, d=6 input Pi groups
     # RF: parameters to optimize, 2 x (m + 1 + d)
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["rf_opt_ent_params"] =
-        vec(cat(randn(2,100), # vec(cat(randn(2, m),
+        vec(cat(reproducible_randn(set_seed, seed, 2, 100), # vec(cat(randn(2, m),
                     ones(2,7), dims=2)) # ones(2, d + 1), dims=2))
 
     # RF: fixed realizations of random variables, 2 x m x (1 + d)
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["rf_fix_ent_params"] =
-        vec(cat(2*pi*rand(2,100,1), # vec(cat(2*pi*rand(2, m, 1),
-                    randn(2,100,6), dims=3)) # randn(2, m, d), dims=3))
+        vec(cat(2*pi*reproducible_rand(set_seed, seed, 2, 100, 1), # vec(cat(2*pi*rand(2, m, 1),
+        reproducible_randn(set_seed, seed, 2, 100, 6), dims=3)) # randn(2, m, d), dims=3))
 
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["linear_ent_params"] =
-        SA.SVector{14}(rand(14))
+        reproducible_rand(set_seed, seed, 14)
 
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["linear_ent_biases"] = true
 
@@ -284,7 +294,7 @@ function default_namelist(
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["fno_ent_width"] = 2
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["fno_ent_n_modes"] = 2
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["fno_ent_params"] =
-        SA.SVector{50}(rand(50))
+        reproducible_rand(set_seed, seed, 50)
 
     #! format: on
 
