@@ -137,8 +137,9 @@ for flight_number in flight_numbers
             # NameList.convert_namelist_types_to_default!(namelist, default_namelist) # coerce remaining type
 
             # nonequilibrium_moisture_scheme = :geometric_liq__exponential_T_scaling_and_geometric_ice
-            nonequilibrium_moisture_scheme = :geometric_liq__exponential_T_scaling_ice
+            # nonequilibrium_moisture_scheme = :geometric_liq__exponential_T_scaling_ice
             # nonequilibrium_moisture_scheme = :exponential_T_scaling_ice
+            nonequilibrium_moisture_scheme = :neural_network
             # dt_string = "adapt_dt__dt_min_5.0__dt_max_10.0"
             dt_string = "adapt_dt__dt_min_10.0__dt_max_20.0"
             method = "best_particle_final"

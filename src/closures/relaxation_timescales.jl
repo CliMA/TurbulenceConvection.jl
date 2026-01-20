@@ -1261,31 +1261,88 @@ function get_τs_and_Ns!(param_set::APS, microphys_params::ACMP, relaxation_time
     parent(N_liq)[valid_inds] .= _N_l
     parent(N_ice)[valid_inds] .= _N_i
 
+    if get_adjust_liq_N(relaxation_timescale) || get_adjust_ice_N(relaxation_timescale)
+        q_p      = parent(q)
+        ρ_p      = parent(ρ)
+        T_p      = parent(T)
+        w_p      = parent(w)
+        dTdz_p   = parent(dTdz)
+        N_liq_p  = parent(N_liq)
+        N_ice_p  = parent(N_ice)
+        f_mult_p = parent(f_ice_mult)
+        q_sno_p  = parent(q_sno)
+        mf_p     = parent(massflux)
+        w_i_p    = parent(w_i)
+    end
+
 
     # Because  this bypasses get_N_l(), get_N_i(), we need to apply adjust_liq/ice_N() here.
     if get_adjust_liq_N(relaxation_timescale)
-        @view(parent(N_liq)[valid_inds]) .= adjust_liq_N_no_kwargs.(param_set, @view(parent(N_liq)[valid_inds]), @view(parent(q)[valid_inds, 2]), @view(parent(ρ)[valid_inds]); monodisperse=true, decrease_N_if_subsaturated=false)
+        # @view(parent(N_liq)[valid_inds]) .= adjust_liq_N_no_kwargs.(param_set, @view(parent(N_liq)[valid_inds]), @view(parent(q)[valid_inds, 2]), @view(parent(ρ)[valid_inds]); monodisperse=true, decrease_N_if_subsaturated=false)
+        for i in eachindex(valid_inds)
+            valid_inds[i] || continue
+            N_liq_p[i] = adjust_liq_N_no_kwargs(param_set, N_liq_p[i], q_p[i, 2], ρ_p[i]; monodisperse=true, decrease_N_if_subsaturated=false)
+        end
     end
     if get_adjust_ice_N(relaxation_timescale)
         thermo_params = TCP.thermodynamics_params(param_set)
-        FT = eltype(param_set)
-        qs = TD.PhasePartition{FT}[TD.PhasePartition(parent(q)[i, 1], parent(q)[i, 2], parent(q)[i, 3]) for i in eachindex(valid_inds) if valid_inds[i]]
-        S_i = TD.supersaturation.(thermo_params, qs, @view(parent(ρ)[valid_inds]), @view(parent(T)[valid_inds]), TD.Ice())
-        N_INP = get_INP_concentration.(param_set, relaxation_timescale, qs, @view(parent(T)[valid_inds]), @view(parent(ρ)[valid_inds]), @view(parent(w)[valid_inds]))
-        dNINP_dz = get_dNINP_dz.(param_set, relaxation_timescale, @view(parent(T)[valid_inds]), @view(parent(dTdz)[valid_inds]))
-        @view(parent(N_ice)[valid_inds]) .= adjust_ice_N_no_kwargs.(param_set,
-            @view(parent(N_ice)[valid_inds]),
-            N_INP .* @view(parent(f_ice_mult)[valid_inds]),
-            @view(parent(q)[valid_inds, 3]),
-            @view(parent(ρ)[valid_inds]),
-            S_i,
-            @view(parent(q)[valid_inds, 2]), # q_l for boosting <r>
-            @view(parent(q_sno)[valid_inds]),
-            @view(parent(massflux)[valid_inds]),
-            dNINP_dz,
-            @view(parent(w_i)[valid_inds]),
-            N_INP_top .* @view(parent(f_ice_mult)[valid_inds]),
-            ; monodisperse=false, decrease_N_if_subsaturated=true, N_i_from_INP = false, apply_massflux_boost = apply_massflux_boost, apply_sedimentation_boost = apply_sedimentation_boost)
+        # FT = eltype(param_set)
+        # qs = TD.PhasePartition{FT}[TD.PhasePartition(parent(q)[i, 1], parent(q)[i, 2], parent(q)[i, 3]) for i in eachindex(valid_inds) if valid_inds[i]]
+        # S_i = TD.supersaturation.(thermo_params, qs, @view(parent(ρ)[valid_inds]), @view(parent(T)[valid_inds]), TD.Ice())
+        # N_INP = get_INP_concentration.(param_set, relaxation_timescale, qs, @view(parent(T)[valid_inds]), @view(parent(ρ)[valid_inds]), @view(parent(w)[valid_inds]), S_i)
+        # dNINP_dz = get_dNINP_dz.(param_set, relaxation_timescale, @view(parent(T)[valid_inds]), @view(parent(dTdz)[valid_inds]))
+        # @view(parent(N_ice)[valid_inds]) .= adjust_ice_N_no_kwargs.(param_set,
+        #     @view(parent(N_ice)[valid_inds]),
+        #     N_INP .* @view(parent(f_ice_mult)[valid_inds]),
+        #     @view(parent(q)[valid_inds, 3]),
+        #     @view(parent(ρ)[valid_inds]),
+        #     S_i,
+        #     @view(parent(q)[valid_inds, 2]), # q_l for boosting <r>
+        #     @view(parent(q_sno)[valid_inds]),
+        #     @view(parent(massflux)[valid_inds]),
+        #     dNINP_dz,
+        #     @view(parent(w_i)[valid_inds]),
+        #     N_INP_top .* @view(parent(f_ice_mult)[valid_inds]),
+        #     ; monodisperse=false, decrease_N_if_subsaturated=true, N_i_from_INP = false, apply_massflux_boost = apply_massflux_boost, apply_sedimentation_boost = apply_sedimentation_boost)
+
+        q_p      = parent(q)
+        ρ_p      = parent(ρ)
+        T_p      = parent(T)
+        w_p      = parent(w)
+        dTdz_p   = parent(dTdz)
+        N_ice_p  = parent(N_ice)
+        f_mult_p = parent(f_ice_mult)
+        q_sno_p  = parent(q_sno)
+        mf_p     = parent(massflux)
+        w_i_p    = parent(w_i)
+        @inbounds for i in eachindex(valid_inds)
+            valid_inds[i] || continue
+
+            qs = TD.PhasePartition(q_p[i,1], q_p[i,2], q_p[i,3])
+            S_i = TD.supersaturation(thermo_params, qs, ρ_p[i], T_p[i], TD.Ice())
+            N_INP = get_INP_concentration(param_set, relaxation_timescale, qs, T_p[i], ρ_p[i], w_p[i], S_i)
+            dNINP_dz = get_dNINP_dz(param_set, relaxation_timescale, T_p[i], dTdz_p[i])
+            N_ice_p[i] = adjust_ice_N_no_kwargs(
+                param_set,
+                N_ice_p[i],
+                N_INP * f_mult_p[i],
+                q_p[i, 3],
+                ρ_p[i],
+                S_i,
+                q_p[i, 2],
+                q_sno_p[i],
+                mf_p[i],
+                dNINP_dz,
+                w_i_p[i],
+                N_INP_top * f_mult_p[i];
+                monodisperse=false,
+                decrease_N_if_subsaturated=true,
+                N_i_from_INP=false,
+                apply_massflux_boost=apply_massflux_boost,
+                apply_sedimentation_boost=apply_sedimentation_boost,
+            )
+        end
+
     end
 
 
@@ -1311,7 +1368,7 @@ function get_τs_and_Ns_and_N_i_no_boost!(param_set::APS, microphys_params::ACMP
     # _τ_liq .= clamp(_τ_liq, relaxation_timescale.args.min_τ_liq, relaxation_timescale.args.max_τ_liq)
     # _τ_ice .= clamp(_τ_ice, relaxation_timescale.args.min_τ_ice, relaxation_timescale.args.max_τ_ice)
     # _N_l .= clamp(_N_l, relaxation_timescale.args.min_N_liq, relaxation_timescale.args.max_N_liq)
-    # _N_i .= 
+    # _N_i .= clamp(_N_i, relaxation_timescale.args.min_N_ice, relaxation_timescale.args.max_N_ice)
 
 
     parent(τ_liq)[valid_inds] .= _τ_liq
@@ -1319,52 +1376,121 @@ function get_τs_and_Ns_and_N_i_no_boost!(param_set::APS, microphys_params::ACMP
     parent(N_liq)[valid_inds] .= _N_l
     parent(N_ice)[valid_inds] .= _N_i
 
+    if get_adjust_liq_N(relaxation_timescale) || get_adjust_ice_N(relaxation_timescale)
+        q_p      = parent(q)
+        ρ_p      = parent(ρ)
+        T_p      = parent(T)
+        w_p      = parent(w)
+        dTdz_p   = parent(dTdz)
+        N_liq_p  = parent(N_liq)
+        N_ice_p  = parent(N_ice)
+        f_mult_p = parent(f_ice_mult)
+        q_sno_p  = parent(q_sno)
+        mf_p     = parent(massflux)
+        w_i_p    = parent(w_i)
+    end
 
     # Because  this bypasses get_N_l(), get_N_i(), we need to apply adjust_liq/ice_N() here.
     if get_adjust_liq_N(relaxation_timescale)
-        @view(parent(N_liq)[valid_inds]) .= adjust_liq_N_no_kwargs.(param_set, @view(parent(N_liq)[valid_inds]), @view(parent(q)[valid_inds, 2]), @view(parent(ρ)[valid_inds]); monodisperse=true, decrease_N_if_subsaturated=false)
+        # @view(parent(N_liq)[valid_inds]) .= adjust_liq_N_no_kwargs.(param_set, @view(parent(N_liq)[valid_inds]), @view(parent(q)[valid_inds, 2]), @view(parent(ρ)[valid_inds]); monodisperse=true, decrease_N_if_subsaturated=false)
+        @inbounds for i in eachindex(valid_inds)
+            valid_inds[i] || continue
+            parent(N_liq)[i] = adjust_liq_N_no_kwargs(param_set, N_liq_p[i], q_p[i, 2], ρ_p[i]; monodisperse=true, decrease_N_if_subsaturated=false)
+        end
     end
     if get_adjust_ice_N(relaxation_timescale)
         thermo_params = TCP.thermodynamics_params(param_set)
-        FT = eltype(param_set)
-        qs = TD.PhasePartition{FT}[TD.PhasePartition(parent(q)[i, 1], parent(q)[i, 2], parent(q)[i, 3]) for i in eachindex(valid_inds) if valid_inds[i]]
-        S_i = TD.supersaturation.(thermo_params, qs, @view(parent(ρ)[valid_inds]), @view(parent(T)[valid_inds]), TD.Ice())
-        N_INP = get_INP_concentration.(param_set, relaxation_timescale, qs, @view(parent(T)[valid_inds]), @view(parent(ρ)[valid_inds]), @view(parent(w)[valid_inds]))
-        dNINP_dz = get_dNINP_dz.(param_set, relaxation_timescale, @view(parent(T)[valid_inds]), @view(parent(dTdz)[valid_inds]))
-        
+        # FT = eltype(param_set)
+        # qs = TD.PhasePartition{FT}[TD.PhasePartition(parent(q)[i, 1], parent(q)[i, 2], parent(q)[i, 3]) for i in eachindex(valid_inds) if valid_inds[i]]
+        # S_i = TD.supersaturation.(thermo_params, qs, @view(parent(ρ)[valid_inds]), @view(parent(T)[valid_inds]), TD.Ice())
+        # N_INP = get_INP_concentration.(param_set, relaxation_timescale, qs, @view(parent(T)[valid_inds]), @view(parent(ρ)[valid_inds]), @view(parent(w)[valid_inds]), S_i)
+        # dNINP_dz = get_dNINP_dz.(param_set, relaxation_timescale, @view(parent(T)[valid_inds]), @view(parent(dTdz)[valid_inds]))
 
-        @view(parent(N_ice)[valid_inds]) .= adjust_ice_N_no_kwargs.(param_set,
-            @view(parent(N_ice)[valid_inds]),
-            N_INP .* @view(parent(f_ice_mult)[valid_inds]),
-            @view(parent(q)[valid_inds, 3]),
-            @view(parent(ρ)[valid_inds]),
-            S_i,
-            @view(parent(q)[valid_inds, 2]), # q_l for boosting <r>
-            @view(parent(q_sno)[valid_inds]),
-            @view(parent(massflux)[valid_inds]),
-            dNINP_dz,
-            @view(parent(w_i)[valid_inds]),
-            N_INP_top .* @view(parent(f_ice_mult)[valid_inds]),
-            ; monodisperse=false, decrease_N_if_subsaturated=true, N_i_from_INP = false, apply_massflux_boost = apply_massflux_boost, apply_sedimentation_boost = apply_sedimentation_boost)
-    
-    
-        if apply_massflux_boost
-            @view(parent(N_ice_no_boost)[valid_inds]) .= adjust_ice_N_no_kwargs.(param_set,
-                @view(parent(N_ice)[valid_inds]),
-                N_INP .* @view(parent(f_ice_mult)[valid_inds]),
-                @view(parent(q)[valid_inds, 3]),
-                @view(parent(ρ)[valid_inds]),
+        # @view(parent(N_ice)[valid_inds]) .= adjust_ice_N_no_kwargs.(param_set,
+        #     @view(parent(N_ice)[valid_inds]),
+        #     N_INP .* @view(parent(f_ice_mult)[valid_inds]),
+        #     @view(parent(q)[valid_inds, 3]),
+        #     @view(parent(ρ)[valid_inds]),
+        #     S_i,
+        #     @view(parent(q)[valid_inds, 2]), # q_l for boosting <r>
+        #     @view(parent(q_sno)[valid_inds]),
+        #     @view(parent(massflux)[valid_inds]),
+        #     dNINP_dz,
+        #     @view(parent(w_i)[valid_inds]),
+        #     N_INP_top .* @view(parent(f_ice_mult)[valid_inds]),
+        #     ; monodisperse=false, decrease_N_if_subsaturated=true, N_i_from_INP = false, apply_massflux_boost = apply_massflux_boost, apply_sedimentation_boost = apply_sedimentation_boost)
+
+        # if apply_massflux_boost
+        #     @view(parent(N_ice_no_boost)[valid_inds]) .= adjust_ice_N_no_kwargs.(param_set,
+        #         @view(parent(N_ice)[valid_inds]),
+        #         N_INP .* @view(parent(f_ice_mult)[valid_inds]),
+        #         @view(parent(q)[valid_inds, 3]),
+        #         @view(parent(ρ)[valid_inds]),
+        #         S_i,
+        #         @view(parent(q)[valid_inds, 2]), # q_l for boosting <r>
+        #         @view(parent(q_sno)[valid_inds]),
+        #         @view(parent(massflux)[valid_inds]),
+        #         dNINP_dz,
+        #         @view(parent(w_i)[valid_inds]),
+        #         N_INP_top .* @view(parent(f_ice_mult)[valid_inds]),
+        #         ; monodisperse=false, decrease_N_if_subsaturated=true, N_i_from_INP = false, apply_massflux_boost = false, apply_sedimentation_boost = apply_sedimentation_boost)
+        # else
+        #     @view(parent(N_ice_no_boost)[valid_inds]) .= @view(parent(N_ice)[valid_inds])
+        # end
+
+        @inbounds for i in eachindex(valid_inds)
+            valid_inds[i] || continue
+
+            qs = TD.PhasePartition(q_p[i,1], q_p[i,2], q_p[i,3])
+            S_i = TD.supersaturation(thermo_params, qs, ρ_p[i], T_p[i], TD.Ice())
+            N_INP = get_INP_concentration(param_set, relaxation_timescale, qs, T_p[i], ρ_p[i], w_p[i], S_i)
+            dNINP_dz = get_dNINP_dz(param_set, relaxation_timescale, T_p[i], dTdz_p[i])
+            N_ice_p[i] = adjust_ice_N_no_kwargs(
+                param_set,
+                N_ice_p[i],
+                N_INP * f_mult_p[i],
+                q_p[i, 3],
+                ρ_p[i],
                 S_i,
-                @view(parent(q)[valid_inds, 2]), # q_l for boosting <r>
-                @view(parent(q_sno)[valid_inds]),
-                @view(parent(massflux)[valid_inds]),
+                q_p[i, 2],
+                q_sno_p[i],
+                mf_p[i],
                 dNINP_dz,
-                @view(parent(w_i)[valid_inds]),
-                N_INP_top .* @view(parent(f_ice_mult)[valid_inds]),
-                ; monodisperse=false, decrease_N_if_subsaturated=true, N_i_from_INP = false, apply_massflux_boost = false, apply_sedimentation_boost = apply_sedimentation_boost)
-        else
-            @view(parent(N_ice_no_boost)[valid_inds]) .= @view(parent(N_ice)[valid_inds])
+                w_i_p[i],
+                N_INP_top * f_mult_p[i];
+                monodisperse=false,
+                decrease_N_if_subsaturated=true,
+                N_i_from_INP=false,
+                apply_massflux_boost=apply_massflux_boost,
+                apply_sedimentation_boost=apply_sedimentation_boost,
+            )
+
+            if apply_massflux_boost
+                parent(N_ice_no_boost)[i] = adjust_ice_N_no_kwargs(
+                    param_set,
+                    N_ice_p[i],
+                    N_INP * f_mult_p[i],
+                    q_p[i, 3],
+                    ρ_p[i],
+                    S_i,
+                    q_p[i, 2],
+                    q_sno_p[i],
+                    mf_p[i],
+                    dNINP_dz,
+                    w_i_p[i],
+                    N_INP_top * f_mult_p[i];
+                    monodisperse=false,
+                    decrease_N_if_subsaturated=true,
+                    N_i_from_INP=false,
+                    apply_massflux_boost=false,
+                    apply_sedimentation_boost=apply_sedimentation_boost,
+                )
+            else
+                parent(N_ice_no_boost)[i] = N_ice_p[i]
+            end
         end
+
+
     end
 
 
@@ -1390,31 +1516,86 @@ function get_Ns!(param_set::APS, microphys_params::ACMP, relaxation_timescale::N
     parent(N_liq)[valid_inds] .= _N_l
     parent(N_ice)[valid_inds] .= _N_i
 
+    if get_adjust_liq_N(relaxation_timescale) || get_adjust_ice_N(relaxation_timescale)
+        q_p      = parent(q)
+        ρ_p      = parent(ρ)
+        T_p      = parent(T)
+        w_p      = parent(w)
+        dTdz_p   = parent(dTdz)
+        N_liq_p  = parent(N_liq)
+        N_ice_p  = parent(N_ice)
+        f_mult_p = parent(f_ice_mult)
+        q_sno_p  = parent(q_sno)
+        mf_p     = parent(massflux)
+        w_i_p    = parent(w_i)
+    end
 
     # Because  this bypasses get_N_l(), get_N_i(), we need to apply adjust_liq/ice_N() here.
     if get_adjust_liq_N(relaxation_timescale)
-        @view(parent(N_liq)[valid_inds]) .= adjust_liq_N_no_kwargs.(param_set, @view(parent(N_liq)[valid_inds]), @view(parent(q)[valid_inds, 2]), @view(parent(ρ)[valid_inds]); monodisperse=true, decrease_N_if_subsaturated=false)
+        # @view(parent(N_liq)[valid_inds]) .= adjust_liq_N_no_kwargs.(param_set, @view(parent(N_liq)[valid_inds]), @view(parent(q)[valid_inds, 2]), @view(parent(ρ)[valid_inds]); monodisperse=true, decrease_N_if_subsaturated=false)
+        @inbounds for i in eachindex(valid_inds)
+            valid_inds[i] || continue
+            N_liq_p[i] = adjust_liq_N_no_kwargs(param_set, N_liq_p[i], q_p[i, 2], ρ_p[i]; monodisperse=true, decrease_N_if_subsaturated=false)
+        end
     end
     if get_adjust_ice_N(relaxation_timescale)
         thermo_params = TCP.thermodynamics_params(param_set)
         FT = eltype(param_set)
-        qs = TD.PhasePartition{FT}[TD.PhasePartition(parent(q)[i, 1], parent(q)[i, 2], parent(q)[i, 3]) for i in eachindex(valid_inds) if valid_inds[i]]
-        S_i = TD.supersaturation.(thermo_params, qs, @view(parent(ρ)[valid_inds]), @view(parent(T)[valid_inds]), TD.Ice())
-        N_INP = get_INP_concentration.(param_set, relaxation_timescale, qs, @view(parent(T)[valid_inds]), @view(parent(ρ)[valid_inds]), @view(parent(w)[valid_inds]))
-        dNINP_dz = get_dNINP_dz.(param_set, relaxation_timescale, @view(parent(T)[valid_inds]), @view(parent(dTdz)[valid_inds]))
-        @view(parent(N_ice)[valid_inds]) .= adjust_ice_N_no_kwargs.(param_set,
-            @view(parent(N_ice)[valid_inds]),
-            N_INP .* @view(parent(f_ice_mult)[valid_inds]),
-            @view(parent(q)[valid_inds, 3]),
-            @view(parent(ρ)[valid_inds]),
-            S_i,
-            @view(parent(q)[valid_inds, 2]), # q_l for boosting <r>
-            @view(parent(q_sno)[valid_inds]),
-            @view(parent(massflux)[valid_inds]),
-            dNINP_dz,
-            @view(parent(w_i)[valid_inds]),
-            N_INP_top .* @view(parent(f_ice_mult)[valid_inds]),
-            ; monodisperse=false, decrease_N_if_subsaturated=true, N_i_from_INP = false, apply_massflux_boost = apply_massflux_boost, apply_sedimentation_boost = apply_sedimentation_boost)
+    #     qs = TD.PhasePartition{FT}[TD.PhasePartition(parent(q)[i, 1], parent(q)[i, 2], parent(q)[i, 3]) for i in eachindex(valid_inds) if valid_inds[i]] # this allocates a matrix
+    #     S_i = TD.supersaturation.(thermo_params, qs, @view(parent(ρ)[valid_inds]), @view(parent(T)[valid_inds]), TD.Ice()) # this allocation seems hard to get around while maintaining only matrix ops
+    #     N_INP = get_INP_concentration.(param_set, relaxation_timescale, qs, @view(parent(T)[valid_inds]), @view(parent(ρ)[valid_inds]), @view(parent(w)[valid_inds]), S_i) # this allocation seems hard to get around while maintaining only matrix ops
+    #     dNINP_dz = get_dNINP_dz.(param_set, relaxation_timescale, @view(parent(T)[valid_inds]), @view(parent(dTdz)[valid_inds]))
+    #     @view(parent(N_ice)[valid_inds]) .= adjust_ice_N_no_kwargs.(param_set,
+    #         @view(parent(N_ice)[valid_inds]),
+    #         N_INP .* @view(parent(f_ice_mult)[valid_inds]),
+    #         @view(parent(q)[valid_inds, 3]),
+    #         @view(parent(ρ)[valid_inds]),
+    #         S_i,
+    #         @view(parent(q)[valid_inds, 2]), # q_l for boosting <r>
+    #         @view(parent(q_sno)[valid_inds]),
+    #         @view(parent(massflux)[valid_inds]),
+    #         dNINP_dz,
+    #         @view(parent(w_i)[valid_inds]),
+    #         N_INP_top .* @view(parent(f_ice_mult)[valid_inds]),
+    #         ; monodisperse=false, decrease_N_if_subsaturated=true, N_i_from_INP = false, apply_massflux_boost = apply_massflux_boost, apply_sedimentation_boost = apply_sedimentation_boost)
+
+        q_p      = parent(q)
+        ρ_p      = parent(ρ)
+        T_p      = parent(T)
+        w_p      = parent(w)
+        dTdz_p   = parent(dTdz)
+        N_ice_p  = parent(N_ice)
+        f_mult_p = parent(f_ice_mult)
+        q_sno_p  = parent(q_sno)
+        mf_p     = parent(massflux)
+        w_i_p    = parent(w_i)
+        @inbounds for i in eachindex(valid_inds)
+            valid_inds[i] || continue
+
+            qs = TD.PhasePartition(q_p[i,1], q_p[i,2], q_p[i,3])
+            S_i = TD.supersaturation(thermo_params, qs, ρ_p[i], T_p[i], TD.Ice())
+            N_INP = get_INP_concentration(param_set, relaxation_timescale, qs, T_p[i], ρ_p[i], w_p[i], S_i)
+            dNINP_dz = get_dNINP_dz(param_set, relaxation_timescale, T_p[i], dTdz_p[i])
+            N_ice_p[i] = adjust_ice_N_no_kwargs(
+                param_set,
+                N_ice_p[i],
+                N_INP * f_mult_p[i],
+                q_p[i, 3],
+                ρ_p[i],
+                S_i,
+                q_p[i, 2],
+                q_sno_p[i],
+                mf_p[i],
+                dNINP_dz,
+                w_i_p[i],
+                N_INP_top * f_mult_p[i];
+                monodisperse=false,
+                decrease_N_if_subsaturated=true,
+                N_i_from_INP=false,
+                apply_massflux_boost=apply_massflux_boost,
+                apply_sedimentation_boost=apply_sedimentation_boost,
+            )
+        end
     end
 
     # Because this bypasses get_N_l(), get_N_i(), and get_τs() we need to clamp the values here [[ (clamping the static array didn't work) -- e.g. clamp(_N_i, relaxation_timescale.args.min_N_ice, relaxation_timescale.args.max_N_ice) return an error bc of the stride arrays ]]
@@ -1437,51 +1618,119 @@ function get_Ns_and_N_i_no_boost!(param_set::APS, microphys_params::ACMP, relaxa
     parent(N_liq)[valid_inds] .= _N_l
     parent(N_ice)[valid_inds] .= _N_i
 
+    if get_adjust_liq_N(relaxation_timescale) || get_adjust_ice_N(relaxation_timescale)
+        q_p      = parent(q)
+        ρ_p      = parent(ρ)
+        T_p      = parent(T)
+        w_p      = parent(w)
+        dTdz_p   = parent(dTdz)
+        N_liq_p  = parent(N_liq)
+        N_ice_p  = parent(N_ice)
+        f_mult_p = parent(f_ice_mult)
+        q_sno_p  = parent(q_sno)
+        mf_p     = parent(massflux)
+        w_i_p    = parent(w_i)
+    end
 
     # Because  this bypasses get_N_l(), get_N_i(), we need to apply adjust_liq/ice_N() here.
     if get_adjust_liq_N(relaxation_timescale)
-        @view(parent(N_liq)[valid_inds]) .= adjust_liq_N_no_kwargs.(param_set, @view(parent(N_liq)[valid_inds]), @view(parent(q)[valid_inds, 2]), @view(parent(ρ)[valid_inds]); monodisperse=true, decrease_N_if_subsaturated=false)
+        # @view(parent(N_liq)[valid_inds]) .= adjust_liq_N_no_kwargs.(param_set, @view(parent(N_liq)[valid_inds]), @view(parent(q)[valid_inds, 2]), @view(parent(ρ)[valid_inds]); monodisperse=true, decrease_N_if_subsaturated=false)
+        @inbounds for i in eachindex(valid_inds)
+            valid_inds[i] || continue
+            N_liq_p[i] = adjust_liq_N_no_kwargs(param_set, N_liq_p[i], q_p[i, 2], ρ_p[i]; monodisperse=true, decrease_N_if_subsaturated=false)
+        end
     end
     if get_adjust_ice_N(relaxation_timescale)
         thermo_params = TCP.thermodynamics_params(param_set)
-        FT = eltype(param_set)
-        qs = TD.PhasePartition{FT}[TD.PhasePartition(parent(q)[i, 1], parent(q)[i, 2], parent(q)[i, 3]) for i in eachindex(valid_inds) if valid_inds[i]]
-        S_i = TD.supersaturation.(thermo_params, qs, @view(parent(ρ)[valid_inds]), @view(parent(T)[valid_inds]), TD.Ice())
-        N_INP = get_INP_concentration.(param_set, relaxation_timescale, qs, @view(parent(T)[valid_inds]), @view(parent(ρ)[valid_inds]), @view(parent(w)[valid_inds]))
-        dNINP_dz = get_dNINP_dz.(param_set, relaxation_timescale, @view(parent(T)[valid_inds]), @view(parent(dTdz)[valid_inds]))
-        @view(parent(N_ice)[valid_inds]) .= adjust_ice_N_no_kwargs.(param_set,
-            @view(parent(N_ice)[valid_inds]),
-            N_INP .* @view(parent(f_ice_mult)[valid_inds]),
-            @view(parent(q)[valid_inds, 3]),
-            @view(parent(ρ)[valid_inds]),
-            S_i,
-            @view(parent(q)[valid_inds, 2]), # q_l for boosting <r>
-            @view(parent(q_sno)[valid_inds]),
-            @view(parent(massflux)[valid_inds]),
-            dNINP_dz,
-            @view(parent(w_i)[valid_inds]),
-            N_INP_top .* @view(parent(f_ice_mult)[valid_inds]),
-            ; monodisperse=false, decrease_N_if_subsaturated=true, N_i_from_INP = false, apply_massflux_boost = apply_massflux_boost, apply_sedimentation_boost = apply_sedimentation_boost)
+        # FT = eltype(param_set)
+        # qs = TD.PhasePartition{FT}[TD.PhasePartition(parent(q)[i, 1], parent(q)[i, 2], parent(q)[i, 3]) for i in eachindex(valid_inds) if valid_inds[i]]
+        # S_i = TD.supersaturation.(thermo_params, qs, @view(parent(ρ)[valid_inds]), @view(parent(T)[valid_inds]), TD.Ice())
+        # N_INP = get_INP_concentration.(param_set, relaxation_timescale, qs, @view(parent(T)[valid_inds]), @view(parent(ρ)[valid_inds]), @view(parent(w)[valid_inds]))
+        # dNINP_dz = get_dNINP_dz.(param_set, relaxation_timescale, @view(parent(T)[valid_inds]), @view(parent(dTdz)[valid_inds]))
+        # @view(parent(N_ice)[valid_inds]) .= adjust_ice_N_no_kwargs.(param_set,
+        #     @view(parent(N_ice)[valid_inds]),
+        #     N_INP .* @view(parent(f_ice_mult)[valid_inds]),
+        #     @view(parent(q)[valid_inds, 3]),
+        #     @view(parent(ρ)[valid_inds]),
+        #     S_i,
+        #     @view(parent(q)[valid_inds, 2]), # q_l for boosting <r>
+        #     @view(parent(q_sno)[valid_inds]),
+        #     @view(parent(massflux)[valid_inds]),
+        #     dNINP_dz,
+        #     @view(parent(w_i)[valid_inds]),
+        #     N_INP_top .* @view(parent(f_ice_mult)[valid_inds]),
+        #     ; monodisperse=false, decrease_N_if_subsaturated=true, N_i_from_INP = false, apply_massflux_boost = apply_massflux_boost, apply_sedimentation_boost = apply_sedimentation_boost)
     
     
     
-        if apply_massflux_boost
-            @view(parent(N_ice_no_boost)[valid_inds]) .= adjust_ice_N_no_kwargs.(param_set,
-                @view(parent(N_ice)[valid_inds]),
-                N_INP .* @view(parent(f_ice_mult)[valid_inds]),
-                @view(parent(q)[valid_inds, 3]),
-                @view(parent(ρ)[valid_inds]),
+        # if apply_massflux_boost
+        #     @view(parent(N_ice_no_boost)[valid_inds]) .= adjust_ice_N_no_kwargs.(param_set,
+        #         @view(parent(N_ice)[valid_inds]),
+        #         N_INP .* @view(parent(f_ice_mult)[valid_inds]),
+        #         @view(parent(q)[valid_inds, 3]),
+        #         @view(parent(ρ)[valid_inds]),
+        #         S_i,
+        #         @view(parent(q)[valid_inds, 2]), # q_l for boosting <r>
+        #         @view(parent(q_sno)[valid_inds]),
+        #         @view(parent(massflux)[valid_inds]),
+        #         dNINP_dz,
+        #         @view(parent(w_i)[valid_inds]),
+        #         N_INP_top .* @view(parent(f_ice_mult)[valid_inds]),
+        #         ; monodisperse=false, decrease_N_if_subsaturated=true, N_i_from_INP = false, apply_massflux_boost = false, apply_sedimentation_boost = apply_sedimentation_boost)
+        # else
+        #     @view(parent(N_ice_no_boost)[valid_inds]) .= @view(parent(N_ice)[valid_inds])
+        # end
+
+        @inbounds for i in eachindex(valid_inds)
+            valid_inds[i] || continue
+
+            qs = TD.PhasePartition(q_p[i,1], q_p[i,2], q_p[i,3])
+            S_i = TD.supersaturation(thermo_params, qs, ρ_p[i], T_p[i], TD.Ice())
+            N_INP = get_INP_concentration(param_set, relaxation_timescale, qs, T_p[i], ρ_p[i], w_p[i], S_i)
+            dNINP_dz = get_dNINP_dz(param_set, relaxation_timescale, T_p[i], dTdz_p[i])
+            N_ice_p[i] = adjust_ice_N_no_kwargs(
+                param_set,
+                N_ice_p[i],
+                N_INP * f_mult_p[i],
+                q_p[i, 3],
+                ρ_p[i],
                 S_i,
-                @view(parent(q)[valid_inds, 2]), # q_l for boosting <r>
-                @view(parent(q_sno)[valid_inds]),
-                @view(parent(massflux)[valid_inds]),
+                q_p[i, 2],
+                q_sno_p[i],
+                mf_p[i],
                 dNINP_dz,
-                @view(parent(w_i)[valid_inds]),
-                N_INP_top .* @view(parent(f_ice_mult)[valid_inds]),
-                ; monodisperse=false, decrease_N_if_subsaturated=true, N_i_from_INP = false, apply_massflux_boost = false, apply_sedimentation_boost = apply_sedimentation_boost)
-        
-        else
-            @view(parent(N_ice_no_boost)[valid_inds]) .= @view(parent(N_ice)[valid_inds])
+                w_i_p[i],
+                N_INP_top * f_mult_p[i];
+                monodisperse=false,
+                decrease_N_if_subsaturated=true,
+                N_i_from_INP=false,
+                apply_massflux_boost=apply_massflux_boost,
+                apply_sedimentation_boost=apply_sedimentation_boost,
+            )
+
+            if apply_massflux_boost
+                parent(N_ice_no_boost)[i] = adjust_ice_N_no_kwargs(
+                    param_set,
+                    N_ice_p[i],
+                    N_INP * f_mult_p[i],
+                    q_p[i, 3],
+                    ρ_p[i],
+                    S_i,
+                    q_p[i, 2],
+                    q_sno_p[i],
+                    mf_p[i],
+                    dNINP_dz,
+                    w_i_p[i],
+                    N_INP_top * f_mult_p[i];
+                    monodisperse=false,
+                    decrease_N_if_subsaturated=true,
+                    N_i_from_INP=false,
+                    apply_massflux_boost=false,
+                    apply_sedimentation_boost=apply_sedimentation_boost,
+                )
+            else
+                parent(N_ice_no_boost)[i] = N_ice_p[i]
+            end
         end
     
     end
