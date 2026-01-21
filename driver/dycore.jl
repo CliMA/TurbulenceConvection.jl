@@ -757,11 +757,11 @@ function compute_gm_tendencies!(
     if state.calibrate_io
         apply_subsidence_barrier!(tendencies_gm.ρq_tot, aux_gm.subsidence, w∇q_tot_gm, aux_tc_f.temporary_f1, aux_tc_f.temporary_f2, q_tot_gm_boa, q_tot_gm_toa, ρ_c)
     else
-        save_subsidence_barrier!(aux_gm.qt_tendency_ls_vert_adv, aux_gm.subsidence, w∇q_tot_gm, aux_tc_f.temporary_f1, aux_tc_f.temporary_f2, q_tot_gm_boa, q_tot_gm_toa, one(FT))
-        @. tendencies_gm.ρq_tot -= ρ_c * aux_gm.qt_tendency_ls_vert_adv
+        save_subsidence_barrier!(aux_tc.qt_tendency_ls_vert_adv, aux_gm.subsidence, w∇q_tot_gm, aux_tc_f.temporary_f1, aux_tc_f.temporary_f2, q_tot_gm_boa, q_tot_gm_toa, one(FT))
+        @. tendencies_gm.ρq_tot -= ρ_c * aux_tc.qt_tendency_ls_vert_adv
     end
     # if !state.calibrate_io
-    #     @. aux_gm.qt_tendency_ls_vert_adv = -w∇q_tot_gm # FOR STORAGE
+    #     @. aux_tc.qt_tendency_ls_vert_adv = -w∇q_tot_gm # FOR STORAGE
     # end
 
     @. aux_tc.dqvdt -= w∇q_tot_gm # grid mean contribution to dqt/dt
@@ -789,11 +789,11 @@ function compute_gm_tendencies!(
         if state.calibrate_io
             apply_subsidence_barrier!(tendencies_gm.q_liq, aux_gm.subsidence, w∇q_liq_gm, aux_tc_f.temporary_f1, aux_tc_f.temporary_f2, q_liq_gm_boa, q_liq_gm_toa, one(FT))
         else
-            save_subsidence_barrier!(aux_gm.ql_tendency_ls_vert_adv, aux_gm.subsidence, w∇q_liq_gm, aux_tc_f.temporary_f1, aux_tc_f.temporary_f2, q_liq_gm_boa, q_liq_gm_toa, one(FT))
-            @. tendencies_gm.q_liq -= aux_gm.ql_tendency_ls_vert_adv
+            save_subsidence_barrier!(aux_tc.ql_tendency_ls_vert_adv, aux_gm.subsidence, w∇q_liq_gm, aux_tc_f.temporary_f1, aux_tc_f.temporary_f2, q_liq_gm_boa, q_liq_gm_toa, one(FT))
+            @. tendencies_gm.q_liq -= aux_tc.ql_tendency_ls_vert_adv
         end
         # if !state.calibrate_io
-        #     @. aux_gm.ql_tendency_ls_vert_adv = -w∇q_liq_gm # FOR STORAGE
+        #     @. aux_tc.ql_tendency_ls_vert_adv = -w∇q_liq_gm # FOR STORAGE
         # end
 
         # ∇q_ice_gm = ∇Tr # alias
@@ -812,11 +812,11 @@ function compute_gm_tendencies!(
         if state.calibrate_io
             apply_subsidence_barrier!(tendencies_gm.q_ice, aux_gm.subsidence, w∇q_ice_gm, aux_tc_f.temporary_f1, aux_tc_f.temporary_f2, q_ice_gm_boa, q_ice_gm_toa, one(FT))
         else
-            save_subsidence_barrier!(aux_gm.qi_tendency_ls_vert_adv, aux_gm.subsidence, w∇q_ice_gm, aux_tc_f.temporary_f1, aux_tc_f.temporary_f2, q_ice_gm_boa, q_ice_gm_toa, one(FT))
-            @. tendencies_gm.q_ice -= aux_gm.qi_tendency_ls_vert_adv
+            save_subsidence_barrier!(aux_tc.qi_tendency_ls_vert_adv, aux_gm.subsidence, w∇q_ice_gm, aux_tc_f.temporary_f1, aux_tc_f.temporary_f2, q_ice_gm_boa, q_ice_gm_toa, one(FT))
+            @. tendencies_gm.q_ice -= aux_tc.qi_tendency_ls_vert_adv
         end
         # if !state.calibrate_io
-        #     @. aux_gm.qi_tendency_ls_vert_adv = -w∇q_ice_gm # FOR STORAGE
+        #     @. aux_tc.qi_tendency_ls_vert_adv = -w∇q_ice_gm # FOR STORAGE
         # end
     end
 
@@ -841,11 +841,11 @@ function compute_gm_tendencies!(
     if state.calibrate_io
         apply_subsidence_barrier!(tendencies_pr.q_rai, aux_gm.subsidence, w∇q_rai_gm, aux_tc_f.temporary_f1, aux_tc_f.temporary_f2, q_rai_gm_boa, q_rai_gm_toa, one(FT))
     else
-        save_subsidence_barrier!(aux_gm.qr_tendency_ls_vert_adv, aux_gm.subsidence, w∇q_rai_gm, aux_tc_f.temporary_f1, aux_tc_f.temporary_f2, q_rai_gm_boa, q_rai_gm_toa, one(FT))
-        @. tendencies_pr.q_rai -= aux_gm.qr_tendency_ls_vert_adv
+        save_subsidence_barrier!(aux_tc.qr_tendency_ls_vert_adv, aux_gm.subsidence, w∇q_rai_gm, aux_tc_f.temporary_f1, aux_tc_f.temporary_f2, q_rai_gm_boa, q_rai_gm_toa, one(FT))
+        @. tendencies_pr.q_rai -= aux_tc.qr_tendency_ls_vert_adv
     end
     # if !state.calibrate_io
-    #     @. aux_gm.qr_tendency_ls_vert_adv = -w∇q_rai_gm # FOR STORAGE
+    #     @. aux_tc.qr_tendency_ls_vert_adv = -w∇q_rai_gm # FOR STORAGE
     # end
 
     # ∇q_sno_gm = ∇Tr # alias
@@ -862,13 +862,13 @@ function compute_gm_tendencies!(
     if state.calibrate_io
         apply_subsidence_barrier!(tendencies_pr.q_sno, aux_gm.subsidence, w∇q_sno_gm, aux_tc_f.temporary_f1, aux_tc_f.temporary_f2, q_sno_gm_boa, q_sno_gm_toa, one(FT))
     else
-        save_subsidence_barrier!(aux_gm.qs_tendency_ls_vert_adv, aux_gm.subsidence, w∇q_sno_gm, aux_tc_f.temporary_f1, aux_tc_f.temporary_f2, q_sno_gm_boa, q_sno_gm_toa, one(FT))
-        @. tendencies_pr.q_sno -= aux_gm.qs_tendency_ls_vert_adv
+        save_subsidence_barrier!(aux_tc.qs_tendency_ls_vert_adv, aux_gm.subsidence, w∇q_sno_gm, aux_tc_f.temporary_f1, aux_tc_f.temporary_f2, q_sno_gm_boa, q_sno_gm_toa, one(FT))
+        @. tendencies_pr.q_sno -= aux_tc.qs_tendency_ls_vert_adv
     end
     # apply_subsidence_barrier!(tendencies_pr.q_sno, w∇q_sno_gm, aux_gm.subsidence, q_sno_gm_boa, q_sno_gm_toa, -FT(1))
     # @. tendencies_pr.q_sno += -w∇q_sno_gm
     # if !state.calibrate_io
-    #     @. aux_gm.qs_tendency_ls_vert_adv = -w∇q_sno_gm # FOR STORAGE
+    #     @. aux_tc.qs_tendency_ls_vert_adv = -w∇q_sno_gm # FOR STORAGE
     # end
 
 

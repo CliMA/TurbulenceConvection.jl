@@ -363,6 +363,16 @@ cent_aux_vars_edmf(::Type{FT}, local_geometry, edmf, calibrate_io_val::Val{calib
         massflux_tendency_qt = FT(0),
         massflux_tendency_ql = FT(0), # moving to here so they're always there even for eq so can put in diagnostics output
         massflux_tendency_qi = FT(0), # moving to here so they're always there even for eq so can put in diagnostics output
+        massflux_tendency_qr = FT(0), # moving to here so they're always there even for eq so can put in diagnostics output
+        massflux_tendency_qs = FT(0), # moving to here so they're always there even for eq so can put in diagnostics output
+        #
+        (calibrate_io ? (;) : (;
+            qt_tendency_ls_vert_adv = FT(0), # my addition
+            ql_tendency_ls_vert_adv = FT(0), # my addition
+            qi_tendency_ls_vert_adv = FT(0), # my addition
+            qr_tendency_ls_vert_adv = FT(0), # my addition [[ not sure how relevant this one is but ]]
+            qs_tendency_ls_vert_adv = FT(0), # my addition [[ not sure how relevant this one is but ]]
+        ))...,
 
         #
         #

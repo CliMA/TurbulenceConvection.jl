@@ -105,8 +105,8 @@ function compute_precipitation_advection_tendencies(
     @. aux_gm.qs_tendency_sedimentation = ∇(wvec(RB(ρ_c * q_sno * term_vel_snow))) / ρ_c # * precip_fraction
 
 
-    @. aux_gm.qr_tendency_vert_adv = FT(0)
-    @. aux_gm.qs_tendency_vert_adv = FT(0)
+    zero_field!(aux_tc.massflux_tendency_qr)
+    zero_field!(aux_tc.massflux_tendency_qs)
 
 
     if edmf.area_partition_model isa CoreCloakAreaPartitionModel
@@ -145,8 +145,8 @@ function compute_precipitation_advection_tendencies(
         for i in 1:N_up
             @. q_rai_here = ifelse(aux_gm.q_liq > FT(0), (aux_up[i].q_liq * aux_up[i].area) / aux_gm.q_liq , FT(1)) * q_rai # fraction of liquid in Updraft
             @. q_sno_here = ifelse(aux_gm.q_ice > FT(0), (aux_up[i].q_ice * aux_up[i].area) / aux_gm.q_ice , FT(1)) * q_sno # fraction of ice in Updraft
-            @. aux_gm.qr_tendency_vert_adv += -∇(wvec(LB(Ic(aux_up_f[i].w) * ρ_c * aux_up[i].area * q_rai_here))) / ρ_c
-            @. aux_gm.qs_tendency_vert_adv += -∇(wvec(LB(Ic(aux_up_f[i].w) * ρ_c * aux_up[i].area * q_sno_here))) / ρ_c
+            @. aux_tc.massflux_tendency_qr += -∇(wvec(LB(Ic(aux_up_f[i].w) * ρ_c * aux_up[i].area * q_rai_here))) / ρ_c
+            @. aux_tc.massflux_tendency_qs += -∇(wvec(LB(Ic(aux_up_f[i].w) * ρ_c * aux_up[i].area * q_sno_here))) / ρ_c
         end
         
         if edmf.area_partition_model.confine_all_downdraft_to_cloak # left of right biased based on direction. This does have the risk to be unstable though... hopefully running out of w helps moderate.... otherwise we could try the second order correction lol...
@@ -179,32 +179,32 @@ function compute_precipitation_advection_tendencies(
                 @. q_rai_here = ifelse(aux_gm.q_liq > FT(0), (aux_en.q_liq_en_remaining * aux_en.a_en_remaining) / aux_gm.q_liq , FT(1)) * q_rai # fraction of liquid in Env remaining
                 @. q_sno_here = ifelse(aux_gm.q_ice > FT(0), (aux_en.q_ice_en_remaining * aux_en.a_en_remaining) / aux_gm.q_ice , FT(1)) * q_sno # fraction of ice in Env remaining
             end
-            @. aux_gm.qr_tendency_vert_adv += -∇(wvec(LRB(Ic(w_region) * ρ_c * area_region * q_rai_here))) / ρ_c
-            @. aux_gm.qs_tendency_vert_adv += -∇(wvec(LRB(Ic(w_region) * ρ_c * area_region * q_sno_here))) / ρ_c
+            @. aux_tc.massflux_tendency_qr += -∇(wvec(LRB(Ic(w_region) * ρ_c * area_region * q_rai_here))) / ρ_c
+            @. aux_tc.massflux_tendency_qs += -∇(wvec(LRB(Ic(w_region) * ρ_c * area_region * q_sno_here))) / ρ_c
         end
 
     else
         @inbounds for i in 1:N_up
-            @. aux_gm.qr_tendency_vert_adv += -∇(wvec(LB(Ic(aux_up_f[i].w) * ρ_c * aux_up[i].area * q_rai))) / ρ_c
-            @. aux_gm.qs_tendency_vert_adv += -∇(wvec(LB(Ic(aux_up_f[i].w) * ρ_c * aux_up[i].area * q_sno))) / ρ_c
+            @. aux_tc.massflux_tendency_qr += -∇(wvec(LB(Ic(aux_up_f[i].w) * ρ_c * aux_up[i].area * q_rai))) / ρ_c
+            @. aux_tc.massflux_tendency_qs += -∇(wvec(LB(Ic(aux_up_f[i].w) * ρ_c * aux_up[i].area * q_sno))) / ρ_c
         end
 
         if (edmf.convective_tke_handler isa ConvectiveTKE) && (edmf.convective_tke_handler.transport_condensed_by_advection)
             # w_conv := sqrt((2 * aux_en.tke_convective))
-            @. aux_gm.qr_tendency_vert_adv += -∇(wvec(LB((sqrt((2 * aux_en.tke_convective))) * ρ_c * aux_en.area/2 * q_rai))) / ρ_c
-            @. aux_gm.qs_tendency_vert_adv += -∇(wvec(LB((sqrt((2 * aux_en.tke_convective))) * ρ_c * aux_en.area/2 * q_sno))) / ρ_c    
+            @. aux_tc.massflux_tendency_qr += -∇(wvec(LB((sqrt((2 * aux_en.tke_convective))) * ρ_c * aux_en.area/2 * q_rai))) / ρ_c
+            @. aux_tc.massflux_tendency_qs += -∇(wvec(LB((sqrt((2 * aux_en.tke_convective))) * ρ_c * aux_en.area/2 * q_sno))) / ρ_c    
             # Ignore tke down draft for now...
         else
             # ignore env contribution for now....
-            # @. aux_gm.qr_tendency_vert_adv = -∇(wvec(LB(Ic(aux_en_f.w) * ρ_c * aux_en.area * q_rai))) / ρ_c #  [[ i think the env part is fake ... a dryish downdraft shoould take care of it.... ]]
-            # @. aux_gm.qs_tendency_vert_adv = -∇(wvec(LB(Ic(aux_en_f.w) * ρ_c * aux_en.area * q_sno))) / ρ_c # [[ i think the env part is fake ... a dryish downdraft shoould take care of it.... ]]
+            # @. aux_tc.massflux_tendency_qr = -∇(wvec(LB(Ic(aux_en_f.w) * ρ_c * aux_en.area * q_rai))) / ρ_c #  [[ i think the env part is fake ... a dryish downdraft shoould take care of it.... ]]
+            # @. aux_tc.massflux_tendency_qs = -∇(wvec(LB(Ic(aux_en_f.w) * ρ_c * aux_en.area * q_sno))) / ρ_c # [[ i think the env part is fake ... a dryish downdraft shoould take care of it.... ]]
         end
 
     end
 
 
-    @. tendencies_pr.q_rai += aux_gm.qr_tendency_vert_adv + aux_gm.qr_tendency_sedimentation
-    @. tendencies_pr.q_sno += aux_gm.qs_tendency_vert_adv + aux_gm.qs_tendency_sedimentation
+    @. tendencies_pr.q_rai += aux_tc.massflux_tendency_qr + aux_gm.qr_tendency_sedimentation
+    @. tendencies_pr.q_sno += aux_tc.massflux_tendency_qs + aux_gm.qs_tendency_sedimentation
     return nothing
 end
 

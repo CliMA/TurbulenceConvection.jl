@@ -837,7 +837,7 @@ get_N_l_helper(param_set::APS, relaxation_timescale::RelaxToEquilibrium, q::TD.P
 # :Base
 # get_N_i_helper(param_set::APS, relaxation_timescale::BaseRelaxationTimescale, q::TD.PhasePartition, T::FT, ρ::FT, w::FT) where {FT} = FT(NaN)   
 get_N_i_helper(param_set::APS, relaxation_timescale::BaseRelaxationTimescale, q::TD.PhasePartition, T::FT, ρ::FT, w::FT) where {FT} = get_N_i_Cooper_curve(T; clamp_N=true) # trial using this to force PITOSN
-# get_N_l_helper(param_set::APS, relaxation_timescale::BaseRelaxationTimescale, q::TD.PhasePartition, T::FT, ρ::FT, w::FT) where {FT} = FT(NaN)
+get_N_l_helper(param_set::APS, relaxation_timescale::BaseRelaxationTimescale, q::TD.PhasePartition, T::FT, ρ::FT, w::FT) where {FT} = FT(NaN)
 
 
 # :exponential_T_scaling_ice

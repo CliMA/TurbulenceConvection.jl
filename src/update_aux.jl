@@ -1544,9 +1544,9 @@ function update_N_τ_termvel!(edmf::EDMFModel, state::State, param_set::APS, the
         @inbounds for i in 1:N_up
             if (TD.has_condensate(aux_up[i].q_ice[k])) && (aux_up[i].area[k] > 1e-6) && ((S_k = TD.supersaturation(thermo_params, TD.PhasePartition(thermo_params, aux_up[i].ts[k]), ρ_c[k], aux_up[i].T[k], TD.Ice())) > FT(0))
                 
+                w_up = -w[k] * aux_en.area[k] / (1-aux_up[i].area[k] + eps(FT))
                 if edmf.moisture_model isa NonEquilibriumMoisture
                     # we know w_mean = 0 so we can calulate w_up 
-                    w_up = -w[k] * aux_en.area[k] / (1-aux_up[i].area[k] + eps(FT))
                     N_i_cloud_top_ice_ups_here = get_INP_concentration(param_set, edmf.moisture_model.scheme, TD.PhasePartition(thermo_params, aux_up[i].ts[k]), aux_up[i].T[k], ρ_c[k], w_up, S_k) # if we use S_k we might get 0. we need frac_activation not frac_supersat really.
                 else
                     N_i_cloud_top_ice_ups_here = get_N_i_Cooper_curve(aux_up[i].T[k]; clamp_N=true) # the fallback

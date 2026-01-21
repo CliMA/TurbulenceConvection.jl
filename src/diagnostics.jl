@@ -67,10 +67,15 @@ function io_dictionary_aux(edmf) # added EDMF as an argument so we can have thin
         "tke_interdomain" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_environment_2m(state).tke.interdomain),
 
         # My convective tke additions
-        "tke_convective" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_environment(state).tke_convective),
-        "tke_convective_production" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_environment(state).tke_convective_production),
-        "tke_convective_advection" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_environment(state).tke_convective_advection),
-        "tke_convective_dissipation" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_environment(state).tke_convective_dissipation),
+        ((edmf.convective_tke_handler isa AbstractYesConvectiveTKEHandler) ? (
+            "tke_convective_production" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_environment(state).tke_convective_production),
+        ) : ())...,
+        ((edmf.convective_tke_handler isa ConvectiveTKE) ? (
+            "tke_convective_advection" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_environment(state).tke_convective_advection),
+            "tke_convective_dissipation" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_environment(state).tke_convective_dissipation),
+            "tke_convective" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_environment(state).tke_convective),
+        ) : ())...,
+
         "latent_heating_pos" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_environment(state).latent_heating_pos),
         "latent_heating_neg" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_environment(state).latent_heating_neg),
         "instability" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_environment(state).instability),
@@ -148,12 +153,15 @@ function io_dictionary_aux(edmf) # added EDMF as an argument so we can have thin
         "massflux_grad" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_turbconv(state).∂M∂z),
         "massflux_grad_rhoa" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_turbconv(state).∂M∂z_ρa),
         "ln_massflux_grad" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_turbconv(state).∂lnM∂z),
-        "massflux_tendency_h" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_turbconv(state).massflux_tendency_h),
-        "massflux_tendency_qt" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_turbconv(state).massflux_tendency_qt),
-        "massflux_tendency_ql" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_turbconv(state).massflux_tendency_ql), # saved here
-        "massflux_tendency_qi" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_turbconv(state).massflux_tendency_qi), # saved here
-        "diffusive_tendency_h" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_turbconv(state).diffusive_tendency_h),
-        "diffusive_tendency_qt" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_turbconv(state).diffusive_tendency_qt),
+
+        "diffusive_tendency_qt" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_turbconv(state).diffusive_tendency_qt), # this is the diffusive tendency of qt, not including  massflux tendency
+        "diffusive_tendency_h" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_turbconv(state).diffusive_tendency_h), # this is the diffusive tendency of h, not including  massflux tendency
+        (edmf.moisture_model isa NonEquilibriumMoisture ? (
+            "diffusive_tendency_ql" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_turbconv(state).diffusive_tendency_ql), # this is the diffusive tendency of ql, not including the massflux tendency
+            "diffusive_tendency_qi" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_turbconv(state).diffusive_tendency_qi), # this is the diffusive tendency of qi, not including the massflux tendency
+        ) : ())...,
+        "diffusive_tendency_qr" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_turbconv(state).diffusive_tendency_qr), # this is the diffusive tendency of qr, not including  massflux tendency
+        "diffusive_tendency_qs" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_turbconv(state).diffusive_tendency_qs), # this is the diffusive tendency of qs, not including  massflux tendency
 
         "total_flux_h" => (; dims = ("zf", "t"), group = "profiles", field = state -> face_aux_turbconv(state).diffusive_flux_h .+ face_aux_turbconv(state).massflux_h),
         "total_flux_qt" => (; dims = ("zf", "t"), group = "profiles", field = state -> face_aux_turbconv(state).diffusive_flux_qt .+ face_aux_turbconv(state).massflux_qt),
@@ -167,10 +175,12 @@ function io_dictionary_aux(edmf) # added EDMF as an argument so we can have thin
         # "KM" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_turbconv(state).KM), # see eddy viscosity
         "KQ" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_turbconv(state).KQ), # moisture eddy diffusivity
 
-        "diffusive_flux_ql" => (; dims = ("zf", "t"), group = "profiles", field = state -> face_aux_turbconv(state).diffusive_flux_ql),
-        "diffusive_flux_qi" => (; dims = ("zf", "t"), group = "profiles", field = state -> face_aux_turbconv(state).diffusive_flux_qi),
-        "massflux_ql" => (; dims = ("zf", "t"), group = "profiles", field = state -> face_aux_turbconv(state).massflux_ql),
-        "massflux_qi" => (; dims = ("zf", "t"), group = "profiles", field = state -> face_aux_turbconv(state).massflux_qi),
+        ((edmf.moisture_model isa NonEquilibriumMoisture) ? (
+            "massflux_ql" => (; dims = ("zf", "t"), group = "profiles", field = state -> face_aux_turbconv(state).massflux_ql),
+            "massflux_qi" => (; dims = ("zf", "t"), group = "profiles", field = state -> face_aux_turbconv(state).massflux_qi),
+            "diffusive_flux_ql" => (; dims = ("zf", "t"), group = "profiles", field = state -> face_aux_turbconv(state).diffusive_flux_ql),
+            "diffusive_flux_qi" => (; dims = ("zf", "t"), group = "profiles", field = state -> face_aux_turbconv(state).diffusive_flux_qi),
+        ) : ())...,
 
         "diffusive_flux_qr" => (; dims = ("zf", "t"), group = "profiles", field = state -> face_aux_turbconv(state).diffusive_flux_qr),
         "diffusive_flux_qs" => (; dims = ("zf", "t"), group = "profiles", field = state -> face_aux_turbconv(state).diffusive_flux_qs),
@@ -262,9 +272,9 @@ function io_dictionary_aux(edmf) # added EDMF as an argument so we can have thin
         # w * ρ * a * q
         "env_qi_sed_flux" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_environment(state).term_vel_ice .* center_aux_environment(state).area .* center_aux_environment(state).q_ice),
 
-        "qr_mean_sed" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_grid_mean(state).qr_tendency_sedimentation), # [[ added vert_adv to advection so now these are broken out separately ]]
-        "qs_mean_sed" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_grid_mean(state).qs_tendency_sedimentation), # [[ added vert_adv to advection so now these are broken out separately ]]
-        "qip_mean_sed" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_grid_mean(state).qs_tendency_sedimentation), # [[ added vert_adv to advection so now these are broken out separately ]]
+        "qr_mean_sed" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_grid_mean(state).qr_tendency_sedimentation),
+        "qs_mean_sed" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_grid_mean(state).qs_tendency_sedimentation),
+        "qip_mean_sed" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_grid_mean(state).qs_tendency_sedimentation),
 
         # acnv
         "ql_mean_acnv" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_bulk(state).ql_tendency_acnv .+ center_aux_environment(state).ql_tendency_acnv),
@@ -326,30 +336,23 @@ function io_dictionary_aux(edmf) # added EDMF as an argument so we can have thin
         "qi_mean_melt" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_bulk(state).qi_tendency_melt .+ center_aux_environment(state).qi_tendency_melt),
 
         # advection and sgs
-        "ql_mean_vert_adv" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_grid_mean(state).ql_tendency_vert_adv), # same as massflux_tendency_ql [though sometimes we calculate differently with diff from grid mean vs absolute flux etc..., might differ if second order corrections are applied]
-        "ql_mean_ls_vert_adv" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_grid_mean(state).ql_tendency_ls_vert_adv),
-        # "ql_mean_sgs_tend" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_grid_mean(state).sgs_tendency_q_liq), # as defined, this includes the massflux...
-    
-        "qi_mean_vert_adv" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_grid_mean(state).qi_tendency_vert_adv), # same as massflux_tendency_qi (seems to only show updraft... is this related to our problem of not tracking wq in both env and up?)
-        "qi_mean_ls_vert_adv" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_grid_mean(state).qi_tendency_ls_vert_adv), # looks good 
-        # "qi_mean_sgs_tend" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_grid_mean(state).sgs_tendency_q_ice), # as defined, this includes the massflux... (seems to only show updraft... is this related to our problem of not tracking wq in both env and up?)
 
-
-        "ql_mean_diff" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_turbconv(state).diffusive_tendency_ql), # this is the diffusive tendency of ql, not including the massflux tendency
-        "qi_mean_diff" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_turbconv(state).diffusive_tendency_qi), # this is the diffusive tendency of qi, not including the massflux tendency
-        "qr_mean_diff" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_turbconv(state).diffusive_tendency_qr), # this is the diffusive tendency of qr, not including  massflux tendency
-        "qs_mean_diff" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_turbconv(state).diffusive_tendency_qs), # this is the diffusive tendency of qs, not including  massflux tendency
-        "qt_mean_diff" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_turbconv(state).diffusive_tendency_qt), # this is the diffusive tendency of qt, not including  massflux tendency
-
-        #
-        "qt_mean_vert_adv" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_turbconv(state).massflux_tendency_qt),
-        "qt_mean_ls_vert_adv" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_grid_mean(state).qt_tendency_ls_vert_adv),
-
-        "qr_mean_vert_adv" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_grid_mean(state).qr_tendency_vert_adv),
-        "qr_mean_ls_vert_adv" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_grid_mean(state).qr_tendency_ls_vert_adv),
-        "qs_mean_vert_adv" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_grid_mean(state).qs_tendency_vert_adv),
-        "qs_mean_ls_vert_adv" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_grid_mean(state).qs_tendency_ls_vert_adv),
+        "massflux_tendency_qt" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_turbconv(state).massflux_tendency_qt),
+        "qt_mean_ls_vert_adv" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_turbconv(state).qt_tendency_ls_vert_adv),
+        "massflux_tendency_qr" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_turbconv(state).massflux_tendency_qr),
+        "qr_mean_ls_vert_adv" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_turbconv(state).qr_tendency_ls_vert_adv),
+        "massflux_tendency_qs" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_turbconv(state).massflux_tendency_qs),
+        "qs_mean_ls_vert_adv" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_turbconv(state).qs_tendency_ls_vert_adv),
         
+        ((edmf.moisture_model isa NonEquilibriumMoisture) ? (
+            "massflux_tendency_ql" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_turbconv(state).massflux_tendency_ql),
+            "ql_mean_ls_vert_adv" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_turbconv(state).ql_tendency_ls_vert_adv),
+            # "ql_mean_sgs_tend" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_grid_mean(state).sgs_tendency_q_liq), # as defined, this includes the massflux...
+        
+            "massflux_tendency_qi" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_turbconv(state).massflux_tendency_qi),
+            "qi_mean_ls_vert_adv" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_turbconv(state).qi_tendency_ls_vert_adv), # looks good 
+            # "qi_mean_sgs_tend" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_grid_mean(state).sgs_tendency_q_ice), # as defined, this includes the massflux... (seems to only show updraft... is this related to our problem of not tracking wq in both env and up?)
+        ) : ())...,
 
         "subsidence" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_grid_mean(state).subsidence),
 
@@ -374,48 +377,45 @@ function io_dictionary_aux(edmf) # added EDMF as an argument so we can have thin
         # all ice precip (do this or just add grapuel to snow in LES output?)
         "qip_mean" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_prog_precipitation(state).q_sno),
 
-
-
         ## [[ TEMPORARY ]] :: STORE THE Cloak
-
         ( ( edmf.area_partition_model isa CoreCloakAreaPartitionModel ) ? (
-        "cloak_up_area" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_environment(state).a_cloak_up),
-        "cloak_dn_area" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_environment(state).a_cloak_dn),
-        "env_remaining_area" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_environment(state).a_en_remaining),
-        #
-        "cloak_up_qt" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_environment(state).q_tot_cloak_up),
-        "cloak_dn_qt" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_environment(state).q_tot_cloak_dn),
-        #
-        "cloak_up_thetal" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_environment(state).θ_liq_ice_cloak_up),
-        "cloak_dn_thetal" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_environment(state).θ_liq_ice_cloak_dn),
-        #
-        "cloak_up_ql" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_environment(state).q_liq_cloak_up),
-        "cloak_dn_ql" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_environment(state).q_liq_cloak_dn),
-        "env_remaining_ql" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_environment(state).q_liq_en_remaining),
-        #
-        "cloak_up_qi" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_environment(state).q_ice_cloak_up),
-        "cloak_dn_qi" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_environment(state).q_ice_cloak_dn),
-        "env_remaining_qi" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_environment(state).q_ice_en_remaining),
-        #
-        "cloak_up_temperature" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_environment(state).T_cloak_up),
-        "cloak_dn_temperature" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_environment(state).T_cloak_dn),
-        "env_remaining_temperature" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_environment(state).T_en_remaining),
-        #
-        "cloak_up_w" => (; dims = ("zf", "t"), group = "profiles", field = state -> face_aux_environment(state).w_cloak_up),
-        "cloak_dn_w" => (; dims = ("zf", "t"), group = "profiles", field = state -> face_aux_environment(state).w_cloak_dn),
-        #
-        "cloak_up_RH_liq" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_environment(state).RH_liq_cloak_up),
-        "cloak_dn_RH_liq" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_environment(state).RH_liq_cloak_dn),
-        "cloak_up_RH_ice" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_environment(state).RH_ice_cloak_up),
-        "cloak_dn_RH_ice" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_environment(state).RH_ice_cloak_dn),
-        "env_remaining_RH_liq" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_environment(state).RH_liq_en_remaining),
-        "env_remaining_RH_ice" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_environment(state).RH_ice_en_remaining),
-        #
+            "cloak_up_area" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_environment(state).a_cloak_up),
+            "cloak_dn_area" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_environment(state).a_cloak_dn),
+            "env_remaining_area" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_environment(state).a_en_remaining),
+            #
+            "cloak_up_qt" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_environment(state).q_tot_cloak_up),
+            "cloak_dn_qt" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_environment(state).q_tot_cloak_dn),
+            #
+            "cloak_up_thetal" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_environment(state).θ_liq_ice_cloak_up),
+            "cloak_dn_thetal" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_environment(state).θ_liq_ice_cloak_dn),
+            #
+            "cloak_up_ql" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_environment(state).q_liq_cloak_up),
+            "cloak_dn_ql" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_environment(state).q_liq_cloak_dn),
+            "env_remaining_ql" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_environment(state).q_liq_en_remaining),
+            #
+            "cloak_up_qi" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_environment(state).q_ice_cloak_up),
+            "cloak_dn_qi" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_environment(state).q_ice_cloak_dn),
+            "env_remaining_qi" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_environment(state).q_ice_en_remaining),
+            #
+            "cloak_up_temperature" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_environment(state).T_cloak_up),
+            "cloak_dn_temperature" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_environment(state).T_cloak_dn),
+            "env_remaining_temperature" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_environment(state).T_en_remaining),
+            #
+            "cloak_up_w" => (; dims = ("zf", "t"), group = "profiles", field = state -> face_aux_environment(state).w_cloak_up),
+            "cloak_dn_w" => (; dims = ("zf", "t"), group = "profiles", field = state -> face_aux_environment(state).w_cloak_dn),
+            #
+            "cloak_up_RH_liq" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_environment(state).RH_liq_cloak_up),
+            "cloak_dn_RH_liq" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_environment(state).RH_liq_cloak_dn),
+            "cloak_up_RH_ice" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_environment(state).RH_ice_cloak_up),
+            "cloak_dn_RH_ice" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_environment(state).RH_ice_cloak_dn),
+            "env_remaining_RH_liq" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_environment(state).RH_liq_en_remaining),
+            "env_remaining_RH_ice" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_environment(state).RH_ice_en_remaining),
+            #
 
-        #sub_dep 
-        "cloak_up_qi_sub_dep" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_environment(state).qi_tendency_sub_dep_cloak_up),
-        "cloak_dn_qi_sub_dep" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_environment(state).qi_tendency_sub_dep_cloak_dn),
-        "env_remaining_qi_sub_dep" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_environment(state).qi_tendency_sub_dep_en_remaining),
+            #sub_dep 
+            "cloak_up_qi_sub_dep" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_environment(state).qi_tendency_sub_dep_cloak_up),
+            "cloak_dn_qi_sub_dep" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_environment(state).qi_tendency_sub_dep_cloak_dn),
+            "env_remaining_qi_sub_dep" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_environment(state).qi_tendency_sub_dep_en_remaining),
         ) : () )...,
 
         

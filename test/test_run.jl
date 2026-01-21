@@ -138,10 +138,10 @@ for flight_number in flight_numbers
 
             # nonequilibrium_moisture_scheme = :geometric_liq__exponential_T_scaling_and_geometric_ice
             # nonequilibrium_moisture_scheme = :geometric_liq__exponential_T_scaling_ice
-            # nonequilibrium_moisture_scheme = :exponential_T_scaling_ice
-            nonequilibrium_moisture_scheme = :neural_network
-            # dt_string = "adapt_dt__dt_min_5.0__dt_max_10.0"
-            dt_string = "adapt_dt__dt_min_10.0__dt_max_20.0"
+            nonequilibrium_moisture_scheme = :exponential_T_scaling_ice
+            # nonequilibrium_moisture_scheme = :Base
+            dt_string = "adapt_dt__dt_min_5.0__dt_max_10.0"
+            # dt_string = "adapt_dt__dt_min_10.0__dt_max_20.0"
             method = "best_particle_final"
             flight_number = 9
             case_name = "SOCRATES_RF" * string(flight_number, pad = 2) * "_" * lowercase(forcing_str) * "_data" # can't recall why it's lower here lol

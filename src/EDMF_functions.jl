@@ -96,8 +96,6 @@ function compute_sgs_flux!(edmf::EDMFModel, state::State, surf::SurfaceBase, par
     if edmf.moisture_model isa NonEquilibriumMoisture
         massflux_ql = aux_tc_f.massflux_ql
         massflux_qi = aux_tc_f.massflux_qi
-        ql_flux_vert_adv = aux_gm_f.ql_flux_vert_adv # load for storage
-        qi_flux_vert_adv = aux_gm_f.qi_flux_vert_adv # load for storage
     end
 
 
@@ -327,18 +325,10 @@ function compute_sgs_flux!(edmf::EDMFModel, state::State, surf::SurfaceBase, par
                     @. massflux_ql = massflux_en * IfRBF_q_liq_en(q_liq_en)
                     @. massflux_qi = massflux_en * IfRBF_q_ice_en(q_ice_en)
 
-                    # @. massflux_qi = FT(0) # test en contribution no down motion
-
-                    @. ql_flux_vert_adv = massflux_ql # same here
-                    @. qi_flux_vert_adv = massflux_qi # same here
                 else
                     # ql and qi should be correlated w/ tke. We handle prt of that in diffusivity but they shouldn't feel the netire advective force
                     @. massflux_ql = (massflux_en_conv * efficiency) * IfLBF_q_liq_en(q_liq_en) + (massflux_en) * IfRBF_q_liq_en(q_liq_en) # assume liq/ice are in the upper part of the distribution, and the down side has little flux. (massflux_en is small anyway, and significant conv downdrafts should dry quickly)
                     @. massflux_qi = (massflux_en_conv * efficiency) * IfLBF_q_ice_en(q_ice_en) + (massflux_en) * IfRBF_q_ice_en(q_ice_en) # assume liq/ice are in the upper part of the distribution, and the down side has little flux. (massflux_en is small anyway, and significant conv downdrafts should dry quickly)
-                    
-
-                    @. ql_flux_vert_adv = massflux_ql # same here
-                    @. qi_flux_vert_adv = massflux_qi # same here
 
                     # since we introduce bias in ql, qi transport, we need to adjust qt transport accordingly and calculate each term separately
 
@@ -518,8 +508,6 @@ function compute_sgs_flux!(edmf::EDMFModel, state::State, surf::SurfaceBase, par
         @. massflux_h = FT(0)
         @. massflux_qt = FT(0)
         if edmf.moisture_model isa NonEquilibriumMoisture
-            @. ql_flux_vert_adv = FT(0) # Storing updraft part for diagnostic, prolly should rename
-            @. qi_flux_vert_adv = FT(0) # Storing updraft part for diagnostic, prolly should rename
             @. massflux_ql = FT(0)
             @. massflux_qi = FT(0)
         end
@@ -586,12 +574,6 @@ function compute_sgs_flux!(edmf::EDMFModel, state::State, surf::SurfaceBase, par
                     @. massflux_qi += ρ_f * ᶠinterp_a_RBF_a_en_remaining(a_en_remaining) * w_en * IfRBF_q_ice_en(q_ice_en_remaining)
                 end
 
-                @. ql_flux_vert_adv += ρ_f * ᶠinterp_a_LBF_a_cloak_up(a_cloak_up) * w_cloak_up * IfLBF_q_liq_cloak_up(q_liq_cloak_up) + ρ_f * ᶠinterp_a_RBF_a_cloak_dn(a_cloak_dn) * w_cloak_dn * IfRBF_q_liq_cloak_dn(q_liq_cloak_dn) # add up all the updraft cloaks, leave w_en outside the cloaks as 0
-                @. qi_flux_vert_adv += ρ_f * ᶠinterp_a_LBF_a_cloak_up(a_cloak_up) * w_cloak_up * IfLBF_q_ice_cloak_up(q_ice_cloak_up) + ρ_f * ᶠinterp_a_RBF_a_cloak_dn(a_cloak_dn) * w_cloak_dn * IfRBF_q_ice_cloak_dn(q_ice_cloak_dn) # add up all the updraft cloaks, leave w_en outside the cloaks as 0
-                if !edmf.area_partition_model.confine_all_downdraft_to_cloak
-                    @. ql_flux_vert_adv += ρ_f * ᶠinterp_a_RBF_a_en_remaining(a_en_remaining) * w_en * IfRBF_q_liq_en(q_liq_en_remaining)
-                    @. qi_flux_vert_adv += ρ_f * ᶠinterp_a_RBF_a_en_remaining(a_en_remaining) * w_en * IfRBF_q_ice_en(q_ice_en_remaining)
-                end
             end
 
         end
@@ -659,8 +641,8 @@ function compute_sgs_flux!(edmf::EDMFModel, state::State, surf::SurfaceBase, par
                 @. massflux_ql += ρ_f * ᶠinterp_a_LBF_a_up(a_up) * (w_up_i) * IfLBF_q_liq_up(q_liq_up) # leave w_en outside the updraft as 0
                 @. massflux_qi += ρ_f * ᶠinterp_a_LBF_a_up(a_up) * (w_up_i) * IfLBF_q_ice_up(q_ice_up) # leave w_en outside the updraft as 0
 
-                @. ql_flux_vert_adv += massflux_up_i * IfLBF_q_liq_up(q_liq_up) # storage [[ not diff from gm -- though i feel like it should cancel out?  mean flux x gm = 0 x gm = 0]]
-                @. qi_flux_vert_adv += massflux_up_i * IfLBF_q_ice_up(q_ice_up) # storage [[ not diff from gm -- though i feel like it should cancel out?  mean flux x gm = 0 x gm = 0]]
+                @. massflux_ql += massflux_up_i * IfLBF_q_liq_up(q_liq_up) # storage [[ not diff from gm -- though i feel like it should cancel out?  mean flux x gm = 0 x gm = 0]]
+                @. massflux_qi += massflux_up_i * IfLBF_q_ice_up(q_ice_up) # storage [[ not diff from gm -- though i feel like it should cancel out?  mean flux x gm = 0 x gm = 0]]
             end
 
         end
@@ -708,12 +690,6 @@ function compute_sgs_flux!(edmf::EDMFModel, state::State, surf::SurfaceBase, par
 
         @. massflux_tendency_ql = -∇c(wvec(massflux_ql)) / ρ_c
         @. massflux_tendency_qi = -∇c(wvec(massflux_qi)) / ρ_c
-
-        # my addition
-        ql_tendency_vert_adv = aux_gm.ql_tendency_vert_adv # store tendency for vert adv
-        qi_tendency_vert_adv = aux_gm.qi_tendency_vert_adv # store tendency for vert adv
-        @. ql_tendency_vert_adv = -∇c(wvec(ql_flux_vert_adv)) / ρ_c # store tendency for vert adv
-        @. qi_tendency_vert_adv = -∇c(wvec(qi_flux_vert_adv)) / ρ_c # store tendency for vert adv
 
         diffusive_flux_ql = aux_tc_f.diffusive_flux_ql
         diffusive_flux_qi = aux_tc_f.diffusive_flux_qi

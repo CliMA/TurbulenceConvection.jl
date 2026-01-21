@@ -69,18 +69,6 @@ cent_aux_vars_gm(FT, local_geometry, edmf, calibrate_io_val::Val{calibrate_io}) 
     θ_liq_ice = FT(0),
     q_tot = FT(0),
     p = FT(0),
-    (calibrate_io ? (;) : (;
-        qt_tendency_ls_vert_adv = FT(0), # my addition
-        ql_tendency_ls_vert_adv = FT(0), # my addition
-        qi_tendency_ls_vert_adv = FT(0), # my addition
-        qr_tendency_ls_vert_adv = FT(0), # my addition [[ not sure how relevant this one is but ]]
-        qs_tendency_ls_vert_adv = FT(0), # my addition [[ not sure how relevant this one is but ]]
-    ))...,
-    # qt_tendency_vert_adv = error("not implemented, see massflux_tendency_qt")
-    ql_tendency_vert_adv = FT(0), # my addition [ For full flux, massflux is only differential between up/env and gm so sgs ]
-    qi_tendency_vert_adv = FT(0), # my addition [ For full flux, massflux is only differential between up/env and gm so sgs ]
-    qr_tendency_vert_adv = FT(0), # my addition 
-    qs_tendency_vert_adv = FT(0), # my addition
     qr_tendency_sedimentation = FT(0), # storage
     qs_tendency_sedimentation = FT(0), # storage
     # # Maybe deprecate these... we store diff and massflux already...
@@ -100,8 +88,6 @@ cent_aux_vars(FT, local_geometry, edmf, calibrate_io_val::Val{calibrate_io}) whe
 face_aux_vars_gm_moisture(FT, ::TC.NonEquilibriumMoisture, calibrate_io_val::Val{calibrate_io}) where {calibrate_io} = (;
     sgs_flux_q_liq = FT(0),
     sgs_flux_q_ice = FT(0),
-    ql_flux_vert_adv = FT(0), # my addition [ For full flux, massflux is only differential between up/env and gm so sgs , could also go in aux_tc_f [face_aux_vars_edmf_moisture(FT, ::NonEquilibriumMoisture) ]
-    qi_flux_vert_adv = FT(0), # my addition [ For full flux, massflux is only differential between up/env and gm so sgs , could also go in aux_tc_f [face_aux_vars_edmf_moisture(FT, ::NonEquilibriumMoisture) ]
 )
 face_aux_vars_gm_moisture(FT, ::TC.EquilibriumMoisture, calibrate_io_val::Val{calibrate_io}) where {calibrate_io} = NamedTuple()
 face_aux_vars_gm(FT, local_geometry, edmf, calibrate_io_val::Val{calibrate_io}) where {calibrate_io} = (;
