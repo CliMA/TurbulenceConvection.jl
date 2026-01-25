@@ -137,10 +137,12 @@ for flight_number in flight_numbers
             # NameList.convert_namelist_types_to_default!(namelist, default_namelist) # coerce remaining type
 
             # nonequilibrium_moisture_scheme = :geometric_liq__exponential_T_scaling_and_geometric_ice
-            # nonequilibrium_moisture_scheme = :geometric_liq__exponential_T_scaling_ice
-            nonequilibrium_moisture_scheme = :exponential_T_scaling_ice
+            nonequilibrium_moisture_scheme = :geometric_liq__exponential_T_scaling_ice
+            # nonequilibrium_moisture_scheme = :exponential_T_scaling_ice
+            # nonequilibrium_moisture_scheme = :neural_network
             # nonequilibrium_moisture_scheme = :Base
-            dt_string = "adapt_dt__dt_min_5.0__dt_max_10.0"
+            dt_string = "adapt_dt__dt_min_0.5__dt_max_1.0"
+            # dt_string = "adapt_dt__dt_min_5.0__dt_max_10.0"
             # dt_string = "adapt_dt__dt_min_10.0__dt_max_20.0"
             method = "best_particle_final"
             flight_number = 9
@@ -423,7 +425,7 @@ for flight_number in flight_numbers
         namelist["stats_io"]["frequency"] = 60.
         namelist["stats_io"]["calibrate_io"] = false
 
-        # namelist["stats_io"]["frequency"] = 600.
+        namelist["stats_io"]["frequency"] = 600.
         # namelist["stats_io"]["calibrate_io"] = true
         # namelist["thermodynamics"]["moisture_model"] = "equilibrium"
 
@@ -523,7 +525,7 @@ for flight_number in flight_numbers
 
 
 
-        namelist["turbulence"]["EDMF_PrognosticTKE"]["convective_tke_buoyancy_coeff"] = FT(.25)
+        # namelist["turbulence"]["EDMF_PrognosticTKE"]["convective_tke_buoyancy_coeff"] = FT(.25)
         # namelist["turbulence"]["EDMF_PrognosticTKE"]["convective_tke_advection_coeff"] = FT(0.1)
         # namelist["turbulence"]["EDMF_PrognosticTKE"]["convective_tke_dissipation_coeff"] = FT(0.05) # smaller than generation
         # namelist["turbulence"]["EDMF_PrognosticTKE"]["convective_tke_self_dissipation_coeff"] = FT(0.002) # extra dissipation when tke is convectively generated [ this one is the problem ]
@@ -570,7 +572,8 @@ for flight_number in flight_numbers
         # namelist["turbulence"]["EDMF_PrognosticTKE"]["tke_conv_entr_detr_rate_inv_s"] = FT(0)
 
         # parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "tke_ed_coeff")
-        # namelist["turbulence"]["EDMF_PrognosticTKE"]["tke_ed_coeff"] = 0.0002
+        # namelist["turbulence"]["EDMF_PrognosticTKE"]["tke_ed_coeff"] = 0.02
+        # namelist["turbulence"]["EDMF_PrognosticTKE"]["c_KQi"]  = 5
         # namelist["user_params"]["stable_updraft_area_reduction_factor"] = FT(5.0)
         # namelist["microphysics"]["microph_scaling_dep_sub"] = FT(2)
         # namelist["microphysics"]["microph_scaling_melt"] = FT(.1)
@@ -578,6 +581,8 @@ for flight_number in flight_numbers
 
         # namelist["turbulence"]["EDMF_PrognosticTKE"]["c_KQl"] = FT(1)
         # namelist["turbulence"]["EDMF_PrognosticTKE"]["c_KQi"] = FT(1)
+
+        # namelist["turbulence"]["EDMF_PrognosticTKE"]["c_KTKE"] = FT(10)
 
         # namelist["turbulence"]["EDMF_PrognosticTKE"]["c_KTKEql"] = FT(.1)
         # namelist["turbulence"]["EDMF_PrognosticTKE"]["c_KTKEqi"] = FT(.1)

@@ -908,18 +908,20 @@ function compute_diffusive_fluxes(edmf::EDMFModel, state::State, surf::SurfaceBa
         # At the same time we prognose/diagnose some existing QTvar. if that exceeds what eddies would induce, then our flux is not high enough, if it does not exceed, then our flux is too high and there's some upgradient process going on..
         # σ_explained should be propotional to K / σ_w * ∂q/∂z = K/sqrt(2 * tke)/(∂q/∂z), where tke ≈ 1/2 w'w' = 1/2 σ_w^2, but K / σ_w should be roughly l_mix.
 
+
+        correction_safety_factor = FT(0.9) # leave at least some small down gradient portion
         @. aux_tc_f.diffusive_flux_qt = -aux_tc_f.ρ_ae_KQ * ∇q_tot_en(wvec(aux_en.q_tot))
         # correction but dont allow sign change from down gradient
         @. aux_tc_f.diffusive_flux_qt += ifelse(aux_tc_f.diffusive_flux_qt > 0,
-            max(corr_w_qt * Ifx(ρ_c * a_en * sqrt(aux_en.tke) * sqrt(max(aux_en.QTvar, zero(FT)))), -aux_tc_f.diffusive_flux_qt),
-            min(corr_w_qt * Ifx(ρ_c * a_en * sqrt(aux_en.tke) * sqrt(max(aux_en.QTvar, zero(FT)))), -aux_tc_f.diffusive_flux_qt)
+            max(corr_w_qt * Ifx(ρ_c * a_en * sqrt(aux_en.tke) * sqrt(max(aux_en.QTvar, zero(FT)))), -aux_tc_f.diffusive_flux_qt * correction_safety_factor),
+            min(corr_w_qt * Ifx(ρ_c * a_en * sqrt(aux_en.tke) * sqrt(max(aux_en.QTvar, zero(FT)))), -aux_tc_f.diffusive_flux_qt * correction_safety_factor)
         )
 
         @. aux_tc_f.diffusive_flux_h = -aux_tc_f.ρ_ae_KH * ∇θ_liq_ice_en(wvec(aux_en.θ_liq_ice))
         # correction but dont allow sign change from down gradient
         @. aux_tc_f.diffusive_flux_h += ifelse(aux_tc_f.diffusive_flux_h > 0,
-            max(corr_w_h * Ifx(ρ_c * a_en * sqrt(aux_en.tke) * sqrt(max(aux_en.Hvar, zero(FT)))), -aux_tc_f.diffusive_flux_h),
-            min(corr_w_h * Ifx(ρ_c * a_en * sqrt(aux_en.tke) * sqrt(max(aux_en.Hvar, zero(FT)))), -aux_tc_f.diffusive_flux_h)
+            max(corr_w_h * Ifx(ρ_c * a_en * sqrt(aux_en.tke) * sqrt(max(aux_en.Hvar, zero(FT)))), -aux_tc_f.diffusive_flux_h * correction_safety_factor),
+            min(corr_w_h * Ifx(ρ_c * a_en * sqrt(aux_en.tke) * sqrt(max(aux_en.Hvar, zero(FT)))), -aux_tc_f.diffusive_flux_h * correction_safety_factor)
         )   
 
         # When we have strong limiters on updraft area, these can get out of sync and lead to weirdness where the variance blows up... if you ever reach gradient reversal
@@ -929,10 +931,10 @@ function compute_diffusive_fluxes(edmf::EDMFModel, state::State, surf::SurfaceBa
         ∂q∂z = aux_tc.∂qt∂z
 
         water_advection_factor = mixing_length_params(edmf).c_KTKEqt
-        @. aux_tc_f.diffusive_flux_qt += ρ_f * Ifx(a_en * sqrt(aux_en.tke) * water_advection_factor * (2 * (∂q∂z < 0) * sqrt(max(aux_en.QTvar, zero(FT))))) # (mean + σ) - (mean - σ) = 2σ
+        @. aux_tc_f.diffusive_flux_qt += ρ_f * Ifx(a_en * sqrt(aux_en.tke) * water_advection_factor * (2 * corr_w_qt * (∂q∂z < 0) * sqrt(max(aux_en.QTvar, zero(FT))))) # (mean + σ) - (mean - σ) = 2σ
 
         h_advection_factor = mixing_length_params(edmf).c_KTKEh
-        @. aux_tc_f.diffusive_flux_h += ρ_f * Ifx(a_en * sqrt(aux_en.tke) * h_advection_factor * (-2 * (∂θ∂z > 0) * sqrt(max(aux_en.Hvar, zero(FT))))) # (mean - σ) - (mean + σ) = -2σ
+        @. aux_tc_f.diffusive_flux_h += ρ_f * Ifx(a_en * sqrt(aux_en.tke) * h_advection_factor * (2 * corr_w_h * (∂θ∂z > 0) * sqrt(max(aux_en.Hvar, zero(FT))))) # (mean - σ) - (mean + σ) = -2σ
 
 
         @. aux_tc_f.diffusive_flux_uₕ = -aux_tc_f.ρ_ae_KM * ∇uₕ_gm(prog_gm_uₕ)
@@ -2871,12 +2873,31 @@ function compute_en_tendencies!(
     end
 
     RB = CCO.RightBiasedC2F(; top = CCO.SetValue(FT(0)))
-    c_KTKE = mixing_length_params(edmf).c_KTKE
+    c_K = is_tke ? mixing_length_params(edmf).c_KTKE : one(FT)
 
     @. tend_covar =
         press + buoy + shear + entr_gain + rain_src - D_env * covar -
-        (c_d * sqrt(max(tke_en, 0)) / max(mixing_length, 1)) * prog_covar - ∇c(wvec(RB(prog_covar * Ic(w_en_f)))) -
-        ∇c_turb(-1 * ρ_f * If(aeK) * c_KTKE * ∇f(covar))
+        (c_d * sqrt(max(tke_en, 0)) / max(mixing_length, 1)) * prog_covar - ∇c(wvec(RB(prog_covar * Ic(w_en_f))))  -
+        ∇c_turb(-1 * ρ_f * c_K * If(aeK) * ∇f(covar)) # if we have tke we prolly shouldnt let aeK go to 0 but idk what a good lower bound is.
+
+        
+    if is_tke 
+        # c_KTKETKE = FT(0)
+        # @. tend_covar -= ∇c_turb(-1 * ρ_f * c_KTKETKE * If(sqrt(max(tke_en, 0))) * ∇f(covar)) # self advection test without using default K
+        # we hav to estimate the imbalance here....
+        # LBF = CCO.LeftBiasedC2F(; top = CCO.SetValue(FT(0)))
+        # RBF = CCO.RightBiasedC2F(; top = CCO.SetValue(FT(0)))
+        a_en = aux_en.area
+        # @. tend_covar +=  -∇c(wvec(ρ_f * LBF(aeK/2 * c_KTKETKE * sqrt(max(tke_en, 0)) * covar))) - ∇c(wvec(ρ_f * RBF(aeK/2 * c_KTKETKE * -sqrt(max(tke_en, 0)) * covar)))
+        if !state.calibrate_io
+            if !is_tke
+                @. aux_en.tke_transport = -∇c_turb(-1 * ρ_f * If(aeK) * ∇f(covar)) #- ∇c_turb(-1 * ρ_f * c_KTKETKE * sqrt(If(sqrt(max(tke_en, 0)))) * ∇f(covar)) # diffusion with w_rms = sqrt(w_tke) = sqrt(sqrt(2*tke))
+            else
+                @. aux_en.tke_transport = -∇c_turb(-1 * ρ_f * c_K * If(aeK) * ∇f(covar)) #- ∇c_turb(-1 * ρ_f * c_KTKETKE * sqrt(If(sqrt(max(tke_en, 0)))) * ∇f(covar)) # diffusion with w_rms = sqrt(w_tke) = sqrt(sqrt(2*tke))
+                # @. aux_en.tke_transport +=  -∇c(wvec(ρ_f * LBF(aeK/2 * c_KTKETKE * sqrt(max(tke_en, 0)) * covar))) - ∇c(wvec(ρ_f * RBF(aeK/2 * c_KTKETKE * -sqrt(max(tke_en, 0)) * covar)))
+            end
+        end
+    end
 
 
     if is_tke && (edmf.convective_tke_handler isa AbstractYesConvectiveTKEHandler)

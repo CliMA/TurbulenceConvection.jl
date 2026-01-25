@@ -1188,7 +1188,8 @@ function update_aux!(edmf::EDMFModel, state::State, surf::SurfaceBase, param_set
             b_exch = b_exch[k],
         )
 
-        ml = mixing_length(mix_len_params, param_set, ml_model)
+        tke_convective_production = edmf.convective_tke_handler isa AbstractYesConvectiveTKEHandler ? aux_en.tke_convective_production[k] : zero(FT)
+        ml = mixing_length(mix_len_params, param_set, ml_model, tke_convective_production)
         aux_tc.mls[k] = ml.min_len_ind
         aux_tc.mixing_length[k] = ml.mixing_length
         aux_tc.ml_ratio[k] = ml.ml_ratio
@@ -1203,7 +1204,7 @@ function update_aux!(edmf::EDMFModel, state::State, surf::SurfaceBase, param_set
 
         aux_en_2m.tke.buoy[k] = -aux_en.area[k] * ρ_c[k] * KH[k] * bg.∂b∂z
 
-        aux_en_2m.tke.buoy[k] += aux_en.tke_convective_production[k] # test
+        aux_en_2m.tke.buoy[k] += tke_convective_production # test
 
         # I dont think we need this section anymore bc 1) we updated the buoyancy gradient 2) we have convective tke now... It seems to be too strong and too inflexible and leads to runaway TKE growth. Also doesnt respect latent haeting etc.
         # # 1. Calculate the normal buoyancy production [[ commenting this part out didn't make the updrafts come back...]]

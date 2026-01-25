@@ -105,6 +105,17 @@ face_cloak_variables(FT, ::CoreCloakAreaPartitionModel) = (;
     # w_en_remaining = FT(0), # env vertical velocity not in cloak [[ this is either unchanged or 0 based on if `confine_all_downdraft_to_cloak` is true or false...]]
 )
 
+convective_tke_variables(FT, ::NoConvectiveTKE) = NamedTuple()
+convective_tke_variables(FT, ::ConvectiveTKE) = (;
+    tke_convective = FT(0),
+    tke_convective_production = FT(0),
+    tke_convective_advection = FT(0),
+    tke_convective_dissipation = FT(0),
+)
+convective_tke_variables(FT, ::ConvectiveTKEProductionAndGraftOnly) = (;
+    tke_convective_production = FT(0),
+)
+
 # consolidate my additions so it's easier to edit. These will exist everywhere... (though they may not be used or defined in eq case...)
 my_microphysics_additions(FT, moisture_model::AbstractMoistureModel, cloud_sedimentation_model::Union{AbstractCloudSedimentationModel, Nothing}, area_partition_model::Union{AbstractAreaPartitionModel, Nothing}, calibrate_io_val::Val{calibrate_io}) where {calibrate_io} = (;
     #
@@ -299,11 +310,14 @@ cent_aux_vars_edmf(::Type{FT}, local_geometry, edmf, calibrate_io_val::Val{calib
             buoy = FT(0),
             cloud_fraction = FT(0),
             tke = FT(0),
+            # tke_transport = FT(0),
+            (calibrate_io ? (; ) : (; tke_transport = FT(0), ))...,
             # Convert to convective TKE model soon
-            tke_convective = FT(0),
-            tke_convective_production = FT(0),
-            tke_convective_advection = FT(0),
-            tke_convective_dissipation = FT(0),
+            convective_tke_variables(FT, edmf.convective_tke_handler)...,
+            # tke_convective = FT(0),
+            # tke_convective_production = FT(0),
+            # tke_convective_advection = FT(0),
+            # tke_convective_dissipation = FT(0),
             latent_heating_pos = FT(0),
             latent_heating_neg = FT(0),
             instability = FT(0),

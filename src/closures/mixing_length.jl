@@ -1,4 +1,4 @@
-function mixing_length(mix_len_params, param_set, ml_model::MinDisspLen{FT}) where {FT}
+function mixing_length(mix_len_params, param_set, ml_model::MinDisspLen{FT}, convective_tke_production::FT) where {FT} # technically if we add a separe convective production we should allow for a separate convective dissipation....
     c_m = mix_len_params.c_m
     c_d = mix_len_params.c_d
     smin_ub = mix_len_params.smin_ub
@@ -22,27 +22,76 @@ function mixing_length(mix_len_params, param_set, ml_model::MinDisspLen{FT}) whe
         l_W = vkc * z / (sqrt(tke_surf / ustar / ustar) * c_m)
     end
 
-    # compute l_TKE - the production-dissipation balanced length scale
-    a_pd = c_m * (ml_model.Shear² - ∂b∂z / ml_model.Pr) * sqrt(tke)
-    # Dissipation term
-    c_neg = c_d * tke * sqrt(tke)
-    # Subdomain exchange term
-    b_exch = ml_model.b_exch
+    # # compute l_TKE - the production-dissipation balanced length scale [[ we use buoy = KH * ∂b∂z, KH = KM / Pr, KM = c_m * l_TKE * sqrt(tke) ]]
+    # a_pd = c_m * (ml_model.Shear² - ∂b∂z / ml_model.Pr) * sqrt(tke)
+    # # Dissipation term
+    # c_neg = c_d * tke * sqrt(tke)
+    # # Subdomain exchange term
+    # b_exch = ml_model.b_exch
 
-    if abs(a_pd) > eps(FT) && 4 * a_pd * c_neg > -b_exch * b_exch
-        l_TKE = max(-b_exch / 2 / a_pd + sqrt(b_exch * b_exch + 4 * a_pd * c_neg) / 2 / a_pd, 0)
-    elseif abs(a_pd) < eps(FT) && abs(b_exch) > eps(FT)
-        l_TKE = c_neg / b_exch
+    # if abs(a_pd) > eps(FT) && 4 * a_pd * c_neg > -b_exch * b_exch
+    #     l_TKE = max(-b_exch / 2 / a_pd + sqrt(b_exch * b_exch + 4 * a_pd * c_neg) / 2 / a_pd, 0)
+    # elseif abs(a_pd) < eps(FT) && abs(b_exch) > eps(FT)
+    #     l_TKE = c_neg / b_exch
+    # else
+    #     l_TKE = FT(0)
+    # end
+
+    # now we really have tke production = buoy + tke_production, so we need to add that in
+    a_pd = c_m * (ml_model.Shear² - ∂b∂z / ml_model.Pr) * sqrt(tke)
+    c_neg = c_d * tke * sqrt(tke)
+    b_lin = ml_model.b_exch # + convective_tke_production # this seems to break things since the closure assumes shorter mixing lengths to counter larger production for a given tke amount...
+    if abs(a_pd) > eps(FT) && 4 * a_pd * c_neg > -b_lin * b_lin
+        l_TKE = max(
+            -b_lin / (2 * a_pd) +
+            sqrt(b_lin * b_lin + 4 * a_pd * c_neg) / (2 * a_pd),
+            0,
+        )
+    elseif abs(a_pd) < eps(FT) && abs(b_lin) > eps(FT)
+        l_TKE = c_neg / b_lin
     else
         l_TKE = FT(0)
     end
 
+
+
+
+    # # compute l_N - the effective static stability length scale.
+    # N_eff = sqrt(max(∂b∂z, 0))
+    # if N_eff > 0.0
+    #     l_N = min(sqrt(max(c_b * tke, 0)) / N_eff, l_max)
+    # else
+    #     l_N = l_max
+    # end
+
     # compute l_N - the effective static stability length scale.
-    N_eff = sqrt(max(∂b∂z, 0))
-    if N_eff > 0.0
+
+    # 1. Configuration (Tunable)
+    #    ∂b∂z_ref: The stable gradient where we trust the standard mixing length.
+    #    factor:   How much larger mixing is at Neutral (0) vs Stable (∂b∂z_ref).
+    ∂b∂z_ref = FT(1e-5)
+    factor   = FT(1.1)
+
+    N_eff = if ∂b∂z > ∂b∂z_ref
+        sqrt(∂b∂z)
+    elseif FT(0) <= ∂b∂z <= ∂b∂z_ref # At ∂b∂z = 0, N_eff = sqrt(∂b∂z_ref) / factor
+        # interpolate
+        sqrt(∂b∂z_ref) * (1 / factor + ∂b∂z / ∂b∂z_ref * (1 - 1 / factor)) # Linearly scales from (1/factor) at 0 up to (1.0) at ∂b∂z_ref
+    else # ∂b∂z < 0
+        # extrapolate
+            # sqrt(∂b∂z_ref) * (1 / factor + ∂b∂z / ∂b∂z_ref * (1 - 1 / factor)) # Linearly scales from (1/factor) at 0 up to (1.0) at ∂b∂z_ref
+        max(sqrt(∂b∂z_ref) * (1 / factor + ∂b∂z / ∂b∂z_ref * (1 - 1 / factor)), eps(FT))
+    end
+
+
+    # 3. Calculate Length
+    #    This formula now applies to ALL regimes.
+    #    - If TKE ~ 0: Numerator is 0 -> l_N = 0. (SOLVES THE JUMP)
+    #    - If Unstable: Denominator is small (eps) -> l_N_val is huge -> caps at l_max.
+    if tke > eps(FT)
         l_N = min(sqrt(max(c_b * tke, 0)) / N_eff, l_max)
     else
-        l_N = l_max
+        l_N = FT(0)
     end
 
     # add limiters

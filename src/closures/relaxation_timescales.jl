@@ -1445,6 +1445,7 @@ function get_τs_and_Ns_and_N_i_no_boost!(param_set::APS, microphys_params::ACMP
             S_i = TD.supersaturation(thermo_params, qs, ρ_p[i], T_p[i], TD.Ice())
             N_INP = get_INP_concentration(param_set, relaxation_timescale, qs, T_p[i], ρ_p[i], w_p[i], S_i)
             dNINP_dz = get_dNINP_dz(param_set, relaxation_timescale, T_p[i], dTdz_p[i])
+            old_N_ice_p = N_ice_p[i]
             N_ice_p[i] = adjust_ice_N_no_kwargs(
                 param_set,
                 N_ice_p[i],
@@ -1468,7 +1469,7 @@ function get_τs_and_Ns_and_N_i_no_boost!(param_set::APS, microphys_params::ACMP
             if apply_massflux_boost
                 parent(N_ice_no_boost)[i] = adjust_ice_N_no_kwargs(
                     param_set,
-                    N_ice_p[i],
+                    old_N_ice_p, # use original value to match pointwise semantics
                     N_INP * f_mult_p[i],
                     q_p[i, 3],
                     ρ_p[i],
@@ -1688,6 +1689,7 @@ function get_Ns_and_N_i_no_boost!(param_set::APS, microphys_params::ACMP, relaxa
             S_i = TD.supersaturation(thermo_params, qs, ρ_p[i], T_p[i], TD.Ice())
             N_INP = get_INP_concentration(param_set, relaxation_timescale, qs, T_p[i], ρ_p[i], w_p[i], S_i)
             dNINP_dz = get_dNINP_dz(param_set, relaxation_timescale, T_p[i], dTdz_p[i])
+            old_N_ice_p = N_ice_p[i]
             N_ice_p[i] = adjust_ice_N_no_kwargs(
                 param_set,
                 N_ice_p[i],
@@ -1711,7 +1713,7 @@ function get_Ns_and_N_i_no_boost!(param_set::APS, microphys_params::ACMP, relaxa
             if apply_massflux_boost
                 parent(N_ice_no_boost)[i] = adjust_ice_N_no_kwargs(
                     param_set,
-                    N_ice_p[i],
+                    old_N_ice_p, # not sure if it should be the old one or not...
                     N_INP * f_mult_p[i],
                     q_p[i, 3],
                     ρ_p[i],

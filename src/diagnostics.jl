@@ -53,6 +53,7 @@ function io_dictionary_aux(edmf) # added EDMF as an argument so we can have thin
         "eddy_viscosity" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_turbconv(state).KM),
         "eddy_diffusivity" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_turbconv(state).KH),
         "env_tke" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_environment(state).tke),
+        "env_tke_transport" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_environment(state).tke_transport),
         "env_buoyancy" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_environment(state).buoy),
         "env_Hvar" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_environment(state).Hvar),
         "env_QTvar" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_environment(state).QTvar),
