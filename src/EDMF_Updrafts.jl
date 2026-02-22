@@ -331,10 +331,6 @@ function compute_cloud_condensate_sedimentation_tendencies!(
             # sedimentation (should this maybe be a grid mean tendency?)
             ts_up = aux_up[i].ts # this is the thermodynamic state of the updraft, which is used to compute the sedimentation sources
 
-            # wvec = CC.Geometry.WVector
-            # ∇c = CCO.DivergenceF2C()
-            # LBF = CCO.LeftBiasedC2F(; bottom = CCO.SetValue(FT(0)))
-
             calculate_sedimentation_sources!(
                 sedimentation,
                 sedimentation_other,

@@ -19,7 +19,7 @@ function update_aux_tendencies!(edmf::EDMFModel, state::State, param_set::TCP.Tu
 
 
     microphysics!(edmf.en_thermo, state, edmf, Δt, param_set, use_fallback_tendency_limiters) # set env tendencies for microphysics
-    
+
     #####
     ##### compute_updraft_closures
     #####

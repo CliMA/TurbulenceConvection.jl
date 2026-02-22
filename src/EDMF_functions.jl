@@ -505,11 +505,11 @@ function compute_sgs_flux!(edmf::EDMFModel, state::State, surf::SurfaceBase, par
         q_ice_en_remaining = aux_en.q_ice_en_remaining
 
         # zero out
-        @. massflux_h = FT(0)
-        @. massflux_qt = FT(0)
+        zero_field!(massflux_h)
+        zero_field!(massflux_qt)
         if edmf.moisture_model isa NonEquilibriumMoisture
-            @. massflux_ql = FT(0)
-            @. massflux_qi = FT(0)
+            zero_field!(massflux_ql)
+            zero_field!(massflux_qi)
         end
 
          # The overall env massflux should remain unchanged [ since it balances the core updraft massflux ]
@@ -926,9 +926,8 @@ function compute_diffusive_fluxes(edmf::EDMFModel, state::State, surf::SurfaceBa
 
         # When we have strong limiters on updraft area, these can get out of sync and lead to weirdness where the variance blows up... if you ever reach gradient reversal
         # In reality you'd want to enforce that youre respecting ∂θ/∂z and ∂q/∂z in the env so only truly buoyant air joins the updraft
-        ∂θ∂z = aux_tc.temporary_4
-        @. ∂θ∂z = ∇c(wvec(Ifx(ρ_c * aux_en.θ_liq_ice)))
-        ∂q∂z = aux_tc.∂qt∂z
+        ∂θl∂z = aux_tc.∂θl∂z
+        ∂qt∂z = aux_tc.∂qt∂z
 
         water_advection_factor = mixing_length_params(edmf).c_KTKEqt
         @. aux_tc_f.diffusive_flux_qt += ρ_f * Ifx(a_en * sqrt(aux_en.tke) * water_advection_factor * (2 * corr_w_qt * (∂q∂z < 0) * sqrt(max(aux_en.QTvar, zero(FT))))) # (mean + σ) - (mean - σ) = 2σ
@@ -2056,9 +2055,8 @@ function compute_up_tendencies!(edmf::EDMFModel, state::State, param_set::APS, �
 
             # When we have strong limiters on updraft area, these can get out of sync and lead to weirdness where the variance blows up... if you ever reach gradient reversal
             # In reality you'd want to enforce that youre respecting ∂θ/∂z and ∂q/∂z in the env so only truly buoyant air joins the updraft
-            ∂θ∂z = aux_tc.temporary_4
-            @. ∂θ∂z = ∇c(wvec(Ifx(ρ_c * aux_en.θ_liq_ice)))
-            ∂q∂z = aux_tc.∂qt∂z
+            ∂θl∂z = aux_tc.∂θl∂z
+            ∂qt∂z = aux_tc.∂qt∂z
 
             @inbounds for k in real_center_indices(grid)
 
@@ -2071,13 +2069,13 @@ function compute_up_tendencies!(edmf::EDMFModel, state::State, param_set::APS, �
 
                 # Entrain moist air
                 q_up   = prog_up[i].ρaq_tot[k] * inv_ρa
-                q_eff = aux_en.q_tot[k] + sqrt(eps(FT)) + sqrt(aux_en.QTvar[k] * (∂q∂z[k] < 0)) * sqrt(FT(2) / FT(π))
+                q_eff = aux_en.q_tot[k] + sqrt(eps(FT)) + sqrt(aux_en.QTvar[k] * (∂qt∂z[k] < 0)) * sqrt(FT(2) / FT(π))
                 # tends_ρaq_tot[k] += tends_ρarea_tke_conv[k] * q_eff + ṁ_mix * (q_eff - q_up)
                 tends_ρaq_tot[k] += -limit_tendency(edtl, -((tends_ρarea_tke_conv[k] * q_eff) + (ṁ_mix * (q_eff - q_up))), prog_up[i].ρaq_tot[k], Δt)
 
                 # Old existing air is likely to have -HVar due to being displaced vertically and θli increasing with height. However, new air being entrained is likely to be +HVar buoyant air.
                 θ_up   = prog_up[i].ρaθ_liq_ice[k] * inv_ρa 
-                θ_eff = aux_en.θ_liq_ice[k] - sqrt(eps(FT)) + sqrt(aux_en.Hvar[k] * (∂θ∂z[k] > 0)) * sqrt(FT(2) / FT(π)); # old air is more likely to be displaced, so it is negative like the typical thetali gradient would indicate from perturbations
+                θ_eff = aux_en.θ_liq_ice[k] - sqrt(eps(FT)) + sqrt(aux_en.Hvar[k] * (∂θl∂z[k] > 0)) * sqrt(FT(2) / FT(π)); # old air is more likely to be displaced, so it is negative like the typical thetali gradient would indicate from perturbations
                 # tends_ρaθ_liq_ice[k] += tends_ρarea_tke_conv[k] * θ_eff + ṁ_mix * (θ_eff - θ_up)
                 tends_ρaθ_liq_ice[k] += -limit_tendency(edtl, -((tends_ρarea_tke_conv[k] * θ_eff) + (ṁ_mix * (θ_eff - θ_up))), prog_up[i].ρaθ_liq_ice[k], Δt)
 
@@ -2995,14 +2993,14 @@ function compute_en_tendencies!(
             and the parcel is assumed to be a small perturbation moving through the profile.
 
             2. As the parcel moves upward/downward, it gains/loses buoyancy from two sources:
-            a) Vertical gradient of MSE: moving into lower MSE (dMSE/dz < 0) increases b.
+            a) Vertical gradient of MSE: moving into lower MSE (∂MSE/∂z < 0) increases b.
                 Using finite differences, the local contribution is:
-                    b_gradient ≈ - g/(c_p * T) * dMSE/dz
+                    b_gradient ≈ - g/(c_p * T) * ∂MSE/∂z
             b) Latent heating (LH) adds or removes energy at the level, directly changing buoyancy:
                     b_heating ≈ g/(c_p * T) * LH
 
             3. The total instantaneous acceleration of the parcel is the sum of these effects:
-                dw/dt = b = g/(c_p * T) * (-dMSE/dz + LH)
+                dw/dt = b = g/(c_p * T) * (-∂MSE/∂z + LH)
 
             4. Kinetic energy per unit mass is KE = 0.5 * w^2, so its rate of change follows:
                 dKE/dt = w * dw/dt
@@ -3010,7 +3008,7 @@ function compute_en_tendencies!(
             5. Summary: at each vertical level, compute dw/dt from the MSE gradient and LH,
             then compute dKE/dt from the local w. Step these forward to evolve the profile.
 
-            At KE = 0, we can use the mean over one timestep, ΔKE = 0.5 * (dw/dt * Δt)^2 to initialize KE.  0.5 * (dw/dt * Δt)^2 = 0.5( (g/(c_p * T) * (-dMSE/dz + LH)) * Δt )^2
+            At KE = 0, we can use the mean over one timestep, ΔKE = 0.5 * (dw/dt * Δt)^2 to initialize KE.  0.5 * (dw/dt * Δt)^2 = 0.5( (g/(c_p * T) * (-∂MSE/∂z + LH)) * Δt )^2
         =#
 
         # -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-= #

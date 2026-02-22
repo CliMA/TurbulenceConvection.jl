@@ -1420,8 +1420,6 @@ function compute_domain_interaction_microphysics_tendencies!(
     _area_top = isa(area, FT) ? area : area[kc_toa]
     _area_bottom = isa(area, FT) ? area : area[kc_surf]
     C2Fa = CCO.InterpolateC2F(; bottom = CCO.SetValue(FT(_area_bottom)), top = CCO.SetValue(FT(_area_top)))
-    wvec = CC.Geometry.WVector
-    # ∇c = CCO.DivergenceF2C() # F2C to come back from C2F
     ∇a = aux_tc.temporary_1
     @. ∇a =  ∇c(wvec(C2Fa(area))) # seems stable w/ either sign w...? (Left bias this?)
 

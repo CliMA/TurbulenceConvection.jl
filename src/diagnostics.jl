@@ -253,15 +253,15 @@ function io_dictionary_aux(edmf) # added EDMF as an argument so we can have thin
         "env_τ_liq" => (; dims = ("zc", "t"), group = "profiles", field = (edmf.moisture_model isa NonEquilibriumMoisture) ?  (state -> center_aux_environment(state).τ_liq) :  (state -> center_aux_environment(state).area .* 0)),
         "updraft_τ_liq" => (; dims = ("zc", "t"), group = "profiles", field = (edmf.moisture_model isa NonEquilibriumMoisture) ?  (state -> center_aux_bulk(state).τ_liq) :  (state -> center_aux_bulk(state).area .* 0)),
 
-        "updraft_wi" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_bulk(state).term_vel_ice),
-        "env_wi" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_environment(state).term_vel_ice),
+        "updraft_wi" => (; dims = ("zc", "t"), group = "profiles", field = (edmf.cloud_sedimentation_model isa CloudSedimentationModel) ? (state -> center_aux_bulk(state).term_vel_ice) : (state -> center_aux_bulk(state).area .* 0)),
+        "env_wi" => (; dims = ("zc", "t"), group = "profiles", field = (edmf.cloud_sedimentation_model isa CloudSedimentationModel) ? (state -> center_aux_environment(state).term_vel_ice) : (state -> center_aux_bulk(state).area .* 0)),
 
-        "updraft_wl" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_bulk(state).term_vel_liq),
-        "env_wl" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_environment(state).term_vel_liq),
+        "updraft_wl" => (; dims = ("zc", "t"), group = "profiles", field = (edmf.cloud_sedimentation_model isa CloudSedimentationModel) ? (state -> center_aux_bulk(state).term_vel_liq) : (state -> center_aux_bulk(state).area .* 0)),
+        "env_wl" => (; dims = ("zc", "t"), group = "profiles", field = (edmf.cloud_sedimentation_model isa CloudSedimentationModel) ? (state -> center_aux_environment(state).term_vel_liq) : (state -> center_aux_bulk(state).area .* 0)),    
 
         # overall need to weight by mass, e.g. weight v_up by  ρ * a_up * q_up (the ρ cancel out) and the weights just sum to grid mean bc a sums to 1.
-        "wl_mean" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_grid_mean(state).term_vel_liq),
-        "wi_mean" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_grid_mean(state).term_vel_ice),
+        "wl_mean" => (; dims = ("zc", "t"), group = "profiles", field = (edmf.cloud_sedimentation_model isa CloudSedimentationModel) ? (state -> center_aux_grid_mean(state).term_vel_liq) : (state -> center_aux_grid_mean(state).area .* 0)),
+        "wi_mean" => (; dims = ("zc", "t"), group = "profiles", field = (edmf.cloud_sedimentation_model isa CloudSedimentationModel) ? (state -> center_aux_grid_mean(state).term_vel_ice) : (state -> center_aux_grid_mean(state).area .* 0)), 
         "wr_mean" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_turbconv(state).term_vel_rain),
         "ws_mean" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_turbconv(state).term_vel_snow),
 

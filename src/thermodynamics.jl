@@ -219,3 +219,49 @@ end
 
 liquid_specific_humidity_given_liquid_fraction(q::TD.PhasePartition, λ::FT) where {FT} = q.liq
 liquid_specific_humidity_given_liquid_fraction(param_set::TD.APS, ts::TD.ThermodynamicState{FT}, λ::FT = one(FT)) where{FT} = PhasePartition_given_liquid_fraction(param_set, ts, λ).liq
+
+
+"""
+    sgs_supersaturated_fraction(thermo_params, qt_mean, q_sat, var_qt, var_θli, cov_qtθ, dq_sat_dT, p)
+
+Computes the fraction of the sub-grid PDF that satisfies the supersaturation condition (q_tot > q_sat).
+
+### The Linearization
+We define the saturation deficit variable 's':
+    s ≈ qt - [q_sat(T_mean) + slope * (T - T_mean)]
+
+Using the Exner function (beta) to relate T to theta_liq:
+    s ≈ qt - (slope * beta) * theta_liq + Constant
+
+The function returns the integral of the Gaussian PDF where s > 0.
+
+    For sat eq cloud fraction pass in q=q_tot, for supersaturatd fraation pass in q=q_vap
+"""
+function sgs_saturated_fraction(thermo_params::TDPS, q::FT, q_sat::FT, var_qt::FT, var_θli::FT, cov_qtθ::FT, dq_sat_dT::FT, p::FT) where {FT}
+    
+    # 1. Exner function Π (beta)
+    p_ref = TD.TP.p_ref_theta(thermo_params)
+    R_d   = TD.TP.R_d(thermo_params)
+    c_p   = TD.TP.cp_d(thermo_params)
+    Π     = (p / p_ref)^(R_d / c_p) 
+
+    # 2. Linearization Slope (alpha)
+    # α = ∂q_sat/∂T * ∂T/∂θ
+    α = dq_sat_dT * Π
+
+    # 3. Mean Saturation Deficit (μ_s)
+    # Positive values indicate the mean state is supersaturated.
+    μ_s = q - q_sat
+
+    # 4. Variance of Saturation Deficit (σ²_s)
+    # Var(qt - α*θ)
+    σ2_s = var_qt + (α^2 * var_θli) - (2 * α * cov_qtθ)
+    
+    # 5. Calculate Fraction (Area where s > 0)
+    if σ2_s > eps(FT)
+        σ_s = sqrt(σ2_s)
+        return Distributions.cdf(Distributions.Normal(zero(FT), one(FT)), μ_s / σ_s)
+    else
+        return μ_s > 0 ? one(FT) : zero(FT)
+    end
+end
