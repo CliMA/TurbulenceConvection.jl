@@ -647,7 +647,7 @@ function compute_gm_tendencies!(
 
 
 
-    wvec = CC.Geometry.WVector
+    wvec = TC.wvec
     ∇c = TC.∇c
 
     # Apply forcing and radiation

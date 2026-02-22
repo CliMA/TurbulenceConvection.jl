@@ -191,10 +191,10 @@ function compute_mse(
         data_tcc_arr = TC.get_nc_data(ds_tc, tc_var)
         data_scm_arr = TC.get_nc_data(ds_scampy, tc_var)
         # Only compare fields that exist in the nc files
-        missing_les_var = data_les_arr == nothing
-        missing_tcm_var = data_tcm_arr == nothing
-        missing_tcc_var = data_tcc_arr == nothing
-        missing_scm_var = data_scm_arr == nothing
+        missing_les_var = isnothing(data_les_arr)
+        missing_tcm_var = isnothing(data_tcm_arr)
+        missing_tcc_var = isnothing(data_tcc_arr)
+        missing_scm_var = isnothing(data_scm_arr)
 
         coord_name = first(NC.dimnames(data_tcc_arr))
         coord_name == "zf" || coord_name == "zc" || error("Bad coord_name")

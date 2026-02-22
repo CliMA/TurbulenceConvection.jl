@@ -166,7 +166,7 @@ function initialize_updrafts_SOCRATES(edmf, state, surf, param_set)
             if  k ∉ (kc_toa, kc_surf) # don't do this for surface or top of atmosphere
                 # unstable = aux_gm.θ_liq_ice[k] ≥ aux_gm.θ_liq_ice[k+1] # unstable if θ_liq_ice decreases with height
                 unstable = aux_gm.θ_virt[k] ≥ aux_gm.θ_virt[k+1] # unstable if θ_virt decreases with height [[ would start w/ MSE but idk if it's been calculated yet for env? it's not stored for GM either.. ]]
-                # unstable = unstable || (∂MSE_gm_∂z[k] < FT(0)) # also unstable if dMSE/dz < 0
+                # unstable = unstable || (∂MSE_gm_∂z[k] < FT(0)) # also unstable if ∂MSE/∂z < 0
                 unstable = unstable || (MSE_gm[k] < MSE_gm[k+1]) # also unstable if MSE increases with height
                 if unstable
                     # aux_up[i].area[k+2] = TC.resolve_nan(aux_up[i].area[k+2], FT(0)) + (((k+2) != kc_toa) ? initial_profile_updraft_area : FT(0)) # socrates init area

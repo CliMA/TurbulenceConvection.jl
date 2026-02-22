@@ -54,3 +54,8 @@ julia = "1.5"
 
 [extras]
 CPUSummary = "2a0fbf3d-bb9c-48f3-b0a9-814d99fd7ab9"
+Flux = "587475ba-b771-5e3f-ad9e-33799f191a9c"
+SimpleChains = "de6bee2f-e2f4-4ec7-b6ed-219cc6f6e9e5"
+
+[targets]
+test = ["Flux", "SimpleChains"]

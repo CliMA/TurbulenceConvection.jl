@@ -214,7 +214,7 @@ number_of_columns(space::CC.Spaces.ExtrudedFiniteDifferenceSpace) = number_of_co
     column_idx_type(space::ClimaCore.Spaces.AbstractSpace)
 
 Returns the type of `colidx` in
-```julia
+julia
 bycolumn(space) do colidx
     # ...
 end
@@ -222,7 +222,7 @@ end
 function column_idx_type(space::CC.Spaces.AbstractSpace)
     colidxtype = nothing
     CC.Fields.bycolumn(space) do colidx
-        if colidxtype == nothing
+        if isnothing(colidxtype)
             colidxtype = typeof(colidx)
         else
             colidxtype = typejoin(colidxtype, typeof(colidx))

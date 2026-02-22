@@ -18,8 +18,6 @@ function get_inversion(state::State, param_set::APS, Ri_bulk_crit)
     Ri_bulk = center_aux_grid_mean(state).Ri
     θ_virt_b = θ_virt[kc_surf]
     z_c = grid.zc
-    ∇c = CCO.DivergenceF2C()
-    wvec = CC.Geometry.WVector
 
     # test if we need to look at the free convective limit
     if (u[kc_surf]^2 + v[kc_surf]^2) <= 0.01

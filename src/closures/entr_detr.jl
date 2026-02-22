@@ -484,7 +484,6 @@ function compute_phys_entr_detr!(
     g::FT = TCP.grav(param_set)
     w_up_c = aux_tc.w_up_c
     w_en_c = aux_tc.w_en_c
-    wvec = CC.Geometry.WVector
     max_area = edmf.max_area
     plume_scale_height = map(1:N_up) do i
         compute_plume_scale_height(state, edmf.H_up_min, i)
@@ -662,7 +661,6 @@ function compute_ml_entr_detr!(
     g::FT = TCP.grav(param_set)
     w_up_c = aux_tc.w_up_c
     w_en_c = aux_tc.w_en_c
-    wvec = CC.Geometry.WVector
     max_area = edmf.max_area
     plume_scale_height = map(1:N_up) do i
         compute_plume_scale_height(state, edmf.H_up_min, i)
@@ -818,7 +816,6 @@ function compute_ml_entr_detr!(
     g::FT = TCP.grav(param_set)
     w_up_c = aux_tc.w_up_c
     w_en_c = aux_tc.w_en_c
-    wvec = CC.Geometry.WVector
     max_area = edmf.max_area
     plume_scale_height = map(1:N_up) do i
         compute_plume_scale_height(state, edmf.H_up_min, i)

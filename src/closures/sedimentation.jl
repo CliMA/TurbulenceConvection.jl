@@ -89,8 +89,6 @@ function calculate_sedimentation_sources!(
     S = sedimentation
     S_other = sedimentation_other
 
-    wvec = CC.Geometry.WVector
-    # ∇c = CCO.DivergenceF2C() # F2C to come back from C2F
     UBsed = CCO.UpwindBiasedProductC2F(; bottom = CCO.Extrapolate(), top = CCO.SetValue(FT(0))) # upwinding, extrapolate bc we don't know the boa/toa derivatives, no flux through the top
 
     #=

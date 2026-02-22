@@ -29,7 +29,7 @@ toscalar(x::CCG.WVector) = x.w # see https://github.com/CliMA/ClimaAtmos.jl/pull
 const lazy = CC.MatrixFields.lazy
 # const @lazy = CC.MatrixFields.@lazy
 
-@inline function zero_field!(field::CC.Fields.FiniteDifferenceField)
+@inline function zero_field!(field::CC.Fields.FiniteDifferenceField) # All the methods worked but suggestion was this was the most efficient (assuming inlined) -- might have efficient zero semantics
     fill!(parent(field), zero(eltype(parent(field))))
 end
 

@@ -206,7 +206,7 @@ function compute_diagnostics!(
 
     if !calibrate_io
         
-        wvec = CC.Geometry.WVector
+        wvec = TC.wvec
         aeKHs_bc = -surf.ρs_flux / aux_tc_f.ρ_ae_KH[kf_surf]
 
         If = CCO.InterpolateC2F(; bottom = CCO.SetValue(FT(0)), top = CCO.SetValue(FT(0)))

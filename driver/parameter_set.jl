@@ -52,7 +52,7 @@ function create_parameter_set(
     a_acnv_KK2000 = TC.parse_namelist(namelist, "microphysics", "a_acnv_KK2000"; default = 2.47)
     b_acnv_KK2000 = TC.parse_namelist(namelist, "microphysics", "b_acnv_KK2000"; default = -1.79)
     c_acnv_KK2000 = TC.parse_namelist(namelist, "microphysics", "c_acnv_KK2000"; default = -1.47)
-    pow_icenuc = TC.parse_namelist(namelist, "microphysics", "pow_icenuc"; default = 1e7) # I think this has to be here to overwrite toml..., and to place it so we can overwrite_namelist it .. picked high value initially to keep ramp but maybe should keep original default... https://github.com/CliMA/CLIMAParameters.jl/blob/2f298661d527c1b9a11188ee2abc92ba4ba0c5ec/src/parameters.toml#L558
+    pow_icenuc = TC.parse_namelist(namelist, "microphysics", "pow_icenuc"; default = 1) # I think this has to be here to overwrite toml..., and to place it so we can overwrite_namelist it .. picked high value 1e7 initially to remove ramp but maybe should keep original? (Inf is all ice below freezing, 0 is all liq) default... https://github.com/CliMA/CLIMAParameters.jl/blob/2f298661d527c1b9a11188ee2abc92ba4ba0c5ec/src/parameters.toml#L558
     r_ice_snow = TC.parse_namelist(namelist, "microphysics", "r_ice_snow"; default = 62.5e-6) # allow changing this in the namelist/param_set/microphys_params instead of user_params (probably not ideal if you used a 2-moment or something where this mattered more but ...)
     #
     χm_ice = TC.parse_namelist(namelist, "microphysics", "χm_ice"; default = 1.0)
@@ -325,7 +325,7 @@ function create_parameter_set(
     user_params = deepcopy(namelist_user_params) # make a copy of user_params so we can modify it without changing the original
     user_args = deepcopy(namelist_user_args) # make a copy of user_args so we can modify it without changing the original
     # delete things stored in relaxation timescales
-    delete!.(Ref(user_params), ["neural_microphysics_relaxation_network", "model_re_location", "model_x_0_characteristic"]) # drop neural_microphysics_relaxation_network, model_re_location, model_x_0_characteristic, etc. from user_param.  deletes from user_params, but not from namelist, so we can use it later, so it doesnt end up in the param_set
+    delete!.(Ref(user_params), ["neural_microphysics_relaxation_network", "model_re_location", "model_x_0_characteristic"]) # drop neural_microphysics_relaxation_network, model_re_location, model_x_0_characteristic from user_param. deletes from user_params, but not from namelist, so we can use it later, so it doesnt end up in the param_set
     delete!.(Ref(user_args), ["nonequilibrium_moisture_scheme", "adjust_liq_N", "adjust_ice_N", "use_heterogeneous_ice_nucleation",]) # these are now in relaxtion_timescale object
     delete!.(Ref(user_params), ["heterogeneous_ice_nucleation_coefficient", "heterogeneous_ice_nucleation_exponent", "min_τ_liq", "min_τ_ice", "max_τ_liq", "max_τ_ice", "min_N_liq", "min_N_ice", "max_N_liq", "max_N_ice"]) # these are now in relaxtion_timescale object
 

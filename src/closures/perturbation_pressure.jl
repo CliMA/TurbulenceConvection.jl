@@ -25,7 +25,6 @@ function compute_nh_pressure!(state::State, edmf::EDMFModel, surf::SurfaceBase)
     kc_toa = kc_top_of_atmos(grid)
 
     Ifc = CCO.InterpolateF2C()
-    wvec = CC.Geometry.WVector
     w_bcs = (; bottom = CCO.SetValue(wvec(FT(0))), top = CCO.SetValue(wvec(FT(0))))
     ∇ = CCO.DivergenceC2F(; w_bcs...)
     aux_up = center_aux_updrafts(state)
