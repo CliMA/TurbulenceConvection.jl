@@ -729,9 +729,9 @@ function EquilibriumMoisture(param_set::APS, namelist)
         RelaxToEquilibrium(param_set, namelist)
     # elseif nonequilibrium_moisture_scheme_type === :KorolevMazin2007
     #     KorolevMazin2007()
-    elseif (nonequilibrium_moisture_scheme_type ∈ valid_relaxation_timescale_types) && (nonequilibrium_moisture_scheme_type ∉ [:neural_network, :neural_network_no_weights])
+    elseif (nonequilibrium_moisture_scheme_type ∈ valid_relaxation_timescale_types) && (nonequilibrium_moisture_scheme_type ∉ [:neural_network, :neural_network_no_weights, :extended_neural_network])
         get_relaxation_timescale_type(nonequilibrium_moisture_scheme_type, param_set, namelist) # we really could just pass namelist here...
-    elseif nonequilibrium_moisture_scheme_type ∈ [:neural_network, :neural_network_no_weights]
+    elseif nonequilibrium_moisture_scheme_type ∈ [:neural_network, :neural_network_no_weights, :extended_neural_network]
         # we decided to stop storing NN things in the param_set... it's redundant for all the objects but it's especially bad for the NN, as every call w/ param_set has to deal w/ massive tuple/svector
         get_relaxation_timescale_type(nonequilibrium_moisture_scheme_type, param_set, namelist)
     else
@@ -763,9 +763,9 @@ function NonEquilibriumMoisture(param_set::APS, namelist)
         RelaxToEquilibrium(param_set, namelist)
     # elseif nonequilibrium_moisture_scheme_type === :KorolevMazin2007
     #     KorolevMazin2007()
-    elseif (nonequilibrium_moisture_scheme_type ∈ valid_relaxation_timescale_types) && (nonequilibrium_moisture_scheme_type ∉ [:neural_network, :neural_network_no_weights])
+    elseif (nonequilibrium_moisture_scheme_type ∈ valid_relaxation_timescale_types) && (nonequilibrium_moisture_scheme_type ∉ [:neural_network, :neural_network_no_weights, :extended_neural_network])
         get_relaxation_timescale_type(nonequilibrium_moisture_scheme_type, param_set, namelist) # we really could just pass namelist here...
-    elseif nonequilibrium_moisture_scheme_type ∈ [:neural_network, :neural_network_no_weights]
+    elseif nonequilibrium_moisture_scheme_type ∈ [:neural_network, :neural_network_no_weights, :extended_neural_network]
         # we decided to stop storing NN things in the param_set... it's redundant for all the objects but it's especially bad for the NN, as every call w/ param_set has to deal w/ massive tuple/svector
         get_relaxation_timescale_type(nonequilibrium_moisture_scheme_type, param_set, namelist)
     else

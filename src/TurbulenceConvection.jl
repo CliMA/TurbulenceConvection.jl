@@ -277,6 +277,8 @@ const Ic = CCO.InterpolateF2C() # no bcs on F2C, this gets used all the time, so
 const Ifx = CCO.InterpolateC2F(; bottom = CCO.Extrapolate(), top = CCO.Extrapolate()) # C2F with extrapolate bcs, this gets used all the time, so define it once here
 # const Ifw = CCO.InterpolateC2F(; bottom = CCO.SetValue(FT(0)), top = CCO.SetValue(FT(0)))
 const ∇c = CCO.DivergenceF2C() 
+const wvec = CC.Geometry.WVector
+
 
 include("Grid.jl")
 include("dycore_api.jl")
@@ -299,9 +301,13 @@ include("turbulence_functions.jl")
 include("utility_functions.jl")
 include("variables.jl")
 include("EDMF_Precipitation.jl")
-include("closures/ql_qi_supersaturation_covariance_closure.jl") # for SGS quadrature w/ ql, qi
+include("closures/sgs_condensate/ql_qi_supersaturation_quadrature_covariance_closure.jl") # for SGS quadrature w/ ql, qi
 include("EDMF_Environment.jl")
 include("EDMF_Updrafts.jl")
+include("closures/sgs_condensate/saturation_partitioning.jl") # for SGS partitioning w/ ql, qi (no quadrature)
+include("closures/sgs_condensate/SHOC/SHOC.jl")
+include("closures/sgs_condensate/cSigma/cSigma.jl")
+include("closures/CAPE.jl")
 include("update_aux.jl")
 include("EDMF_functions.jl")
 include("thermodynamics.jl")

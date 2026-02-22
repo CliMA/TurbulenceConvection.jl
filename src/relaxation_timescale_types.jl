@@ -12,6 +12,7 @@
 :linear_combination
 :linear_combination_with_w
 :neural_network
+:extended_neural_network
 :raymond_ice_test
 =#
 
@@ -44,11 +45,12 @@ const valid_relaxation_timescale_types::Set{Symbol} = Set([
     :linear_combination,
     :linear_combination_with_w,
     :neural_network,
+    :extended_neural_network,
     :neural_network_no_weights,
     :neural_network_random_init,
     :neural_network_pca_noise,
     # :raymond_ice_test,
-    ]
+]
 )
 # ---------------------------------------------------------------------------------------------------------------------------------------- #
 struct RelaxationTimescaleArgs{FT}
@@ -66,7 +68,7 @@ end
 """
 Trying to use this to reduce duplicated code
 """
-function get_relaxation_timescale_args(namelist, FT) 
+function get_relaxation_timescale_args(namelist, FT)
     # FT = namelist["float_type"] == "Float32" ? Float32 : Float64 # how main() does it.
     return RelaxationTimescaleArgs{FT}(
         #
@@ -78,16 +80,14 @@ function get_relaxation_timescale_args(namelist, FT)
         get(namelist["user_params"], "min_N_liq", FT(0)),
         get(namelist["user_params"], "min_N_ice", FT(0)),
         get(namelist["user_params"], "max_N_liq", FT(Inf)),
-        get(namelist["user_params"], "max_N_ice", FT(Inf))
-        
-    )
+        get(namelist["user_params"], "max_N_ice", FT(Inf)))
 end
 
 # ---------------------------------------------------------------------------------------------------------------------------------------- #
 
 
 # struct KorolevMazin2007 <: AbstractNonEquillibriumSourcesType end  # placeholder to keep that code around
-struct RelaxToEquilibrium{FT} <: AbstractNonEquillibriumSourcesType 
+struct RelaxToEquilibrium{FT} <: AbstractNonEquillibriumSourcesType
     adjust_ice_N::Bool
     args::RelaxationTimescaleArgs{FT} # Maybe pare this down to remove tau
 end  # placeholder to keep that code around
@@ -237,17 +237,21 @@ end
 
 # :neural_network
 # struct NeuralNetworkRelaxationTimescale{FTNN, FT, NNT, NNPT, MRELT,  Nx} <: AbstractRelaxationTimescaleType
-struct NeuralNetworkRelaxationTimescale{FTNN, FT, NNT, NNNP,  Nx} <: AbstractRelaxationTimescaleType # I gave up on NNPType in favor of enforcing FTNN within the type itself (rather than just in a constructor)
+struct NeuralNetworkRelaxationTimescale{FTNN,FT,NNT,NNNP,Nx} <: AbstractRelaxationTimescaleType # I gave up on NNPType in favor of enforcing FTNN within the type itself (rather than just in a constructor)
     neural_network::NNT # Now that we have SimpleChain, it is isbits :)
     # neural_network_params::NNPT # use a SVector, is isbits [seems to massively slow down init though... I wonder if using the global was faster lol..]
-    neural_network_params::SA.SVector{NNNP, FTNN} # use a SVector, is isbits [seems to massively slow down init though... I wonder if using the global was faster lol..]
-    model_x_0_characteristic::NTuple{Nx, FT}
+    neural_network_params::SA.SVector{NNNP,FTNN} # use a SVector, is isbits [seems to massively slow down init though... I wonder if using the global was faster lol..]
+    model_x_0_characteristic::NTuple{Nx,FT}
     # neural_network_params::NTuple{Nnn, FT} # this wouldn't be immutable and thus not `isbits`
     # model_re_location::MRELT # should be Val{Symbol(model_re_location)}? (now we have an isbits version I dont think we need to store it)
     adjust_liq_N::Bool
     adjust_ice_N::Bool # You can hope the NN stays reasonable but if extrapolating to unseen data who knows... but it will not if not well pretrained or if you extrapolate far enough
     args::RelaxationTimescaleArgs{FT}
 end
+
+const BaseNeuralNetworkRelaxationTimescale{FTNN,FT,NNT,NNNP} = NeuralNetworkRelaxationTimescale{FTNN,FT,NNT,NNNP,5}
+const ExtendedNeuralNetworkRelaxationTimescale{FTNN,FT,NNT,NNNP} = NeuralNetworkRelaxationTimescale{FTNN,FT,NNT,NNNP,9}
+
 # NeuralNetworkRelaxationTimescale(model_x_0_characteristic::NTuple{Nx, FT}, model_re_location::MRELT, args::RelaxationTimescaleArgs{FT}) where {FT, MRELT, Nx} = NeuralNetworkRelaxationTimescale{FT, MRELT, Nx}(model_x_0_characteristic, model_re_location, args)
 
 # # :raymond_ice_test
@@ -344,12 +348,12 @@ function get_relaxation_timescale_type(::Val{:geometric_liq__geometric_ice}, par
     c_1l = get(namelist["relaxation_timescale_params"], "geometric_liq_c_1", FT(1 / (4 / 3 * π * ρ_l * r_r^2))) # Inhomogenous default assuming r_0 = 20 micron since `typical` N is harder to define
     c_2l = get(namelist["relaxation_timescale_params"], "geometric_liq_c_2", FT(2 / 3.0)) # Halfway between 1/3 and 1
     c_3l = get(namelist["relaxation_timescale_params"], "geometric_liq_c_3", FT(N_l0 * r_0)) # Inhomogenous default assuming r_0 = 20 micron since `typical` N is harder to define
-    c_4l = get(namelist["relaxation_timescale_params"], "geometric_liq_c_4", FT(2e2*1e6)) # max N acceptable
+    c_4l = get(namelist["relaxation_timescale_params"], "geometric_liq_c_4", FT(2e2 * 1e6)) # max N acceptable
 
     c_1i = get(namelist["relaxation_timescale_params"], "geometric_ice_c_1", FT(1 / (4 / 3 * π * ρ_i * r_r^2))) # Inhomogenous default assuming r_0 = 20 micron since `typical` N is harder to define
     c_2i = get(namelist["relaxation_timescale_params"], "geometric_ice_c_2", FT(2 / 3.0)) # Halfway between 1/3 and 1
     c_3i = get(namelist["relaxation_timescale_params"], "geometric_ice_c_3", FT(N_i0 * r_0)) # Inhomogenous default assuming r_0 = 20 micron since `typical` N is harder to define
-    c_4i = get(namelist["relaxation_timescale_params"], "geometric_ice_c_4", FT(2e4*1e6)) # max N acceptable
+    c_4i = get(namelist["relaxation_timescale_params"], "geometric_ice_c_4", FT(2e4 * 1e6)) # max N acceptable
 
     adjust_liq_N = get(namelist["user_args"], "adjust_liq_N", false) # default to false if not set
     adjust_ice_N = get(namelist["user_args"], "adjust_ice_N", false) # default to false if not set
@@ -371,11 +375,11 @@ function get_relaxation_timescale_type(::Val{:geometric_liq__exponential_T_scali
     c_1l = get(namelist["relaxation_timescale_params"], "geometric_liq_c_1", FT(1 / (4 / 3 * π * ρ_l * r_r^2))) # Inhomogenous default assuming r_0 = 20 micron since `typical` N is harder to define
     c_2l = get(namelist["relaxation_timescale_params"], "geometric_liq_c_2", FT(2 / 3.0)) # Halfway between 1/3 and 1
     c_3l = get(namelist["relaxation_timescale_params"], "geometric_liq_c_3", FT(N_l0 * r_0)) # Inhomogenous default assuming r_0 = 20 micron since `typical` N is harder to define
-    c_4l = get(namelist["relaxation_timescale_params"], "geometric_liq_c_4", FT(2e2*1e6)) # max N acceptable
+    c_4l = get(namelist["relaxation_timescale_params"], "geometric_liq_c_4", FT(2e2 * 1e6)) # max N acceptable
 
     c_1i = get(namelist["relaxation_timescale_params"], "exponential_T_scaling_ice_c_1", FT(0.02)) # Fletcher 1962 (values taken from Frostenberg 2022)
     c_2i = get(namelist["relaxation_timescale_params"], "exponential_T_scaling_ice_c_2", FT(-0.6)) # Fletcher 1962 (values taken from Frostenberg 2022)
-   
+
     adjust_liq_N = get(namelist["user_args"], "adjust_liq_N", false) # default to false if not set
     adjust_ice_N = get(namelist["user_args"], "adjust_ice_N", false) # default to false if not set
 
@@ -398,11 +402,11 @@ function get_relaxation_timescale_type(::Val{:geometric_liq__powerlaw_T_scaling_
     c_1l = get(namelist["relaxation_timescale_params"], "geometric_liq_c_1", FT(1 / (4 / 3 * π * ρ_l * r_r^2))) # Inhomogenous default assuming r_0 = 20 micron since `typical` N is harder to define
     c_2l = get(namelist["relaxation_timescale_params"], "geometric_liq_c_2", FT(2 / 3.0)) # Halfway between 1/3 and 1
     c_3l = get(namelist["relaxation_timescale_params"], "geometric_liq_c_3", FT(N_l0 * r_0)) # Inhomogenous default assuming r_0 = 20 micron since `typical` N is harder to define
-    c_4l = get(namelist["relaxation_timescale_params"], "geometric_liq_c_4", FT(2e2*1e6)) # max N acceptable
+    c_4l = get(namelist["relaxation_timescale_params"], "geometric_liq_c_4", FT(2e2 * 1e6)) # max N acceptable
 
     c_1i = get(namelist["relaxation_timescale_params"], "powerlaw_T_scaling_ice_c_1", FT(-9)) # F23 (values taken from Frostenberg 2022)
     c_2i = get(namelist["relaxation_timescale_params"], "powerlaw_T_scaling_ice_c_2", FT(9)) # F23 (values taken from Frostenberg 2022)
-    
+
     adjust_liq_N = get(namelist["user_args"], "adjust_liq_N", false) # default to false if not set
     adjust_ice_N = get(namelist["user_args"], "adjust_ice_N", false) # default to false if not set
 
@@ -425,7 +429,7 @@ function get_relaxation_timescale_type(::Val{:geometric_liq__exponential_T_scali
     c_1l = get(namelist["relaxation_timescale_params"], "geometric_liq_c_1", FT(1 / (4 / 3 * π * ρ_l * r_r^2))) # Inhomogenous default assuming r_0 = 20 micron since `typical` N is harder to define
     c_2l = get(namelist["relaxation_timescale_params"], "geometric_liq_c_2", FT(2 / 3.0)) # Halfway between 1/3 and 1
     c_3l = get(namelist["relaxation_timescale_params"], "geometric_liq_c_3", FT(N_l0 * r_0)) # Inhomogenous default assuming r_0 = 20 micron since `typical` N is harder to define
-    c_4l = get(namelist["relaxation_timescale_params"], "geometric_liq_c_4", FT(2e2*1e6)) # max N acceptable
+    c_4l = get(namelist["relaxation_timescale_params"], "geometric_liq_c_4", FT(2e2 * 1e6)) # max N acceptable
 
     # [[ deprecated ]] - use the names from :exponential_T_scaling_ice and :geometric_ice
     # c_1i = get(namelist["relaxation_timescale_params"], "exponential_T_scaling_and_geometric_ice_c_1", FT(1/(4/3 * π * ρ_i * r_r^2))) # Yeahhh.... idk for this one lol... just combined them serially from the homogenous case where c_3 is -1/3, and used .02 as the prefactor
@@ -439,7 +443,7 @@ function get_relaxation_timescale_type(::Val{:geometric_liq__exponential_T_scali
     c_1i = get(namelist["relaxation_timescale_params"], "geometric_ice_c_1", FT(1 / (4 / 3 * π * ρ_i * r_r^2)))
     c_2i = get(namelist["relaxation_timescale_params"], "geometric_ice_c_2", FT(2 / 3.0)) # Halfway between 1/3 and 1
     # c_3i = get(namelist["relaxation_timescale_params"], "exponential_T_scaling_and_geometric_ice_c_3", FT(-7)) #  we use c_3 differently so it keeps its special form...
-    
+
     c_4i = get(namelist["relaxation_timescale_params"], "exponential_T_scaling_ice_c_1", FT(0.02)) # Fletcher 1962 (values taken from Frostenberg 2022)
     c_5i = get(namelist["relaxation_timescale_params"], "exponential_T_scaling_ice_c_2", FT(-0.6)) # Fletcher 1962 (values taken from Frostenberg 2022)
 
@@ -450,7 +454,7 @@ function get_relaxation_timescale_type(::Val{:geometric_liq__exponential_T_scali
     τ_sub_dep_scaling_factor = get(namelist["relaxation_timescale_params"], "τ_sub_dep_scaling_factor", FT(1.0)) # default to 1.0 if not set
 
     # return GeometricLiqExponentialTScalingAndGeometricIceRelaxationTimescale(c_1l, c_2l, c_3l, c_4l, c_1i, c_2i, c_3i, c_4i, c_5i, adjust_liq_N, adjust_ice_N, τ_cond_evap_scaling_factor, τ_sub_dep_scaling_factor, get_relaxation_timescale_args(namelist, FT))
-    return GeometricLiqExponentialTScalingAndGeometricIceRelaxationTimescale(c_1l, c_2l, c_3l, c_4l, c_1i, c_2i,       c_4i, c_5i, adjust_liq_N, adjust_ice_N, τ_cond_evap_scaling_factor, τ_sub_dep_scaling_factor, get_relaxation_timescale_args(namelist, FT))
+    return GeometricLiqExponentialTScalingAndGeometricIceRelaxationTimescale(c_1l, c_2l, c_3l, c_4l, c_1i, c_2i, c_4i, c_5i, adjust_liq_N, adjust_ice_N, τ_cond_evap_scaling_factor, τ_sub_dep_scaling_factor, get_relaxation_timescale_args(namelist, FT))
 end
 
 # :linear_combination
@@ -507,7 +511,7 @@ function get_relaxation_timescale_type(::Val{:linear_combination_with_w}, param_
 
     τ_cond_evap_scaling_factor = get(namelist["relaxation_timescale_params"], "τ_cond_evap_scaling_factor", FT(1.0)) # default to 1.0 if not set
     τ_sub_dep_scaling_factor = get(namelist["relaxation_timescale_params"], "τ_sub_dep_scaling_factor", FT(1.0)) # default to 1.0 if not set
-    
+
 
     return LinearCombinationWithWRelaxationTimescale(c_1l, c_2l, c_3l, c_4l, c_1i, c_2i, c_3i, c_4i, adjust_liq_N, adjust_ice_N, τ_cond_evap_scaling_factor, τ_sub_dep_scaling_factor, get_relaxation_timescale_args(namelist, FT))
 end
@@ -515,7 +519,7 @@ end
 
 # :neural_network
 # this version accepts the namelist, so we can ideally keep the neural network params out of the param_set to reduce bloat...
-function get_relaxation_timescale_type(::Union{Val{:neural_network}, Val{:neural_network_no_weights}, Val{:neural_network_random_init}}, param_set::APS, microphys_params::ACMP, namelist)
+function get_relaxation_timescale_type(::Union{Val{:neural_network},Val{:neural_network_no_weights},Val{:neural_network_random_init},Val{:extended_neural_network}}, param_set::APS, microphys_params::ACMP, namelist)
     FT = eltype(param_set)
     # rn everything in user_params ends up in param_set... but that isn't really necessary given we're creating these objects... it was more of a convenience when we were testing random things...
     neural_network_params = create_svector(FTNN.(namelist["relaxation_timescale_params"]["neural_microphysics_relaxation_network"])) # convert to SVector for NN since that's what it's supposed to be (save eltype in the jld2?)
@@ -523,6 +527,7 @@ function get_relaxation_timescale_type(::Union{Val{:neural_network}, Val{:neural
     model_re_location = namelist["relaxation_timescale_params"]["model_re_location"]
 
     neural_network = simple_chain_model_from_file(model_re_location) # construct the NN from the parameters, and also get the simple chain params for the neural network
+    # @warn "neural_network = $neural_network"
 
     adjust_liq_N = get(namelist["user_args"], "adjust_liq_N", false) # default to false if not set
     adjust_ice_N = get(namelist["user_args"], "adjust_ice_N", false) # default to false if not set # we could add this... hopefully the NN stays reasonable but if extrapolating to unseen data who knows...
@@ -544,7 +549,7 @@ function get_relaxation_timescale_type(::Val{:neural_network_pca_noise}, param_s
     reference_to_truth = namelist["relaxation_timescale_params"]["reference_to_truth"] # if true, then the pca_components are in reference to the truth, otherwise they are in reference to the model
     specific_toggle = namelist["relaxation_timescale_params"]["specific_toggle"] # if true, then the pca_components are specific to the model, otherwise they are general
 
-   
+
     # pca_explained_variance = S^2/(n_samples - 1)
     # the real noise, σ = S / sqrt(n_samples - 1) = sqrt(pca_explained_variance) # this is the standard deviation of the noise, so we can scale the components by it
 
@@ -566,12 +571,12 @@ function get_relaxation_timescale_type(::Val{:neural_network_pca_noise}, param_s
         ((1 + n_pca) == length(pca_weights)) || error("The number of PCA weights must match the 1 plus the number of PCA components, got $(length(pca_weights)) instead of $(1 + n_pca) weights.")
         dp_weight = pca_weights[end] # this is the weight for the total motion, which is just the last weight in the PCA weights
         pca_weights = pca_weights[1:end-1] # remove the last weight
-         # pca_components is [nparams x ncomponents] 
+        # pca_components is [nparams x ncomponents] 
         pca_weights = reshape(pca_weights, 1, length(pca_weights)) # make sure it's a row vector
         pca_explained_variance = reshape(pca_explained_variance, 1, length(pca_explained_variance)) # make sure it's a row vector to match the weights
         σ_real = sqrt.(pca_explained_variance) # this is the standard deviation of the noise, so we can scale the components by it
 
-        dlossdp = FTNN.(pca_mean_vec .+ sum( ((pca_weights .* σ_real) .* pca_components), dims=2) )[:]  # this is the PCA noise, so we add the mean and scale by the weights, and sum over all components
+        dlossdp = FTNN.(pca_mean_vec .+ sum(((pca_weights .* σ_real) .* pca_components), dims=2))[:]  # this is the PCA noise, so we add the mean and scale by the weights, and sum over all components
         if reference_to_truth
             learning_rate = FT(0.1) * inv.(maximum(abs.(dlossdp))) # this is the learning rate, which is just a hyperparameter to control how much we wiggle the parameters, so we can adjust it later if needed
         else
@@ -591,17 +596,17 @@ function get_relaxation_timescale_type(::Val{:neural_network_pca_noise}, param_s
         dps = Vector{Vector{FT}}(undef, n_outputs) # this is the gradient of the loss with respect to the parameters, which is just the PCA noise scaled by the weights and summed over all components
 
         pca_explained_variance = map(pev -> reshape(pev, 1, length(pev)), pca_explained_variance) # make sure each explained variance is a row vector to match the weights
-        
+
         starting_ind = 1
         for i_o in 1:n_outputs
             n_pca_each = length(pca_explained_variance[i_o]) # number of PCA components for this output
 
-            pca_weights_here = pca_weights[starting_ind:(starting_ind + n_pca_each - 1)] # get the weights for this output
+            pca_weights_here = pca_weights[starting_ind:(starting_ind+n_pca_each-1)] # get the weights for this output
             pca_weights_here = reshape(pca_weights_here, 1, length(pca_weights_here)) # make sure it's a row vector to match the weights
             starting_ind += n_pca_each # move to the next output
             σ_real = sqrt.(pca_explained_variance[i_o]) # this is the standard deviation of the noise, so we can scale the
             # @warn "σ_real[$i_o] = $(σ_real)"
-            dlossdps[i_o] = FTNN.(pca_mean_vec[i_o] .+ sum( ((pca_weights_here .* σ_real) .* pca_components[i_o]), dims=2) )[:] # this is the PCA noise, so we add the mean and scale by the weights, and sum over all components
+            dlossdps[i_o] = FTNN.(pca_mean_vec[i_o] .+ sum(((pca_weights_here .* σ_real) .* pca_components[i_o]), dims=2))[:] # this is the PCA noise, so we add the mean and scale by the weights, and sum over all components
 
             if reference_to_truth # we want to take a principled step in the loss direction via gradient descent.
                 learning_rates[i_o] = FT(0.1) * inv.(maximum(abs.(dlossdps[i_o]))) # this is the learning rate, which is just a hyperparameter to control how much we wiggle the parameters, so we can adjust it later if needed
@@ -609,8 +614,8 @@ function get_relaxation_timescale_type(::Val{:neural_network_pca_noise}, param_s
             else # we are just stirring things up, we want to take a step such that the maximum df is about 1. so df/dp * dp = 1, dp = 1/(df/dp)
                 if !specific_toggle
                     learning_rates[i_o] = FT(0.2) * inv.(maximum(abs.(dlossdps[i_o]))) # dτ (dloss) is O(1) so dp = 1/max(dlossdp) # we go with 0.2 bc with the gaussian noise, that will go up to 0.5 ish either way and we don't wanna wiggle things too much as that de-trains the model. (then again we can go higher bc PCA narrows the effect to only a few neurons)
-                    # learning_rates[i_o] = FT(0.1) * (dlossdps[i_o] ./ (maximum(abs.(dlossdps[i_o])))) # dp is in gradient direction, max value O(1)
-                    # no /= n_outputs here, they can overlap so we just let cedmf figure it out, we want each contribution to reach peak on its own i think...
+                # learning_rates[i_o] = FT(0.1) * (dlossdps[i_o] ./ (maximum(abs.(dlossdps[i_o])))) # dp is in gradient direction, max value O(1)
+                # no /= n_outputs here, they can overlap so we just let cedmf figure it out, we want each contribution to reach peak on its own i think...
                 else
                     learning_rates[i_o] = FT(1.0) # this is the learning rate (we're already in dp units, it's already in units of dp to move output by 1)
                 end
@@ -620,20 +625,20 @@ function get_relaxation_timescale_type(::Val{:neural_network_pca_noise}, param_s
             dps[i_o] .*= dp_weights[i_o] # scale the parameters by the output weight, this is just a hyperparameter to control how much we wiggle the parameters, so we can adjust it later if needed
             # @warn "pca_mean_vec[$i_o] = $(pca_mean_vec[i_o]); dlossdps[$i_o] = $(dlossdps[i_o]); pca_weights_here = $(pca_weights_here); pca_components[$i_o] = $(pca_components[i_o])"
         end
-        
+
         # @warn "dlossdps = $(dlossdps); dps = $dps; " # pca_components = $(pca_components); pca_explained_variance = $(pca_explained_variance); learning_rates = $(learning_rates);" # @info doesn't seem to work on workers idk why...
-        
+
 
         dp = reduce(+, dps) # sum the gradients over all outputs, this is the gradient of the loss with respect to the parameters, which is just the PCA noise scaled by the weights and summed over all components
 
     end
-    
+
 
 
     neural_network_params = copy(namelist["relaxation_timescale_params"]["neural_microphysics_relaxation_network"]) # copy so no mutate this is the neural network params, which are just the PCA noise scaled by the weights and summed over all components
 
     # @warn "dp = $dp; neural_network_params = $neural_network_params"
-    
+
     # essentially we're getting how much we'd have to wiggle each parameter to get a change in the otput, but we dont want to wiggle all the parameters.
     # the wiggle should look like 
 
@@ -644,10 +649,12 @@ function get_relaxation_timescale_type(::Val{:neural_network_pca_noise}, param_s
 
     # neural_network_params = create_svector(FTNN.(pca_mean_vec .+ sum( ((pca_weights .* inv.(pca_explained_variance)).* pca_components), dims=2) )[:]) # this is the PCA noise, so we add the mean and scale by the weights, and sum over all components
     # @warn "new Neural network params: $(neural_network_params)"
-    flush(stdout); flush(stderr)
+    flush(stdout)
+    flush(stderr)
 
     # @warn "dp = $(dp); " # pca_weights = $(pca_weights); pca_components = $(pca_components); pca_explained_variance = $(pca_explained_variance)"
-    flush(stdout); flush(stderr)
+    flush(stdout)
+    flush(stderr)
     # @error "dp = $(dp); old_neural_network_params = $(neural_network_params); pca_weights = $(pca_weights); pca_components = $(pca_components); pca_explained_variance = $(pca_explained_variance)"
     # flush(stdout); flush(stderr)
     # error("have i printed? if not why?")
