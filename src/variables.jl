@@ -199,6 +199,7 @@ cent_aux_vars_up(FT, local_geometry, edmf, calibrate_io_val::Val{calibrate_io}) 
     q_liq = FT(0),
     q_ice = FT(0),
     T = FT(0),
+    CAPE = FT(0), # my addition
     p = FT(0), # store this instead of constantly recalculating it [ both phasenonequil and phaseequil store ρ but phaseequil doesn't store p ] -- note typically in our case it should be the same as p_c but better safe than sorry.
     RH = FT(0),
     (calibrate_io ? (; ) : (; RH_liq = FT(0), RH_ice = FT(0)))..., # RH for liquid and ice, i.e. the ratio of q_vap to q_vap_sat_liq/ice
@@ -289,6 +290,7 @@ cent_aux_vars_edmf(::Type{FT}, local_geometry, edmf, calibrate_io_val::Val{calib
             # tendencies = cent_prognostic_vars_up(FT, edmf), # storage for tendencies limiter so we can reuse same memory
             # tendencies_adjustments = cent_prognostic_vars_up(FT, edmf), # storage for tendencies limiter so we can reuse same memory
             # prognostic = cent_prognostic_vars_up(FT, edmf), # storage for prognostic bulk w/ no clippings so we can be sure we have the true bulk for limiting
+            CAPE = FT(0), # my addition
         ),
         up = ntuple(i -> cent_aux_vars_up(FT, local_geometry, edmf, calibrate_io_val), Val(n_updrafts(edmf))),
         en = (;
@@ -304,6 +306,7 @@ cent_aux_vars_edmf(::Type{FT}, local_geometry, edmf, calibrate_io_val::Val{calib
             (calibrate_io ? (; ) : (; RH_liq = FT(0), RH_ice = FT(0)))...,
             MSE = FT(0), # my addition
             ∂MSE∂z = FT(0), # my addition
+            CAPE = FT(0), # my addition
             s = FT(0),
             T = FT(0),
             p = FT(0), # store this instead of constantly recalculating it [ both phasenonequil and phaseequil store ρ but phaseequil doesn't store p ] -- note typically in our case it should be the same as p_c but better safe than sorry.
@@ -417,6 +420,146 @@ cent_aux_vars_edmf(::Type{FT}, local_geometry, edmf, calibrate_io_val::Val{calib
         (calibrate_io ? (;) : (; 
             ϕ_up_cubed = FT(0), # temporary for cubed updraft variables in grid mean 3rd moment functions
         ))...,
+        #
+        # SHOC diagnostic outputs - everything SHOC computes for debugging
+        # shoc = (;
+        #     # Stability and length scales
+        #     N2 = FT(0),                    # Brunt-Väisälä frequency squared
+        #     pblh = FT(0),                  # Planetary boundary layer height
+        #     l_inf = FT(0),                 # Integral length scale
+        #     mixing_length = FT(0),         # Mixing length
+        #     wstar = FT(0),                 # Convective velocity scale
+        #     tscale = FT(0),                # Convective time scale
+            
+        #     # TKE and second moments
+        #     tke_eff = FT(0),               # Effective TKE (max of TKE, MINTKE)
+        #     w2 = FT(0),                    # Vertical velocity variance (2/3 * TKE)
+        #     w3 = FT(0),                    # Third moment of vertical velocity
+        #     thl_var = FT(0),               # Liquid potential temperature variance
+        #     qt_var = FT(0),                # Total water variance
+        #     thl_qt_cov = FT(0),            # Covariance between thl and qt
+        #     wthl_sec = FT(0),              # Liquid potential temperature flux
+        #     wqw_sec = FT(0),               # Total water flux
+            
+        #     # Diffusivities
+        #     Km = FT(0),                    # Momentum diffusivity
+        #     Kh = FT(0),                    # Heat/moisture diffusivity
+            
+        #     # PDF and cloud outputs
+        #     cloud_fraction = FT(0),        # Cloud fraction from PDF
+        #     ql_mean = FT(0),               # Mean liquid water from PDF
+        #     qi_mean = FT(0),               # Mean ice water from PDF
+        #     qc_total = FT(0),              # Total condensate (ql + qi)
+        #     wqls = FT(0),                  # Condensate flux from PDF
+        #     wthv_sec = FT(0),              # Virtual potential temperature flux (buoyancy flux)
+        #     ql_var = FT(0),                # Liquid water variance from PDF
+            
+        #     # PDF diagnostic inputs
+        #     pdf_qt_mean = FT(0),           # Mean total water fed to PDF
+        #     pdf_thl_mean = FT(0),          # Mean liquid potential temperature fed to PDF
+        #     pdf_qt_var_input = FT(0),      # Qt variance fed to PDF
+        #     pdf_thl_var_input = FT(0),     # Thl variance fed to PDF
+        #     pdf_thl_qt_cov_input = FT(0),  # Thl-qt covariance fed to PDF
+            
+        #     # PDF plume state diagnostics
+        #     pdf_thl1_1 = FT(0),            # Liquid potential temperature in plume 1a
+        #     pdf_thl1_2 = FT(0),            # Liquid potential temperature in plume 1b
+        #     pdf_qw1_1 = FT(0),             # Total water in plume 1a
+        #     pdf_qw1_2 = FT(0),             # Total water in plume 1b
+        #     pdf_w1_1 = FT(0),              # Vertical velocity in plume 1a
+        #     pdf_w1_2 = FT(0),              # Vertical velocity in plume 1b
+        #     pdf_area_frac = FT(0),         # Bimodal area fraction (a)
+            
+        #     # PDF saturation diagnostics (SIGNED - can be negative for undersaturation)
+        #     pdf_qs1 = FT(0),               # Saturation mixing ratio in plume 1a
+        #     pdf_qs2 = FT(0),               # Saturation mixing ratio in plume 1b
+        #     pdf_s1_signed = FT(0),         # Saturation deficit in plume 1a (qt - qs, can be negative)
+        #     pdf_s2_signed = FT(0),         # Saturation deficit in plume 1b (qt - qs, can be negative)
+        #     pdf_qsat_mean = FT(0),         # Mean saturation water vapor feed to PDF
+            
+        #     # get_qc_stats_from_moments outputs for debugging
+        #     ql_from_moments = FT(0),       # Cloud liquid from Gaussian PDF (get_qc_stats_from_moments)
+        #     qi_from_moments = FT(0),       # Cloud ice from Gaussian PDF (get_qc_stats_from_moments)
+        #     w_ql_from_moments = FT(0),     # Vertical flux of ql from moments
+        #     w_qi_from_moments = FT(0),     # Vertical flux of qi from moments
+        #     cov_ql_qt_from_moments = FT(0), # Covariance between ql and qt from moments
+        #     cov_ql_h_from_moments = FT(0),  # Covariance between ql and θ_li from moments
+            
+        #     # Standard deviations of qt in cloudy regions
+        #     ql_qt_sd = FT(0),              # Std dev of qt where ql > 0
+        #     qi_qt_sd = FT(0),              # Std dev of qt where qi > 0
+
+        #     qc_mean_pdf = FT(0),           # Mean cloud condensate from PDF (for debugging against ql_mean + qi_mean
+        #     w_qc_cov_pdf = FT(0),          # Covariance between w and qc from PDF (for debugging against wqls
+        #     ql_pdf = FT(0),                # PDF of ql (for debugging against ql_mean and ql_var
+        #     qi_pdf = FT(0),                # PDF of qi (for debugging against qi_mean and qi_var
+            
+        #     # Intermediate diagnostics for debugging w_qi_cov spike
+        #     pdf_cloud_frac = FT(0),        # Φ - Cloud fraction from Gaussian CDF
+        #     pdf_alpha = FT(0),             # α - Normalized saturation deficit (s_mean/s_std)
+        #     phase_frac_liq = FT(0),        # f_liq - Liquid fraction
+        #     phase_frac_ice = FT(0),        # f_ice - Ice fraction
+        #     flux_scale_liq = FT(0),        # scale_l - Flux scaling factor for liquid (prognostic only)
+        #     flux_scale_ice = FT(0),        # scale_i - Flux scaling factor for ice (prognostic only)
+        #     w_ql_pot = FT(0),              # Potential liquid flux before scaling
+        #     w_qi_pot = FT(0),              # Potential ice flux before scaling
+        # )...,
+        # cSigma = (;
+        #     # cSigma correlation/covariance matrix outputs
+        #     # Stored as symmetric 7x7 matrix: [w, ql, qr, qi, qs, qt, h]
+        #     # For memory efficiency, store unique elements of the correlation matrix
+        #     csigma_corr_w_ql = FT(0),      # Correlation: w - ql
+        #     csigma_corr_w_qr = FT(0),      # Correlation: w - qr
+        #     csigma_corr_w_qi = FT(0),      # Correlation: w - qi
+        #     csigma_corr_w_qs = FT(0),      # Correlation: w - qs
+        #     csigma_corr_w_qt = FT(0),      # Correlation: w - qt
+        #     csigma_corr_w_h = FT(0),       # Correlation: w - h
+        #     csigma_corr_ql_qr = FT(0),     # Correlation: ql - qr
+        #     csigma_corr_ql_qi = FT(0),     # Correlation: ql - qi
+        #     csigma_corr_ql_qs = FT(0),     # Correlation: ql - qs
+        #     csigma_corr_ql_qt = FT(0),     # Correlation: ql - qt
+        #     csigma_corr_ql_h = FT(0),      # Correlation: ql - h
+        #     csigma_corr_qr_qi = FT(0),     # Correlation: qr - qi
+        #     csigma_corr_qr_qs = FT(0),     # Correlation: qr - qs
+        #     csigma_corr_qr_qt = FT(0),     # Correlation: qr - qt
+        #     csigma_corr_qr_h = FT(0),      # Correlation: qr - h
+        #     csigma_corr_qi_qs = FT(0),     # Correlation: qi - qs
+        #     csigma_corr_qi_qt = FT(0),     # Correlation: qi - qt
+        #     csigma_corr_qi_h = FT(0),      # Correlation: qi - h
+        #     csigma_corr_qs_qt = FT(0),     # Correlation: qs - qt
+        #     csigma_corr_qs_h = FT(0),      # Correlation: qs - h
+        #     csigma_corr_qt_h = FT(0),      # Correlation: qt - h
+            
+        #     # cSigma covariance matrix elements (diagonal and off-diagonal)
+        #     csigma_cov_w = FT(0),          # Covariance: var(w)
+        #     csigma_cov_ql = FT(0),         # Covariance: var(ql)
+        #     csigma_cov_qr = FT(0),         # Covariance: var(qr)
+        #     csigma_cov_qi = FT(0),         # Covariance: var(qi)
+        #     csigma_cov_qs = FT(0),         # Covariance: var(qs)
+        #     csigma_cov_qt = FT(0),         # Covariance: var(qt)
+        #     csigma_cov_h = FT(0),          # Covariance: var(h)
+        #     csigma_cov_w_ql = FT(0),       # Covariance: w - ql
+        #     csigma_cov_w_qr = FT(0),       # Covariance: w - qr
+        #     csigma_cov_w_qi = FT(0),       # Covariance: w - qi
+        #     csigma_cov_w_qs = FT(0),       # Covariance: w - qs
+        #     csigma_cov_w_qt = FT(0),       # Covariance: w - qt
+        #     csigma_cov_w_h = FT(0),        # Covariance: w - h
+        #     csigma_cov_ql_qr = FT(0),      # Covariance: ql - qr
+        #     csigma_cov_ql_qi = FT(0),      # Covariance: ql - qi
+        #     csigma_cov_ql_qs = FT(0),      # Covariance: ql - qs
+        #     csigma_cov_ql_qt = FT(0),      # Covariance: ql - qt
+        #     csigma_cov_ql_h = FT(0),       # Covariance: ql - h
+        #     csigma_cov_qr_qi = FT(0),      # Covariance: qr - qi
+        #     csigma_cov_qr_qs = FT(0),      # Covariance: qr - qs
+        #     csigma_cov_qr_qt = FT(0),      # Covariance: qr - qt
+        #     csigma_cov_qr_h = FT(0),       # Covariance: qr - h
+        #     csigma_cov_qi_qs = FT(0),      # Covariance: qi - qs
+        #     csigma_cov_qi_qt = FT(0),      # Covariance: qi - qt
+        #     csigma_cov_qi_h = FT(0),       # Covariance: qi - h
+        #     csigma_cov_qs_qt = FT(0),      # Covariance: qs - qt
+        #     csigma_cov_qs_h = FT(0),       # Covariance: qs - h
+        #     csigma_cov_qt_h = FT(0),       # Covariance: qt - h
+        # ),
     )
 )
 

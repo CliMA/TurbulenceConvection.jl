@@ -171,80 +171,83 @@ function get_qc_stats_from_moments(
     return ql_out, qi_out, cov_ql_qt, cov_ql_h, w_ql_cov, w_qi_cov, final_z, final_z, qc_pdf_pot, w_qc_pot, ql_pdf, qi_pdf, Φ, α, f_liq, f_ice, scale_l, scale_i, w_ql_pot, w_qi_pot
 end
 
-"""
-    get_saturation_adjust_cond_evap(param_set, ts, qt_var, h_var, h_qt_cov, Δt, ql, qi)
+# """
+#     get_saturation_adjust_cond_evap(param_set, ts, qt_var, h_var, h_qt_cov, Δt, ql, qi)
 
-Returns the gross SGS condensation and evaporation rates for latent heating and TKE production.
+# Returns the gross SGS condensation and evaporation rates for latent heating and TKE production.
 
-Computes the target condensate from the SGS supersaturation integral and compares to the current
-condensate (ql + qi) to determine whether condensation or evaporation occurred:
-- If qc_old > qc_target: evaporation removed the excess
-- If qc_old < qc_target: condensation formed the difference
+# Computes the target condensate from the SGS supersaturation integral and compares to the current
+# condensate (ql + qi) to determine whether condensation or evaporation occurred:
+# - If qc_old > qc_target: evaporation removed the excess
+# - If qc_old < qc_target: condensation formed the difference
 
-Both rates capture the SGS processes driving latent heat release, even when net changes are small.
-For nonequilibrium, preserves the existing liquid fraction when computing the saturation state.
-"""
-function get_saturation_adjust_cond_evap(
-    param_set::APS,
-    ts::TD.ThermodynamicState{FT},
-    qt_var::FT,
-    h_var::FT,
-    h_qt_cov::FT,
-    Δt::FT,
-    ql::FT,
-    qi::FT,
-) where {FT}
-    thermo_params = TCP.thermodynamics_params(param_set)
+# Both rates capture the SGS processes driving latent heat release, even when net changes are small.
+# For nonequilibrium, preserves the existing liquid fraction when computing the saturation state.
+# """
+# function get_saturation_adjust_cond_evap(
+#     param_set::APS,
+#     ts::TD.ThermodynamicState{FT},
+#     qt_var::FT,
+#     h_var::FT,
+#     h_qt_cov::FT,
+#     Δt::FT,
+#     ql::FT,
+#     qi::FT,
+# ) where {FT}
 
-    if Δt <= zero(FT)
-        return zero(FT), zero(FT)
-    end
+#     error("We can't raelly do this without knowing the past qt, and rates of thigns going to precip etc...")
 
-    p = TD.air_pressure(thermo_params, ts)
-    θli = TD.liquid_ice_pottemp(thermo_params, ts)
-    qt = TD.total_specific_humidity(thermo_params, ts)
+#     thermo_params = TCP.thermodynamics_params(param_set)
 
-    # Preserve existing liquid fraction (for noneq) when defining the saturation-adjusted state.
-    denom = ql + qi
-    liq_frac = (denom > eps(FT)) ? clamp(ql / denom, zero(FT), one(FT)) : TD.liquid_fraction(thermo_params, ts)
+#     if Δt <= zero(FT)
+#         return zero(FT), zero(FT)
+#     end
 
-    # Linearize saturation deficit around the saturation-adjusted mean state.
-    ts_sat = PhaseEquil_pθq_given_liquid_fraction(thermo_params, p, θli, qt, liq_frac)
-    T_sat = TD.air_temperature(thermo_params, ts_sat)
-    q_sat = TD.vapor_specific_humidity(thermo_params, ts_sat)
-    Π_sat = TD.exner(thermo_params, ts_sat)
-    dqsat_dT = TD.∂q_vap_sat_∂T(thermo_params, liq_frac, T_sat, q_sat)
+#     p = TD.air_pressure(thermo_params, ts)
+#     θli = TD.liquid_ice_pottemp(thermo_params, ts)
+#     qt = TD.total_specific_humidity(thermo_params, ts)
 
-    s_mean = qt - q_sat
-    dsdqt = one(FT)
-    dsdθli = -dqsat_dT * Π_sat
+#     # Preserve existing liquid fraction (for noneq) when defining the saturation-adjusted state.
+#     denom = ql + qi
+#     liq_frac = (denom > eps(FT)) ? clamp(ql / denom, zero(FT), one(FT)) : TD.liquid_fraction(thermo_params, ts)
 
-    qt_var = resolve_nan(qt_var, zero(FT))
-    h_var = resolve_nan(h_var, zero(FT))
-    h_qt_cov = resolve_nan(h_qt_cov, zero(FT))
+#     # Linearize saturation deficit around the saturation-adjusted mean state.
+#     ts_sat = PhaseEquil_pθq_given_liquid_fraction(thermo_params, p, θli, qt, liq_frac)
+#     T_sat = TD.air_temperature(thermo_params, ts_sat)
+#     q_sat = TD.vapor_specific_humidity(thermo_params, ts_sat)
+#     Π_sat = TD.exner(thermo_params, ts_sat)
+#     dqsat_dT = TD.∂q_vap_sat_∂T(thermo_params, liq_frac, T_sat, q_sat)
 
-    # SGS saturation-deficit variance from linearized thermodynamics.
-    s_var = max(dsdqt^2 * qt_var + dsdθli^2 * h_var + FT(2) * dsdqt * dsdθli * h_qt_cov, FT(1e-12))
-    s_std = sqrt(s_var)
+#     s_mean = qt - q_sat
+#     dsdqt = one(FT)
+#     dsdθli = -dqsat_dT * Π_sat
 
-    # Target condensate from SGS supersaturation integral: qc_target = E[max(s, 0)]
-    qc_target = if s_std <= eps(FT)
-        max(s_mean, zero(FT))
-    else
-        α = s_mean / s_std
-        inv_sqrt2 = one(FT) / sqrt(FT(2))
-        Φ = FT(0.5) * (one(FT) + SpecialFunctions.erf(α * inv_sqrt2))
-        φ = exp(-FT(0.5) * α^2) / sqrt(FT(2) * FT(π))
-        max(s_mean * Φ + s_std * φ, zero(FT))
-    end
+#     qt_var = resolve_nan(qt_var, zero(FT))
+#     h_var = resolve_nan(h_var, zero(FT))
+#     h_qt_cov = resolve_nan(h_qt_cov, zero(FT))
 
-    # Current condensate before adjustment.
-    qc_old = max(ql + qi, zero(FT))
+#     # SGS saturation-deficit variance from linearized thermodynamics.
+#     s_var = max(dsdqt^2 * qt_var + dsdθli^2 * h_var + FT(2) * dsdqt * dsdθli * h_qt_cov, FT(1e-12))
+#     s_std = sqrt(s_var)
 
-    # Determine gross rates from the change.
-    Δqc = qc_target - qc_old
-    cond_rate = max(Δqc, zero(FT)) / Δt
-    evap_rate = max(-Δqc, zero(FT)) / Δt
+#     # Target condensate from SGS supersaturation integral: qc_target = E[max(s, 0)]
+#     qc_target = if s_std <= eps(FT)
+#         max(s_mean, zero(FT))
+#     else
+#         α = s_mean / s_std
+#         inv_sqrt2 = one(FT) / sqrt(FT(2))
+#         Φ = FT(0.5) * (one(FT) + SpecialFunctions.erf(α * inv_sqrt2))
+#         φ = exp(-FT(0.5) * α^2) / sqrt(FT(2) * FT(π))
+#         max(s_mean * Φ + s_std * φ, zero(FT))
+#     end
 
-    return cond_rate, evap_rate
-end
+#     # Current condensate before adjustment.
+#     qc_old = max(ql + qi, zero(FT))
+
+#     # Determine gross rates from the change.
+#     Δqc = qc_target - qc_old
+#     cond_rate = max(Δqc, zero(FT)) / Δt
+#     evap_rate = max(-Δqc, zero(FT)) / Δt
+
+#     return cond_rate, evap_rate
+# end

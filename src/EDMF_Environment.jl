@@ -249,6 +249,8 @@ function microphysics!(
                         w_noneq = w[k]
                     end
 
+                    # TODO :: We can leverage sat-adjust to estimate what q_c (and maybe q_l, q_i) would be from the given q_tot, QTvar, θ_li, Hvar... (linearizing about mean like SHOC).
+                    # Then based on how much qc, ql, qi we actually have we might be able to estimate condensate_qt_SD for existing condensate (and uncondensed regions)... idk.
                     if !iszero(moisture_model.condensate_qt_SD)
                         # TODO: Consider turning this off for when we are using cloaks.... also set an error in the quadrature branches
                         q_tot_sd = sqrt(aux_en.QTvar[k])
