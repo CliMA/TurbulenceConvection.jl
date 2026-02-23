@@ -1245,9 +1245,15 @@ function update_aux!(edmf::EDMFModel, state::State, surf::SurfaceBase, param_set
     cp  = TCP.cp_d(param_set)
 
     diffusive_flux_ql_c = aux_tc.temporary_1
-    @. diffusive_flux_ql_c = Ic(aux_tc_f.diffusive_flux_ql)
     diffusive_flux_qi_c = aux_tc.temporary_2
-    @. diffusive_flux_qi_c = Ic(aux_tc_f.diffusive_flux_qi)
+
+    if edmf.moisture_model isa NonEquilibriumMoisture
+        @. diffusive_flux_ql_c = Ic(aux_tc_f.diffusive_flux_ql)
+        @. diffusive_flux_qi_c = Ic(aux_tc_f.diffusive_flux_qi)
+    else # Equilibrium - we need to get the saturated part of w'qt'.... doable.
+        @. diffusive_flux_ql_c = zero(FT)
+        @. diffusive_flux_qi_c = zero(FT)
+    end
 
     # Use a loop over grid points instead of dot broadcasting complex thermodynamic relationships,
     # as deeply nested ClimaCore macro expansions of TD.* methods can confuse the MatrixFields stencil inference (causing ld UndefVarError)
