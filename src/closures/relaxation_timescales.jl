@@ -328,7 +328,7 @@ function get_τ_helper(param_set::APS, microphys_params::ACMP, relaxation_timesc
     return (; τ_liq=τ_liq, τ_ice=τ_ice)
 end
 
-# :extended_neural_network
+# :neural_network_extended
 function get_τ_helper(param_set::APS, microphys_params::ACMP, relaxation_timescale::ExtendedNeuralNetworkRelaxationTimescale, q::TD.PhasePartition, T::FT, p::FT, ρ::FT, w::FT, tke::FT, qt_var::FT, h_var::FT; N_l::FT=FT(NaN), N_i_raw::FT=FT(NaN), N_i_adjusted::FT=FT(NaN), N_INP_top::FT=FT(NaN), f_ice_mult::FT=FT(1), q_sno::FT=FT(0), massflux::FT=FT(0), dTdz::FT=FT(0), w_i::FT=FT(0), apply_massflux_boost::Bool=false, apply_sedimentation_boost::Bool=false) where {FT}
     # convert params to static_strided_array as simplechains doesn't accept svectors directly [if it comes to it we can set the static_strided_array as a global, it more than doubles the call time of the NN)]
     τ_liq, τ_ice, _, _ = predict_τ_extended(ρ, T, q.liq, q.ice, w, q.tot, tke, qt_var, h_var, (relaxation_timescale.neural_network, to_static_strided_array(relaxation_timescale.neural_network_params)), relaxation_timescale.model_x_0_characteristic) # pass in the NN and get the τs out, neural_network should be a global variable?
@@ -1020,17 +1020,17 @@ function get_N_l_helper(param_set::APS, relaxation_timescale::BaseNeuralNetworkR
     return N_l
 end
 
-# :extended_neural_network
+# :neural_network_extended
 function get_N_i_helper(param_set::APS, relaxation_timescale::ExtendedNeuralNetworkRelaxationTimescale, q::TD.PhasePartition, T::FT, ρ::FT, w::FT, tke::FT, qt_var::FT, h_var::FT) where {FT}
     # model_x_0_characteristic = relaxation_timescale.model_x_0_characteristic # get the model_x_0_characteristic from the relaxation_timescale
-    _, _, _, N_i = predict_τ_extended(ρ, T, q.liq, q.ice, w, q.tot, tke, qt_var, h_var, (relaxation_timescale.extended_neural_network, to_static_strided_array(relaxation_timescale.extended_neural_network_params)), relaxation_timescale.extended_model_x_0_characteristic) # pass in the NN and get the τs out, neural_network should be a global variable?
+    _, _, _, N_i = predict_τ_extended(ρ, T, q.liq, q.ice, w, q.tot, tke, qt_var, h_var, (relaxation_timescale.neural_network_extended, to_static_strided_array(relaxation_timescale.neural_network_extended_params)), relaxation_timescale.extended_model_x_0_characteristic) # pass in the NN and get the τs out, neural_network should be a global variable?
 
     return N_i
 end
 
 function get_N_l_helper(param_set::APS, relaxation_timescale::ExtendedNeuralNetworkRelaxationTimescale, q::TD.PhasePartition, T::FT, ρ::FT, w::FT, tke::FT, qt_var::FT, h_var::FT) where {FT}
     # model_x_0_characteristic = relaxation_timescale.model_x_0_characteristic # get the model_x_0_characteristic from the relaxation_timescale
-    _, _, N_l, _ = predict_τ_extended(ρ, T, q.liq, q.ice, w, q.tot, tke, qt_var, h_var, (relaxation_timescale.extended_neural_network, to_static_strided_array(relaxation_timescale.extended_neural_network_params)), relaxation_timescale.extended_model_x_0_characteristic) # pass in the NN and get the τs out, neural_network should be a global variable?
+    _, _, N_l, _ = predict_τ_extended(ρ, T, q.liq, q.ice, w, q.tot, tke, qt_var, h_var, (relaxation_timescale.neural_network_extended, to_static_strided_array(relaxation_timescale.neural_network_extended_params)), relaxation_timescale.extended_model_x_0_characteristic) # pass in the NN and get the τs out, neural_network should be a global variable?
 
     return N_l
 end
