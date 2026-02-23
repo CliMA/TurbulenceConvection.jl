@@ -3027,7 +3027,6 @@ function compute_en_tendencies!(
         R_d     = TCP.R_d(param_set)
         ℓ_mix   = FT(500) 
 
-
         @inbounds for k in real_center_indices(grid)
             
             # --- A. Thermodynamics ---
@@ -3153,7 +3152,14 @@ function compute_en_tendencies!(
                 aux_en.instability[k] = 0
                 aux_en.stability[k]   = -total_instability
             end
-            
+
+            # test a CAPE thingy...
+            # ρatke_convective_production[k] = (aux_en.CAPE[k]/20) * (aux_en.latent_heating_pos[k] + aux_en.latent_heating_neg[k]) * 1e-4
+            # aux_tc_f = face_aux_turbconv(state)
+            # do in places with CAPE but limit in regions of very low cape just default to (0 rn since this is just the convective one but left possibility for later)
+            # ρatke_convective_production[k] += safe_clamp((diffusive_flux_qc_c * g) * min(aux_en.CAPE[k]/30, FT(1.0)), zero(FT), sqrt(2*aux_en.CAPE[k] * aux_en.q_liq[k]))
+            # ρatke_convective_production[k] = zero(FT)
+
         end
         # -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-= #
     end

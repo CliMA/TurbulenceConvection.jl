@@ -1,5 +1,6 @@
 ## Run test on cases and plot relative to LES
-
+using Pkg
+Pkg.activate(expanduser("~/Research_Schneider/CliMA/TurbulenceConvection.jl/"))
 using JLD2
 using Random
 using LinearAlgebra
@@ -141,7 +142,8 @@ for flight_number in flight_numbers
             # nonequilibrium_moisture_scheme = :exponential_T_scaling_ice
             # nonequilibrium_moisture_scheme = :neural_network
             # nonequilibrium_moisture_scheme = :Base
-            dt_string = "adapt_dt__dt_min_0.5__dt_max_1.0"
+            # dt_string = "adapt_dt__dt_min_0.5__dt_max_1.0"
+            dt_string = "adapt_dt__dt_min_2.0__dt_max_4.0"
             # dt_string = "adapt_dt__dt_min_5.0__dt_max_10.0"
             # dt_string = "adapt_dt__dt_min_10.0__dt_max_20.0"
             method = "best_particle_final"
@@ -422,8 +424,9 @@ for flight_number in flight_numbers
         # namelist["stats_io"]["frequency"] = .1
         # namelist["stats_io"]["frequency"] = 30.0
         # namelist["stats_io"]["frequency"] = namelist["time_stepping"]["dt_min"] # 1 timestep
-        namelist["stats_io"]["frequency"] = 60.
+        # namelist["stats_io"]["frequency"] = 60.
         namelist["stats_io"]["calibrate_io"] = false
+        # namelist["stats_io"]["frequency"] = 10.
 
         namelist["stats_io"]["frequency"] = 600.
         # namelist["stats_io"]["calibrate_io"] = true
@@ -477,8 +480,15 @@ for flight_number in flight_numbers
         # namelist["meta"]["simname"] = "SOCRATES_RF01_obs_data"
         # namelist["meta"]["flight_number"] = 01
 
-        namelist["meta"]["simname"] = "SOCRATES_RF09_obs_data"
-        namelist["meta"]["flight_number"] = 9
+        namelist["meta"]["flight_number"] = 09
+        namelist["meta"]["simname"] = "SOCRATES_RF" * string(namelist["meta"]["flight_number"]; pad = 2) * "_obs_data"
+
+        
+
+        # namelist["microphysics"]["pow_icenuc"] = zero(FT) # all liquid
+        namelist["microphysics"]["pow_liqnuc"] = FT(Inf) # all ice
+        # namelist["turbulence"]["EDMF_PrognosticTKE"]["convective_tke_buoyancy_coeff"] = FT(0)
+
 
         namelist["user_params"]["min_N_ice"] = FT(0)
         namelist["user_params"]["max_τ_ice"] = FT(Inf)
@@ -539,7 +549,6 @@ for flight_number in flight_numbers
         # namelist["turbulence"]["EDMF_PrognosticTKE"]["convective_tke_ed_scaling_factor"] = FT(1)
         # namelist["turbulence"]["EDMF_PrognosticTKE"]["tke_conv_entr_detr_rate_inv_s"] = FT(0)
 
-        # namelist["turbulence"]["EDMF_PrognosticTKE"]["convective_tke_model_type"] = "convective_tke_production_and_graft_only"
         # namelist["turbulence"]["EDMF_PrognosticTKE"]["convective_tke_model_type"] = "convective_tke"
 
         # namelist["user_params"]["S_ice_min_activation"] = FT(0.1) # default 0.01, higher means less ice nucleation

@@ -572,13 +572,13 @@ function compute_shoc_pdf_and_ql_qi_fluxes!(
     aux_en = center_aux_environment(state)
     aux_gm = center_aux_grid_mean(state)
     aux_tc = center_aux_turbconv(state)
-    aux_shoc = aux_tc.shoc  # SHOC diagnostic storage
+    # aux_shoc = aux_tc.shoc  # SHOC diagnostic storage
     aux_tc_f = face_aux_turbconv(state)
     Ic = CCO.InterpolateF2C()
 
     @. w2_c = max((2 / 3) * tke, SHOC_MINTKE)
-    @. aux_shoc.w2 = w2_c  # Store for debugging
-    @. aux_shoc.tke_eff = w2_c * (3 / 2)  # Store effective TKE for debugging
+    # @. aux_shoc.w2 = w2_c  # Store for debugging
+    # @. aux_shoc.tke_eff = w2_c * (3 / 2)  # Store effective TKE for debugging
 
     if use_tc_second_moments
       thl_var_c = aux_en.Hvar
@@ -592,9 +592,9 @@ function compute_shoc_pdf_and_ql_qi_fluxes!(
       qt_var_c = @. SHOC_QW2TUNE * (ℓ_mix^2) * (∂qt∂z_c^2)
       thl_qt_cov_c = @. SHOC_QWTHL2TUNE * (ℓ_mix^2) * ∂θl∂z_c * ∂qt∂z_c
     end
-    @. aux_shoc.thl_var = thl_var_c  # Store for debugging
-    @. aux_shoc.qt_var = qt_var_c  # Store for debugging
-    @. aux_shoc.thl_qt_cov = thl_qt_cov_c  # Store for debugging
+    # @. aux_shoc.thl_var = thl_var_c  # Store for debugging
+    # @. aux_shoc.qt_var = qt_var_c  # Store for debugging
+    # @. aux_shoc.thl_qt_cov = thl_qt_cov_c  # Store for debugging
 
     if use_tc_wthird
       w3_c = aux_gm.W_third_m
@@ -605,12 +605,12 @@ function compute_shoc_pdf_and_ql_qi_fluxes!(
                        aux_en.θ_liq_ice, aux_en.p, Δz, grid, g; isotropy_c=isotropy_c)
       w3_c = Ic.(w3_f)
     end
-    @. aux_shoc.w3 = w3_c  # Store for debugging
+    # @. aux_shoc.w3 = w3_c  # Store for debugging
 
     @. wthl_sec_c = Ic.(wthl_f)
     @. wqw_sec_c = Ic.(wqw_f)
-    @. aux_shoc.wthl_sec = wthl_sec_c  # Store for debugging
-    @. aux_shoc.wqw_sec = wqw_sec_c  # Store for debugging
+    # @. aux_shoc.wthl_sec = wthl_sec_c  # Store for debugging
+    # @. aux_shoc.wqw_sec = wqw_sec_c  # Store for debugging
     w_en_c = aux_tc.w_en_c
 
     zero_field!(wqls_c)
@@ -643,28 +643,28 @@ function compute_shoc_pdf_and_ql_qi_fluxes!(
           liq_frac_mean = liq_frac_mean_k,
         )
 
-      # Store PDF diagnostics for debugging
-      aux_shoc.pdf_qt_mean[k] = qt_mean_k
-      aux_shoc.pdf_thl_mean[k] = thl_mean_k
-      aux_shoc.pdf_qt_var_input[k] = qt_var_k
-      aux_shoc.pdf_thl_var_input[k] = thl_var_k
-      aux_shoc.pdf_thl_qt_cov_input[k] = thl_qt_cov_k
+      # # Store PDF diagnostics for debugging
+      # aux_shoc.pdf_qt_mean[k] = qt_mean_k
+      # aux_shoc.pdf_thl_mean[k] = thl_mean_k
+      # aux_shoc.pdf_qt_var_input[k] = qt_var_k
+      # aux_shoc.pdf_thl_var_input[k] = thl_var_k
+      # aux_shoc.pdf_thl_qt_cov_input[k] = thl_qt_cov_k
       
-      # Store plume states
-      aux_shoc.pdf_thl1_1[k] = thl1_1_k
-      aux_shoc.pdf_thl1_2[k] = thl1_2_k
-      aux_shoc.pdf_qw1_1[k] = qw1_1_k
-      aux_shoc.pdf_qw1_2[k] = qw1_2_k
-      aux_shoc.pdf_w1_1[k] = w1_1_k
-      aux_shoc.pdf_w1_2[k] = w1_2_k
-      aux_shoc.pdf_area_frac[k] = a_k
+      # # Store plume states
+      # aux_shoc.pdf_thl1_1[k] = thl1_1_k
+      # aux_shoc.pdf_thl1_2[k] = thl1_2_k
+      # aux_shoc.pdf_qw1_1[k] = qw1_1_k
+      # aux_shoc.pdf_qw1_2[k] = qw1_2_k
+      # aux_shoc.pdf_w1_1[k] = w1_1_k
+      # aux_shoc.pdf_w1_2[k] = w1_2_k
+      # aux_shoc.pdf_area_frac[k] = a_k
       
-      # Store saturation values (SIGNED - can be negative for undersaturation)
-      aux_shoc.pdf_qs1[k] = qs1_k
-      aux_shoc.pdf_qs2[k] = qs2_k
-      aux_shoc.pdf_s1_signed[k] = s1_k  # NOT clipped, shows true saturation/undersaturation
-      aux_shoc.pdf_s2_signed[k] = s2_k  # NOT clipped
-      aux_shoc.pdf_qsat_mean[k] = (qs1_k + qs2_k) / FT(2)
+      # # Store saturation values (SIGNED - can be negative for undersaturation)
+      # aux_shoc.pdf_qs1[k] = qs1_k
+      # aux_shoc.pdf_qs2[k] = qs2_k
+      # aux_shoc.pdf_s1_signed[k] = s1_k  # NOT clipped, shows true saturation/undersaturation
+      # aux_shoc.pdf_s2_signed[k] = s2_k  # NOT clipped
+      # aux_shoc.pdf_qsat_mean[k] = (qs1_k + qs2_k) / FT(2)
 
         # Optional scaling to match existing env condensate (ql+qi) when state is not updated from PDF
         qc_mean_scaled = qc_mean_k
@@ -681,13 +681,15 @@ function compute_shoc_pdf_and_ql_qi_fluxes!(
         end
 
         aux_en.cloud_fraction[k] = cloud_frac_k
-        aux_shoc.cloud_fraction[k] = cloud_frac_k
-        aux_shoc.ql_mean[k] = qc_mean_scaled * liq_frac_mean_k
-        aux_shoc.qi_mean[k] = qc_mean_scaled * (FT(1) - liq_frac_mean_k)
-        aux_shoc.qc_total[k] = qc_mean_scaled
-        aux_shoc.wqls[k] = wqls_scaled
-        aux_shoc.wthv_sec[k] = _wthv_sec_k
-        aux_shoc.ql_var[k] = ql_var_scaled
+
+        # aux_shoc.cloud_fraction[k] = cloud_frac_k
+        # aux_shoc.ql_mean[k] = qc_mean_scaled * liq_frac_mean_k
+        # aux_shoc.qi_mean[k] = qc_mean_scaled * (FT(1) - liq_frac_mean_k)
+        # aux_shoc.qc_total[k] = qc_mean_scaled
+        # aux_shoc.wqls[k] = wqls_scaled
+        # aux_shoc.wthv_sec[k] = _wthv_sec_k
+        # aux_shoc.ql_var[k] = ql_var_scaled
+
       # Optionally partition total condensate into liquid and ice state variables
       # (only in equilibrium mode where q_liq/q_ice are diagnostic)
       # By default, only SGS fluxes are computed, not state variables
@@ -1209,7 +1211,7 @@ function compute_SHOC_fluxes!(edmf::EDMFModel, state::State, surf::SurfaceBase, 
     aux_en = center_aux_environment(state)
     aux_en_f = face_aux_environment(state)
     aux_tc = center_aux_turbconv(state)
-    aux_shoc = aux_tc.shoc  # SHOC diagnostic storage
+    # aux_shoc = aux_tc.shoc  # SHOC diagnostic storage
     prog_gm = center_prog_grid_mean(state)
     prog_pr = center_prog_precipitation(state)
     aux_tc_f = face_aux_turbconv(state)
@@ -1229,31 +1231,31 @@ function compute_SHOC_fluxes!(edmf::EDMFModel, state::State, surf::SurfaceBase, 
     else
         compute_brunt_vaisala!(N², state, param_set)
     end
-    @. aux_shoc.N2 = N²  # Store N² for debugging
+    # @. aux_shoc.N2 = N²  # Store N² for debugging
     
     # 2. Get TKE from TC environment (SHOC is a diagnostic closure, doesn't compute its own TKE)
     tke = aux_en.tke
     
     # 3. Compute integral length scale
     l_inf = compute_l_inf(tke, grid, Δz)
-    @. aux_shoc.l_inf = l_inf  # Store for debugging
+    # @. aux_shoc.l_inf = l_inf  # Store for debugging
     
     # 4. Estimate PBL height (simplified - use PBLH from state if available)
     pblh = FT(1000)  # Default, should use aux_gm.pblh or similar
-    @. aux_shoc.pblh = pblh  # Store for debugging
+    # @. aux_shoc.pblh = pblh  # Store for debugging
     
     # 5. Compute convective velocity scale (using ENVIRONMENT fields, not grid-mean)
     wthv_flux = aux_en.buoy  # Buoyancy flux in environment
     θ_virt = aux_en.θ_virt  # Environment virtual potential temperature
     wstar, tscale = compute_conv_velocity(wthv_flux, θ_virt, pblh, grid, g, Δz)
-    @. aux_shoc.wstar = wstar  # Store for debugging
-    @. aux_shoc.tscale = tscale  # Store for debugging
+    # @. aux_shoc.wstar = wstar  # Store for debugging
+    # @. aux_shoc.tscale = tscale  # Store for debugging
     
     # 6. Compute mixing length (or use TC precomputed value)
     if !use_tc_mixing_length
         compute_shoc_mixing_length!(ℓ_mix, tke, N², pblh, l_inf, tscale, grid, FT(SHOC_VK))
     end
-    @. aux_shoc.mixing_length = ℓ_mix  # Store for debugging
+    # @. aux_shoc.mixing_length = ℓ_mix  # Store for debugging
     
     # 7. Compute eddy diffusivities (or use TC precomputed values)
     if use_tc_kh_km
@@ -1264,8 +1266,8 @@ function compute_SHOC_fluxes!(edmf::EDMFModel, state::State, surf::SurfaceBase, 
         Kh_shoc = aux_tc.temporary_3
         compute_eddy_diffusivities!(Km_shoc, Kh_shoc, tke, ℓ_mix, FT(1.0))
     end
-    @. aux_shoc.Km = Km_shoc  # Store for debugging
-    @. aux_shoc.Kh = Kh_shoc  # Store for debugging
+    # @. aux_shoc.Km = Km_shoc  # Store for debugging
+    # @. aux_shoc.Kh = Kh_shoc  # Store for debugging
     
     # 8. Compute shear production (optional; TC already computes aux_en_2m.tke.shear)
     if !use_tc_shear

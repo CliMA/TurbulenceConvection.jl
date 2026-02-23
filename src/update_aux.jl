@@ -1216,6 +1216,59 @@ function update_aux!(edmf::EDMFModel, state::State, surf::SurfaceBase, param_set
     
     end
 
+    #=
+     update buoyancy to include SGS condensate transport contribution :: [ Sommeria and Deardorff (1977) (https://doi.org/10.1175/1520-0469(1977)034<0344:SSCIMO>2.0.CO;2) ,Cuijpers and Duynkerke (1993) (https://doi.org/10.1175/1520-0469(1993)050<3894:LESOTW>2.0.CO;2) ]
+        w'θ_v' = w'θ_l' + ((1 - ε_o) / ε_o) * θ_o * w'q_t' + χ * [(L_v / c_p) * (p_o / p)^(R_d / c_p) - (1 / ε_o) * θ_o] * w'q_l'
+        w'b' = (g/θ_v') w'θ_v'
+
+        So our qc (ql) contribution is:
+        (g/θ_v') * χ * [(L_v / c_p) * (p_o / p)^(R_d / c_p) - (1 / ε_o) * θ_o] * w'q_l'
+        
+        Simplification:
+        The term (p_o / p)^(R_d / c_p) is exactly 1/Π, where Π is the Exner function.
+        So we use TD.exner instead of pulling out Rd, p_o, p, etc.
+        We also use θ_liq_ice as our approximation for θ_o.
+        Since we need these pointwise thermodynamic variables, we evaluate and add the contribution directly in a loop.
+
+        :: I think the reason we need this is that the mean/bulk state doesnt fully capture the SGS ql picture w/o quadrature (bc variance is missed), and using w'qc' directly helps break through the fog
+        :: Condensate is a proxy for SGS buoyancy perturbations, which generate TKE.
+        :: I think we're just arguing that the updraft doesnt capture the entire buoyancy flux... 
+            we still need this environmental contribution, and the downgradient buoyancy diffusion doesn't quite cut it,
+            esp if SGS qc differs from that in the buoyancy gradient calculation, and expecially if w'qc' differs from downgradient diffusion (which is almost certainly true when the updrafts and condensate are highly correlated).
+    =#
+
+    # Constants
+    g   = TCP.grav(param_set)
+    ε_o = TCP.R_d(param_set) / TCP.R_v(param_set)
+    χ_l   = FT(1) # scaling factor, could be calibrated... [ assume high bc sat adjust rapid so ql is a good proxy for latent heat release and sgs buoyancy]
+    χ_i   = FT(.1) # scaling factor, could be calibrated... [ assume low bc ice is slow so qi is a poor proxy for latent heat release and sgs buoyancy]
+    cp  = TCP.cp_d(param_set)
+
+    diffusive_flux_ql_c = aux_tc.temporary_1
+    @. diffusive_flux_ql_c = Ic(aux_tc_f.diffusive_flux_ql)
+    diffusive_flux_qi_c = aux_tc.temporary_2
+    @. diffusive_flux_qi_c = Ic(aux_tc_f.diffusive_flux_qi)
+
+    # Use a loop over grid points instead of dot broadcasting complex thermodynamic relationships,
+    # as deeply nested ClimaCore macro expansions of TD.* methods can confuse the MatrixFields stencil inference (causing ld UndefVarError)
+    @inbounds for k in real_center_indices(grid)
+        Π = TD.exner(thermo_params, aux_en.ts[k])
+        L_v = TD.latent_heat_vapor(thermo_params, aux_en.ts[k])
+        L_s = TD.latent_heat_sublim(thermo_params, aux_en.ts[k])
+        θ_v = aux_en.θ_virt[k]
+        θ_o = aux_en.θ_liq_ice[k]
+
+        # Separating out liquid and ice components allows using L_v for liquid and L_s for ice separately
+        coeff_ql = (g / θ_v) * χ_l * ((L_v / cp) / Π - θ_o / ε_o)
+        coeff_qi = (g / θ_v) * χ_i * ((L_s / cp) / Π - θ_o / ε_o)
+
+        wb = coeff_ql * diffusive_flux_ql_c[k] + coeff_qi * diffusive_flux_qi_c[k] # w'b'
+
+        # aux_en_2m.tke.buoy[k] += safe_clamp(wb, zero(FT), sqrt(2*aux_en.CAPE[k])) # bound by existing CAPE
+        aux_en_2m.tke.buoy[k] += min(wb, sqrt(2*aux_en.CAPE[k])) # bound by existing CAPE
+
+    end
+
     #####
     ##### compute covariances tendencies
     #####
@@ -1250,7 +1303,21 @@ function update_aux!(edmf::EDMFModel, state::State, surf::SurfaceBase, param_set
 
     get_GMV_CoVar(edmf, state, Val(:tke), Val(:w), Val(:w))
 
-    compute_diffusive_fluxes(edmf, state, surf, param_set)
+    # Apply SHOC turbulence closure if enabled
+    use_shoc_diffusive_fluxes = TCP.get_isbits_nt(param_set.user_params, :use_shoc_diffusive_fluxes, false)
+    use_shoc_diffusive_fluxes = false # testing
+    if use_shoc_diffusive_fluxes
+        use_tc_values = false
+        ql_qi_only = true
+        if ql_qi_only
+            compute_diffusive_fluxes(edmf, state, surf, param_set)
+            apply_shoc_ql_qi_fluxes!(edmf, state, surf, param_set; use_tc_second_moments=use_tc_values, use_tc_wthird=use_tc_values)
+        else
+            apply_shoc_diffusion!(edmf, state, surf, param_set, Δt; use_tc_n2=use_tc_values, use_tc_mixing_length=use_tc_values, use_tc_kh_km=use_tc_values, use_tc_shear=use_tc_values, use_tc_second_moments=use_tc_values, use_tc_wthird=use_tc_values)
+        end
+    else
+        compute_diffusive_fluxes(edmf, state, surf, param_set)
+    end
 
     # TODO: use dispatch
     if edmf.precip_model isa Clima1M

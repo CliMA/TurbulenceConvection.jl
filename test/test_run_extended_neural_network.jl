@@ -1,5 +1,6 @@
 ## Standalone run script for SOCRATES using :extended_neural_network
 ## Keeps test_run.jl untouched.
+using Pkg
 Pkg.activate(expanduser("~/Research_Schneider/CliMA/TurbulenceConvection.jl/"))
 using JLD2
 using Random
@@ -122,7 +123,7 @@ using SimpleChains
 Pkg.activate(expanduser("~/Research_Schneider/CliMA/TurbulenceConvection.jl/integration_tests"))
 nn_params, nn_x0 = JLD2.load(nn_params_file, "params", "x_0_characteristic")
 
-@warn "nn_params = $nn_params, nn_x0 = $nn_x0"
+# @warn "nn_params = $nn_params, nn_x0 = $nn_x0"
 
 length(nn_x0) == 9 || error("Expected 9 extended input normalization values, got $(length(nn_x0)).")
 
