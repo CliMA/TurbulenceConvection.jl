@@ -1392,6 +1392,28 @@ end
 # -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=- #
 # extended
 
+function get_Ns!(param_set::APS, microphys_params::ACMP, relaxation_timescale::ExtendedNeuralNetworkRelaxationTimescale, q::CC.Fields.Field, T::CC.Fields.Field, p::CC.Fields.Field, ρ::CC.Fields.Field, w::CC.Fields.Field, tke::CC.Fields.Field, qt_var::CC.Fields.Field, h_var::CC.Fields.Field, area::CC.Fields.Field, τ_liq::CC.Fields.Field, τ_ice::CC.Fields.Field, N_liq::CC.Fields.Field, N_ice::CC.Fields.Field, f_ice_mult::CC.Fields.Field, q_sno::CC.Fields.Field, massflux::CC.Fields.Field, dTdz::CC.Fields.Field, w_i::CC.Fields.Field; N_INP_top=eltype(param_set)(NaN), apply_massflux_boost::Bool=false, apply_sedimentation_boost::Bool=false)
+    valid_inds = vec(parent(area) .> 0)
+    _, _, _N_l, _N_i = predict_τ_extended(parent(ρ)[valid_inds], parent(T)[valid_inds], parent(q)[valid_inds, 2], parent(q)[valid_inds, 3], parent(w)[valid_inds], parent(q)[valid_inds, 1], parent(tke)[valid_inds], parent(qt_var)[valid_inds], parent(h_var)[valid_inds], (relaxation_timescale.neural_network, to_static_strided_array(relaxation_timescale.neural_network_params)), relaxation_timescale.model_x_0_characteristic)
+
+    parent(N_liq)[valid_inds] .= _N_l
+    parent(N_ice)[valid_inds] .= _N_i
+
+    adjust_and_clamp_NN_outputs!(param_set, relaxation_timescale, q, T, p, ρ, w, area, nothing, nothing, N_liq, N_ice, nothing, f_ice_mult, q_sno, massflux, dTdz, w_i; N_INP_top, apply_massflux_boost, apply_sedimentation_boost)
+    return
+end
+
+function get_Ns_and_N_i_no_boost!(param_set::APS, microphys_params::ACMP, relaxation_timescale::ExtendedNeuralNetworkRelaxationTimescale, q::CC.Fields.Field, T::CC.Fields.Field, p::CC.Fields.Field, ρ::CC.Fields.Field, w::CC.Fields.Field, tke::CC.Fields.Field, qt_var::CC.Fields.Field, h_var::CC.Fields.Field, area::CC.Fields.Field, τ_liq::CC.Fields.Field, τ_ice::CC.Fields.Field, N_liq::CC.Fields.Field, N_ice::CC.Fields.Field, N_ice_no_boost::CC.Fields.Field, f_ice_mult::CC.Fields.Field, q_sno::CC.Fields.Field, massflux::CC.Fields.Field, dTdz::CC.Fields.Field, w_i::CC.Fields.Field; N_INP_top=eltype(param_set)(NaN), apply_massflux_boost::Bool=false, apply_sedimentation_boost::Bool=false)
+    valid_inds = vec(parent(area) .> 0)
+    _, _, _N_l, _N_i = predict_τ_extended(parent(ρ)[valid_inds], parent(T)[valid_inds], parent(q)[valid_inds, 2], parent(q)[valid_inds, 3], parent(w)[valid_inds], parent(q)[valid_inds, 1], parent(tke)[valid_inds], parent(qt_var)[valid_inds], parent(h_var)[valid_inds], (relaxation_timescale.neural_network, to_static_strided_array(relaxation_timescale.neural_network_params)), relaxation_timescale.model_x_0_characteristic)
+
+    parent(N_liq)[valid_inds] .= _N_l
+    parent(N_ice)[valid_inds] .= _N_i
+
+    adjust_and_clamp_NN_outputs!(param_set, relaxation_timescale, q, T, p, ρ, w, area, nothing, nothing, N_liq, N_ice, N_ice_no_boost, f_ice_mult, q_sno, massflux, dTdz, w_i; N_INP_top, apply_massflux_boost, apply_sedimentation_boost)
+    return
+end
+
 function get_τs_and_Ns!(param_set::APS, microphys_params::ACMP, relaxation_timescale::ExtendedNeuralNetworkRelaxationTimescale, q::CC.Fields.Field, T::CC.Fields.Field, p::CC.Fields.Field, ρ::CC.Fields.Field, w::CC.Fields.Field, tke::CC.Fields.Field, qt_var::CC.Fields.Field, h_var::CC.Fields.Field, area::CC.Fields.Field, τ_liq::CC.Fields.Field, τ_ice::CC.Fields.Field, N_liq::CC.Fields.Field, N_ice::CC.Fields.Field, f_ice_mult::CC.Fields.Field, q_sno::CC.Fields.Field, massflux::CC.Fields.Field, dTdz::CC.Fields.Field, w_i::CC.Fields.Field; N_INP_top=eltype(param_set)(NaN), apply_massflux_boost::Bool=false, apply_sedimentation_boost::Bool=false)
     valid_inds = vec(parent(area) .> 0)
     _τ_liq, _τ_ice, _N_l, _N_i = predict_τ_extended(parent(ρ)[valid_inds], parent(T)[valid_inds], parent(q)[valid_inds, 2], parent(q)[valid_inds, 3], parent(w)[valid_inds], parent(q)[valid_inds, 1], parent(tke)[valid_inds], parent(qt_var)[valid_inds], parent(h_var)[valid_inds], (relaxation_timescale.neural_network, to_static_strided_array(relaxation_timescale.neural_network_params)), relaxation_timescale.model_x_0_characteristic)
