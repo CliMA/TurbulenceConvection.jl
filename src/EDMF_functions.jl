@@ -930,10 +930,10 @@ function compute_diffusive_fluxes(edmf::EDMFModel, state::State, surf::SurfaceBa
         ∂qt∂z = aux_tc.∂qt∂z
 
         water_advection_factor = mixing_length_params(edmf).c_KTKEqt
-        @. aux_tc_f.diffusive_flux_qt += ρ_f * Ifx(a_en * sqrt(aux_en.tke) * water_advection_factor * (2 * corr_w_qt * (∂q∂z < 0) * sqrt(max(aux_en.QTvar, zero(FT))))) # (mean + σ) - (mean - σ) = 2σ
+        @. aux_tc_f.diffusive_flux_qt += ρ_f * Ifx(a_en * min(sqrt(aux_en.tke) * water_advection_factor, sqrt(2*aux_en.CAPE)) * (2 * corr_w_qt * (∂qt∂z < 0) * sqrt(max(aux_en.QTvar, zero(FT))))) # (mean + σ) - (mean - σ) = 2σ
 
         h_advection_factor = mixing_length_params(edmf).c_KTKEh
-        @. aux_tc_f.diffusive_flux_h += ρ_f * Ifx(a_en * sqrt(aux_en.tke) * h_advection_factor * (2 * corr_w_h * (∂θ∂z > 0) * sqrt(max(aux_en.Hvar, zero(FT))))) # (mean - σ) - (mean + σ) = -2σ
+        @. aux_tc_f.diffusive_flux_h += ρ_f * Ifx(a_en * min(sqrt(aux_en.tke) * h_advection_factor, sqrt(2*aux_en.CAPE)) * (2 * corr_w_h * (∂θl∂z > 0) * sqrt(max(aux_en.Hvar, zero(FT))))) # (mean - σ) - (mean + σ) = -2σ
 
 
         @. aux_tc_f.diffusive_flux_uₕ = -aux_tc_f.ρ_ae_KM * ∇uₕ_gm(prog_gm_uₕ)
@@ -1011,8 +1011,8 @@ function compute_diffusive_fluxes(edmf::EDMFModel, state::State, surf::SurfaceBa
             # advective adjustment for condensible species
             liquid_advection_factor = mixing_length_params(edmf).c_KTKEql
             ice_advection_factor = mixing_length_params(edmf).c_KTKEqi
-            @. aux_tc_f.diffusive_flux_ql += ρ_f * Ifx(a_en * sqrt(aux_en.tke) * liquid_advection_factor * aux_en.q_liq)
-            @. aux_tc_f.diffusive_flux_qi += ρ_f * Ifx(a_en * sqrt(aux_en.tke) * ice_advection_factor * aux_en.q_ice)
+            @. aux_tc_f.diffusive_flux_ql += ρ_f * Ifx(a_en * min(sqrt(aux_en.tke) * liquid_advection_factor, sqrt(2*aux_en.CAPE)) * aux_en.q_liq)
+            @. aux_tc_f.diffusive_flux_qi += ρ_f * Ifx(a_en * min(sqrt(aux_en.tke) * ice_advection_factor, sqrt(2*aux_en.CAPE)) * aux_en.q_ice)
 
         end
         c_KQr = mixing_length_params(edmf).c_KQr # maybe these would be shared but I think sedimentation might change things idk
@@ -1027,8 +1027,8 @@ function compute_diffusive_fluxes(edmf::EDMFModel, state::State, surf::SurfaceBa
             Snow :: Precip should inherently be biased towards the dry downdrafts far more than condensate.
                 So ideally, supersaturated and production has an up bias, subsaturated ok we can assume a downdraft bias, esp when evap
         =#
-        @. aux_tc_f.diffusive_flux_qr += ρ_f * Ifx(a_en * sqrt(aux_en.tke) * rain_advection_factor * (aux_en.frac_supersat - FT(0.25)) * prog_pr.q_rai) # by 0% supersat, we assume no imbalance, and arguably should even start to lean towards downdrafts. however -0.5 seemed too strong
-        @. aux_tc_f.diffusive_flux_qs += ρ_f * Ifx(a_en * sqrt(aux_en.tke) * snow_advection_factor * (aux_en.frac_supersat - FT(0.25)) * prog_pr.q_sno) # by 0% supersat, we assume no imbalance, and arguably should even start to lean towards downdrafts. however -0.5 seemed too strong
+        @. aux_tc_f.diffusive_flux_qr += ρ_f * Ifx(a_en * min(sqrt(aux_en.tke) * rain_advection_factor, sqrt(2*aux_en.CAPE)) * (aux_en.frac_supersat - FT(0.25)) * prog_pr.q_rai) # by 0% supersat, we assume no imbalance, and arguably should even start to lean towards downdrafts. however -0.5 seemed too strong
+        @. aux_tc_f.diffusive_flux_qs += ρ_f * Ifx(a_en * min(sqrt(aux_en.tke) * snow_advection_factor, sqrt(2*aux_en.CAPE)) * (aux_en.frac_supersat - FT(0.25)) * prog_pr.q_sno) # by 0% supersat, we assume no imbalance, and arguably should even start to lean towards downdrafts. however -0.5 seemed too strong
 
     end
 
