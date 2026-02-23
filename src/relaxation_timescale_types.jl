@@ -12,7 +12,7 @@
 :linear_combination
 :linear_combination_with_w
 :neural_network
-:extended_neural_network
+:neural_network_extended
 :raymond_ice_test
 =#
 
@@ -45,7 +45,7 @@ const valid_relaxation_timescale_types::Set{Symbol} = Set([
     :linear_combination,
     :linear_combination_with_w,
     :neural_network,
-    :extended_neural_network,
+    :neural_network_extended,
     :neural_network_no_weights,
     :neural_network_random_init,
     :neural_network_pca_noise,
@@ -519,7 +519,7 @@ end
 
 # :neural_network
 # this version accepts the namelist, so we can ideally keep the neural network params out of the param_set to reduce bloat...
-function get_relaxation_timescale_type(::Union{Val{:neural_network},Val{:neural_network_no_weights},Val{:neural_network_random_init},Val{:extended_neural_network}}, param_set::APS, microphys_params::ACMP, namelist)
+function get_relaxation_timescale_type(::Union{Val{:neural_network},Val{:neural_network_no_weights},Val{:neural_network_random_init},Val{:neural_network_extended}}, param_set::APS, microphys_params::ACMP, namelist)
     FT = eltype(param_set)
     # rn everything in user_params ends up in param_set... but that isn't really necessary given we're creating these objects... it was more of a convenience when we were testing random things...
     neural_network_params = create_svector(FTNN.(namelist["relaxation_timescale_params"]["neural_microphysics_relaxation_network"])) # convert to SVector for NN since that's what it's supposed to be (save eltype in the jld2?)
