@@ -1023,14 +1023,14 @@ end
 # :neural_network_extended
 function get_N_i_helper(param_set::APS, relaxation_timescale::ExtendedNeuralNetworkRelaxationTimescale, q::TD.PhasePartition, T::FT, ρ::FT, w::FT, tke::FT, qt_var::FT, h_var::FT) where {FT}
     # model_x_0_characteristic = relaxation_timescale.model_x_0_characteristic # get the model_x_0_characteristic from the relaxation_timescale
-    _, _, _, N_i = predict_τ_extended(ρ, T, q.liq, q.ice, w, q.tot, tke, qt_var, h_var, (relaxation_timescale.neural_network_extended, to_static_strided_array(relaxation_timescale.neural_network_extended_params)), relaxation_timescale.extended_model_x_0_characteristic) # pass in the NN and get the τs out, neural_network should be a global variable?
+    _, _, _, N_i = predict_τ_extended(ρ, T, q.liq, q.ice, w, q.tot, tke, qt_var, h_var, (relaxation_timescale.neural_network, to_static_strided_array(relaxation_timescale.neural_network_params)), relaxation_timescale.model_x_0_characteristic) # pass in the NN and get the τs out, neural_network should be a global variable?
 
     return N_i
 end
 
 function get_N_l_helper(param_set::APS, relaxation_timescale::ExtendedNeuralNetworkRelaxationTimescale, q::TD.PhasePartition, T::FT, ρ::FT, w::FT, tke::FT, qt_var::FT, h_var::FT) where {FT}
     # model_x_0_characteristic = relaxation_timescale.model_x_0_characteristic # get the model_x_0_characteristic from the relaxation_timescale
-    _, _, N_l, _ = predict_τ_extended(ρ, T, q.liq, q.ice, w, q.tot, tke, qt_var, h_var, (relaxation_timescale.neural_network_extended, to_static_strided_array(relaxation_timescale.neural_network_extended_params)), relaxation_timescale.extended_model_x_0_characteristic) # pass in the NN and get the τs out, neural_network should be a global variable?
+    _, _, N_l, _ = predict_τ_extended(ρ, T, q.liq, q.ice, w, q.tot, tke, qt_var, h_var, (relaxation_timescale.neural_network, to_static_strided_array(relaxation_timescale.neural_network_params)), relaxation_timescale.model_x_0_characteristic) # pass in the NN and get the τs out, neural_network should be a global variable?
 
     return N_l
 end
