@@ -253,8 +253,11 @@ function microphysics!(
                     # Then based on how much qc, ql, qi we actually have we might be able to estimate condensate_qt_SD for existing condensate (and uncondensed regions)... idk.
                     if !iszero(moisture_model.condensate_qt_SD)
                         # TODO: Consider turning this off for when we are using cloaks.... also set an error in the quadrature branches
-                        q_tot_sd = sqrt(aux_en.QTvar[k])
-                        qt = q_here.tot + moisture_model.condensate_qt_SD * q_tot_sd
+                        qt_liq, _ = condensate_qt_SD(q_here.tot, aux_en.QTvar[k], q_vap_sat_liq, moisture_model.condensate_qt_SD) #
+                        qt_ice, _ = condensate_qt_SD(q_here.tot, aux_en.QTvar[k], q_vap_sat_ice, moisture_model.condensate_qt_SD) # technically this should probably have a smaller condensate_qt_SD but...
+                        liq_frac = TD.liquid_fraction(thermo_params, T, typeof(ts), q_here)
+                        qt = liq_frac * qt_liq + (1 - liq_frac) * qt_ice # weighted sum isn't perfect but will have to do for now.
+                        # qt = q_here.tot + moisture_model.condensate_qt_SD * sqrt(aux_en.QTvar[k]) # fixed assumption
                         θ = TD.liquid_ice_pottemp(thermo_params, ts)
                         ts = (edmf.moisture_model isa NonEquilibriumMoisture) ? thermo_state_pθq(param_set, p_c[k], θ, qt, q_here.liq, q_here.ice) : thermo_state_pθq(param_set, p_c[k], θ, qt)
 

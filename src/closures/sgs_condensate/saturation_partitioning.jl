@@ -1,4 +1,133 @@
 """
+    condensate_qt_SD(qt::FT, qt_var::FT, q_sat::FT, qc_real::FT, σ_max::FT = FT(1)) where {FT}
+
+Estimates the condensate-weighted mean total water (`qt_cond`) and calculates 
+how many standard deviations that conditional mean is shifted from the grid mean (`condensate_qt_SD`).
+
+The shift is derived from the exact analytical integration of the condensate-weighted 
+1st moment of a Gaussian distribution.
+"""
+function condensate_qt_SD(
+    qt::FT,
+    qt_var::FT,
+    q_sat::FT,
+    # qc_real::FT, # Kept for API compatibility, but unused in the pure statistical shift
+    σ_max::FT = FT(1),
+) where {FT}
+
+    if qt_var <= eps(FT)
+        return qt, zero(FT)
+    end
+
+    qt_std = sqrt(qt_var)
+    z_star = (q_sat - qt) / qt_std
+
+    # Asymptotic limit for highly subsaturated clouds (evaporating/non-equilibrium).
+    # As z* -> ∞, the analytical shift cleanly converges to exactly z*.
+    # We catch this early to avoid 0/0 floating-point underflow (NaNs) in the math below.
+    if z_star > FT(3)
+        condensate_qt_SD = min(z_star, σ_max)
+        qt_cond = qt + condensate_qt_SD * qt_std
+        return qt_cond, condensate_qt_SD
+    end
+
+    dist = Distributions.Normal(zero(FT), one(FT))
+    
+    # Use ccdf for better numerical precision in the tail
+    prob_sat = Distributions.ccdf(dist, z_star) 
+    phi_z = Distributions.pdf(dist, z_star)        
+
+    # Theoretical equilibrium condensate
+    qc_sat_adjust = qt_std * max(eps(FT), phi_z - z_star * prob_sat)
+
+    # 1. Pure statistical condensate-weighted mean shift
+    shift = qt_var * prob_sat / qc_sat_adjust
+    qt_cond = qt + shift
+
+    # 2. Normalized shift (capped by σ_max to prevent "cooked SD" in out-of-equilibrium tails)
+    condensate_qt_SD = min(shift / qt_std, σ_max)
+
+    return qt_cond, condensate_qt_SD
+end
+
+
+function partition_condensate_into_sgs_fractions(
+    q::FT,
+    supersaturated_fraction::FT;
+    max_boost_factor::FT = FT(1.0),
+) where {FT}
+    # partition assuming all liq into supersaturated fraction, not to exceed max_boost_factor
+    q_supersat = iszero(supersaturated_fraction) ? (max_boost_factor * q) : min(q / supersaturated_fraction, max_boost_factor * q)
+    q_subsat = isone(supersaturated_fraction) ? zero(FT) : (q - (q_supersat * supersaturated_fraction)) / (1 - supersaturated_fraction)
+
+    return (; supersaturated_fraction, q_supersat, q_subsat)
+end
+
+"""
+    Partitions cloud liquid into supersaturated and subsaturated regions
+    This is a quick fcn for when you dont want to make up an assumed PDF esp given no saturation adjustment.
+"""
+function partition_condensate_into_sgs_fractions(
+    thermo_params::TDPS,
+    ::CMT.LiquidType,
+    ts::TD.ThermodynamicState{FT},
+    # θ_liq_ice::FT,
+    qt_var::FT,
+    h_var::FT,
+    h_qt_cov::FT,
+    ;
+    supersaturated_fraction_liq::FT = FT(NaN),
+    max_boost_factor::FT = FT(2.0),
+) where {FT}
+    q = TD.PhasePartition(ts)
+    if isnan(supersaturated_fraction_liq)
+        T = TD.air_temperature(thermo_params, ts)
+        ρ = TD.air_density(thermo_params, ts)
+        p = TD.air_pressure(thermo_params, ts)
+        q_vap = TD.vapor_specific_humidity(thermo_params, ts)
+        q_sat_l = TD.q_vap_saturation_generic(thermo_params, T, ρ, TD.Liquid())
+        dq_sat_dT_l = TD.∂q_vap_sat_∂T(thermo_params, one(FT), T, q_sat_l)  # Calculate derivative
+        supersaturated_fraction_liq = sgs_saturated_fraction(thermo_params, q_vap, q_sat_l, qt_var, h_var, h_qt_cov, dq_sat_dT_l, p)
+    end
+    return partition_condensate_into_sgs_fractions(TD.Liquid(), q.liq, supersaturated_fraction_liq; max_boost_factor)
+end
+partition_condensate_into_sgs_fractions(::CMT.LiquidType, ql::FT, supersaturated_fraction_liq::FT; max_boost_factor::FT = FT(2.0)) where {FT} = partition_condensate_into_sgs_fractions(ql, supersaturated_fraction_liq; max_boost_factor)
+
+
+
+"""
+Like for liquid but τ_i is much slower than τ_l so our max boost factor default is 1.1 (could be calibrated)
+"""
+function partition_condensate_into_sgs_fractions(
+    thermo_params::TDPS,
+    ::CMT.IceType,
+    ts::TD.ThermodynamicState{FT},
+    # θ_liq_ice::FT,
+    qt_var::FT,
+    h_var::FT,
+    h_qt_cov::FT,
+    ;
+    supersaturated_fraction_ice::FT = FT(NaN),
+    max_boost_factor::FT = FT(1.1),
+) where {FT}
+    q = TD.PhasePartition(ts)
+    if isnan(supersaturated_fraction_ice)
+        T = TD.air_temperature(thermo_params, ts)
+        ρ = TD.air_density(thermo_params, ts)
+        p = TD.air_pressure(thermo_params, ts)
+        q_vap = TD.vapor_specific_humidity(thermo_params, ts)
+        q_sat = TD.q_vap_saturation_generic(thermo_params, T, ρ, TD.Ice())
+        dq_sat_dT = TD.∂q_vap_sat_∂T(thermo_params, zero(FT), T, q_sat)  # Calculate derivative
+        supersaturated_fraction_ice = sgs_saturated_fraction(thermo_params, q_vap, q_sat, qt_var, h_var, h_qt_cov, dq_sat_dT, p) # pass q_vap here to get supersat fraction (pass q_tot to get cloud fraction (under saturation adjustment to form ql))
+    end
+    return partition_condensate_into_sgs_fractions(TD.Ice(), q.ice, supersaturated_fraction_ice; max_boost_factor)
+end
+partition_condensate_into_sgs_fractions(::CMT.IceType, qi::FT, supersaturated_fraction_ice::FT; max_boost_factor::FT = FT(1.1)) where {FT} = partition_condensate_into_sgs_fractions(qi, supersaturated_fraction_ice; max_boost_factor)
+
+# ======================================================================================================================================================== #
+# ======================================================================================================================================================== #
+
+"""
     get_qc_stats_from_moments(...)
 
 Calculates turbulent fluxes using a 'Physical Blending' approach for Ice:
