@@ -1091,10 +1091,9 @@ function morrison_milbrandt_2015_style(
     q_eq::TD.PhasePartition,
     Δt::FT,
     ts::TD.ThermodynamicState;
-    use_fix::Bool = true, # i think something is wrong with the forumula for large timesteps... is less essential now w/ the limiter but still needed... (unless I just don't understand the physics of it)
-    emit_warnings::Bool = true,
-    fallback_to_standard_supersaturation_limiter::Bool = false,
+    opts::MM2015Opts{FT} = MM2015Opts{FT}(),
 )::Tuple{FT, FT} where {FT}
+    (; use_fix, return_mixing_ratio, max_depth, depth, δ_0_shum, δ_0i_shum, fallback_to_standard_supersaturation_limiter, emit_warnings, time_tolerance) = opts
 
     if area > 0
 
@@ -1113,7 +1112,7 @@ function morrison_milbrandt_2015_style(
         below_freezing::Bool = T < TCP.T_triple(param_set) # In the code this is actually where the saturation vapor pressures are equal... I think it's wrong though
         regime = get_saturation_regime(q_vap, q, q_eq, below_freezing)
 
-        return morrison_milbrandt_2015_style(regime, param_set, area, ρ, p, T, w, τ_liq, τ_ice, q_vap, q, q_eq, Δt, ts; use_fix = use_fix, return_mixing_ratio = false, δ_0_shum = δ_0, δ_0i_shum = δ_0i, dqvdt=dqvdt, dTdt=dTdt, fallback_to_standard_supersaturation_limiter = fallback_to_standard_supersaturation_limiter)
+        return morrison_milbrandt_2015_style(regime, param_set, area, ρ, p, T, w, τ_liq, τ_ice, q_vap, q, q_eq, Δt, ts; opts = MM2015Opts{FT}(use_fix = use_fix, return_mixing_ratio = false, δ_0_shum = δ_0, δ_0i_shum = δ_0i, dqvdt=dqvdt, dTdt=dTdt, fallback_to_standard_supersaturation_limiter = fallback_to_standard_supersaturation_limiter))
 
 
         # if below_freezing # [ s_qi < s_ql --> δ_0i > δ_0 ]
@@ -1257,20 +1256,13 @@ end
 function morrison_milbrandt_2015_style(
     regime::Union{Supersaturated{true, true, true}, Supersaturated{true, false, true}, Supersaturated{false, true, true}, Supersaturated{false, false, true}}, # these should all work the same, right? you'll end up with some liq/ice at the end no matter what
     param_set::APS, area::FT, ρ::FT, p::FT, T::FT, w::FT, τ_liq::FT, τ_ice::FT, q_vap::FT, q::TD.PhasePartition, q_eq::TD.PhasePartition, Δt::FT, ts::TD.ThermodynamicState;
-    use_fix::Bool = true, # i think something is wrong with the forumula for large timesteps... is less essential now w/ the limiter but still needed... (unless I just don't understand the physics of it)
-    return_mixing_ratio::Bool = false,
-    max_depth::Int = 12,
-    depth::Int = 0,
-    δ_0_shum::FT,
-    δ_0i_shum::FT,
-    dqvdt::FT = FT(0), # not used in this regime, but needed for the function signature
-    dTdt::FT = FT(0), # not used in this regime, but needed for the function signature
-    fallback_to_standard_supersaturation_limiter::Bool = false,
+    opts::MM2015Opts{FT} = MM2015Opts{FT}(),
     )::Tuple{FT, FT} where {FT}
+    (; use_fix, return_mixing_ratio, max_depth, depth, δ_0_shum, δ_0i_shum, dqvdt, dTdt, fallback_to_standard_supersaturation_limiter) = opts
 
     if depth == max_depth
         # @debug "Max depth reached, returning exponential part only fallback (no thermo adjustments)"
-        S_ql, S_qi = morrison_milbrandt_2015_style_exponential_part_only(regime, param_set, area, ρ, p, T, w, τ_liq, τ_ice, δ_0_shum, δ_0i_shum, q, q_eq, Δt, ts; use_fix = use_fix, return_mixing_ratio = false, dqvdt=dqvdt, dTdt=dTdt, fallback_to_standard_supersaturation_limiter = fallback_to_standard_supersaturation_limiter)
+        S_ql, S_qi = morrison_milbrandt_2015_style_exponential_part_only(regime, param_set, area, ρ, p, T, w, τ_liq, τ_ice, δ_0_shum, δ_0i_shum, q, q_eq, Δt, ts; opts = MM2015Opts{FT}(use_fix = use_fix, return_mixing_ratio = false, dqvdt=dqvdt, dTdt=dTdt, fallback_to_standard_supersaturation_limiter = fallback_to_standard_supersaturation_limiter))
         return return_mixing_ratio ? (S_shum_to_mixing_ratio(S_ql, q.tot), S_shum_to_mixing_ratio(S_qi, q.tot)) : (S_ql, S_qi) # exponential only doesn't bother with mixing ratios at the moment
     end
 
@@ -1280,7 +1272,7 @@ function morrison_milbrandt_2015_style(
     # @debug "Calling Supersaturated{$(q.liq > FT(0)), $(q.ice > FT(0)), true}"
 
     # --- Thermo  constants ------------------------------------------------------------------------------------ #
-    (; g, L_i, L_l, c_p, e_sl, e_si, dqsl_dT, dqsi_dT, q_sl, q_si, q_vap, q_liq, q_ice, T_freeze, δ_0, δ_0i, Γ_l, Γ_i, dqvdt, dTdt) = get_params_and_go_to_mixing_ratio(param_set, area, ρ, p, T, w, τ_liq, τ_ice, q_vap, dqvdt, dTdt, δ_0_shum, δ_0i_shum, q, q_eq, Δt, ts) 
+    (; g, L_i, L_l, c_p, e_sl, e_si, dqsl_dT, dqsi_dT, q_sl, q_si, q_vap, q_liq, q_ice, T_freeze, δ_0, δ_0i, Γ_l, Γ_i) = get_params_and_go_to_mixing_ratio(param_set, area, ρ, p, T, w, τ_liq, τ_ice, q_vap, dqvdt, dTdt, δ_0_shum, δ_0i_shum, q, q_eq, Δt, ts) 
 
     # (δ_0 > FT(0)) && (δ_0i > FT(0)) || error(" Should be supersaturated over both phases, got δ_0 = $δ_0, δ_0i = $δ_0i")
 
@@ -1347,7 +1339,7 @@ function morrison_milbrandt_2015_style(
             # @debug "Ran out of liquid before timestep is over... transitioning to $(typeof(new_regime)) at t = $(min_t)..."
             new_δ_0_shum = TD.vapor_specific_humidity(new_q) - new_q_eq.liq
             new_δ_0i_shum = TD.vapor_specific_humidity(new_q) - new_q_eq.ice
-            S_ql_addit, S_qi_addit = morrison_milbrandt_2015_style(new_regime, param_set, area, new_ρ, new_p, new_T, w, τ_liq, τ_ice, new_q_vap, new_q, new_q_eq, Δt_left, new_ts; use_fix = use_fix, return_mixing_ratio = true, depth = depth + 1, δ_0_shum = new_δ_0_shum, δ_0i_shum = new_δ_0i_shum, dqvdt=dqvdt, dTdt=dTdt, fallback_to_standard_supersaturation_limiter = fallback_to_standard_supersaturation_limiter)
+            S_ql_addit, S_qi_addit = morrison_milbrandt_2015_style(new_regime, param_set, area, new_ρ, new_p, new_T, w, τ_liq, τ_ice, new_q_vap, new_q, new_q_eq, Δt_left, new_ts; opts = MM2015Opts{FT}(use_fix = use_fix, return_mixing_ratio = true, depth = depth + 1, δ_0_shum = new_δ_0_shum, δ_0i_shum = new_δ_0i_shum, dqvdt=dqvdt, dTdt=dTdt, fallback_to_standard_supersaturation_limiter = fallback_to_standard_supersaturation_limiter))
 
             S_ql *= min_t / Δt
             S_qi *= min_t / Δt
@@ -1365,7 +1357,7 @@ function morrison_milbrandt_2015_style(
             # @debug "Ran out of ice before timestep is over... transitioning to $(typeof(new_regime)) at t = $(min_t)..."
             new_δ_0_shum = TD.vapor_specific_humidity(new_q) - new_q_eq.liq
             new_δ_0i_shum = TD.vapor_specific_humidity(new_q) - new_q_eq.ice
-            S_ql_addit, S_qi_addit = morrison_milbrandt_2015_style(new_regime, param_set, area, new_ρ, new_p, new_T, w, τ_liq, τ_ice, new_q_vap, new_q, new_q_eq, Δt_left, new_ts; use_fix = use_fix, return_mixing_ratio = true, depth = depth + 1, δ_0_shum = new_δ_0_shum, δ_0i_shum = new_δ_0i_shum, dqvdt=dqvdt, dTdt=dTdt, fallback_to_standard_supersaturation_limiter = fallback_to_standard_supersaturation_limiter)
+            S_ql_addit, S_qi_addit = morrison_milbrandt_2015_style(new_regime, param_set, area, new_ρ, new_p, new_T, w, τ_liq, τ_ice, new_q_vap, new_q, new_q_eq, Δt_left, new_ts; opts = MM2015Opts{FT}(use_fix = use_fix, return_mixing_ratio = true, depth = depth + 1, δ_0_shum = new_δ_0_shum, δ_0i_shum = new_δ_0i_shum, dqvdt=dqvdt, dTdt=dTdt, fallback_to_standard_supersaturation_limiter = fallback_to_standard_supersaturation_limiter))
         
             S_ql *= min_t / Δt
             S_qi *= min_t / Δt
@@ -1389,7 +1381,7 @@ function morrison_milbrandt_2015_style(
                 new_δ_0_shum = TD.vapor_specific_humidity(new_q) - new_q_eq.liq
                 new_δ_0i_shum = new_δ_0_shum # these are equal at freezing
             end
-            S_ql_addit, S_qi_addit = morrison_milbrandt_2015_style(new_regime, param_set, area, new_ρ, new_p, new_T, w, τ_liq, τ_ice, new_q_vap, new_q, new_q_eq, Δt_left, new_ts; use_fix = use_fix, return_mixing_ratio = true, depth = depth + 1, δ_0_shum = new_δ_0_shum, δ_0i_shum = new_δ_0i_shum, dqvdt=dqvdt, dTdt=dTdt, fallback_to_standard_supersaturation_limiter = fallback_to_standard_supersaturation_limiter)
+            S_ql_addit, S_qi_addit = morrison_milbrandt_2015_style(new_regime, param_set, area, new_ρ, new_p, new_T, w, τ_liq, τ_ice, new_q_vap, new_q, new_q_eq, Δt_left, new_ts; opts = MM2015Opts{FT}(use_fix = use_fix, return_mixing_ratio = true, depth = depth + 1, δ_0_shum = new_δ_0_shum, δ_0i_shum = new_δ_0i_shum, dqvdt=dqvdt, dTdt=dTdt, fallback_to_standard_supersaturation_limiter = fallback_to_standard_supersaturation_limiter))
             S_ql *= min_t / Δt # rescale to the timestep
             S_qi *= min_t / Δt # rescale to the timestep
             S_ql_addit *= Δt_left / Δt # rescale to the remaining time
@@ -1416,23 +1408,16 @@ end
 function morrison_milbrandt_2015_style(
     regime::Union{Supersaturated{true, true, false} , Supersaturated{true, false, false} , Supersaturated{false, true, false} , Supersaturated{false, false, false} },# these should all work the same, right? you'll end up with some liq/ice at the end no matter what
     param_set::APS, area::FT, ρ::FT, p::FT, T::FT, w::FT, τ_liq::FT, τ_ice::FT, q_vap::FT, q::TD.PhasePartition, q_eq::TD.PhasePartition, Δt::FT, ts::TD.ThermodynamicState;
-    use_fix::Bool = true, # i think something is wrong with the forumula for large timesteps... is less essential now w/ the limiter but still needed... (unless I just don't understand the physics of it)
-    return_mixing_ratio::Bool = false,
-    max_depth::Int = 12,
-    depth::Int = 0,
-    δ_0_shum::FT,
-    δ_0i_shum::FT,
-    dqvdt::FT = FT(0), # not used in this regime, but needed for the function signature
-    dTdt::FT = FT(0), # not used in this regime, but needed for the function signature
-    fallback_to_standard_supersaturation_limiter::Bool = false,
+    opts::MM2015Opts{FT} = MM2015Opts{FT}(),
     )::Tuple{FT, FT} where {FT}
+    (; use_fix, return_mixing_ratio, max_depth, depth, δ_0_shum, δ_0i_shum, dqvdt, dTdt, fallback_to_standard_supersaturation_limiter) = opts
 
     # @debug "Calling Supersaturated{$(q.liq > FT(0)), $(q.ice > FT(0)), false}"
 
 
     if depth == max_depth
         # @debug "Max depth reached, returning exponential part only fallback (no thermo adjustments)"
-        S_ql, S_qi = morrison_milbrandt_2015_style_exponential_part_only(regime, param_set, area, ρ, p, T, w, τ_liq, τ_ice, δ_0_shum, δ_0i_shum, q, q_eq, Δt, ts; use_fix = use_fix, return_mixing_ratio = false, dqvdt=dqvdt, dTdt=dTdt, fallback_to_standard_supersaturation_limiter = fallback_to_standard_supersaturation_limiter)
+        S_ql, S_qi = morrison_milbrandt_2015_style_exponential_part_only(regime, param_set, area, ρ, p, T, w, τ_liq, τ_ice, δ_0_shum, δ_0i_shum, q, q_eq, Δt, ts; opts = MM2015Opts{FT}(use_fix = use_fix, return_mixing_ratio = false, dqvdt=dqvdt, dTdt=dTdt, fallback_to_standard_supersaturation_limiter = fallback_to_standard_supersaturation_limiter))
         return return_mixing_ratio ? (S_shum_to_mixing_ratio(S_ql, q.tot), S_shum_to_mixing_ratio(S_qi, q.tot)) : (S_ql, S_qi) # exponential only doesn't bother with mixing ratios at the moment
     end
 
@@ -1442,7 +1427,7 @@ function morrison_milbrandt_2015_style(
 
     τ_ice_here = FT(Inf) # no ice/decay above freezing
     τ = τ_liq # no ice/decay above freezing
-    (; g, L_i, L_l, c_p, e_sl, e_si, dqsl_dT, dqsi_dT, q_sl, q_si, q_vap, q_liq, q_ice, T_freeze, δ_0, δ_0i, Γ_l, Γ_i, dqvdt, dTdt) = get_params_and_go_to_mixing_ratio(param_set, area, ρ, p, T, w, τ_liq, τ_ice_here, q_vap, dqvdt, dTdt, δ_0_shum, δ_0i_shum, q, q_eq, Δt, ts)
+    (; g, L_i, L_l, c_p, e_sl, e_si, dqsl_dT, dqsi_dT, q_sl, q_si, q_vap, q_liq, q_ice, T_freeze, δ_0, δ_0i, Γ_l, Γ_i) = get_params_and_go_to_mixing_ratio(param_set, area, ρ, p, T, w, τ_liq, τ_ice_here, q_vap, dqvdt, dTdt, δ_0_shum, δ_0i_shum, q, q_eq, Δt, ts)
 
     A_c = A_c_func_no_WBF(q_sl, g, w, c_p, e_sl, dqsl_dT, dqvdt, dTdt, p, ρ) # supersaturated so no loss and now growth because above freezing
 
@@ -1490,7 +1475,7 @@ function morrison_milbrandt_2015_style(
             # @debug "Ran out of liquid before timestep is over... transitioning to $(typeof(new_regime)) at t = $(min_t)..."
             new_δ_0_shum = TD.vapor_specific_humidity(new_q) - new_q_eq.liq
             new_δ_0i_shum = TD.vapor_specific_humidity(new_q) - new_q_eq.ice
-            S_ql_addit, S_qi_addit = morrison_milbrandt_2015_style(new_regime, param_set, area, new_ρ, new_p, new_T, w, τ_liq, τ_ice, new_q_vap, new_q, new_q_eq, Δt_left, new_ts; use_fix = use_fix, return_mixing_ratio = true, depth = depth + 1, δ_0_shum = new_δ_0_shum, δ_0i_shum = new_δ_0i_shum, dqvdt=dqvdt, dTdt=dTdt, fallback_to_standard_supersaturation_limiter = fallback_to_standard_supersaturation_limiter)
+            S_ql_addit, S_qi_addit = morrison_milbrandt_2015_style(new_regime, param_set, area, new_ρ, new_p, new_T, w, τ_liq, τ_ice, new_q_vap, new_q, new_q_eq, Δt_left, new_ts; opts = MM2015Opts{FT}(use_fix = use_fix, return_mixing_ratio = true, depth = depth + 1, δ_0_shum = new_δ_0_shum, δ_0i_shum = new_δ_0i_shum, dqvdt=dqvdt, dTdt=dTdt, fallback_to_standard_supersaturation_limiter = fallback_to_standard_supersaturation_limiter))
             S_ql *= min_t / Δt
             S_qi *= min_t / Δt
             S_ql_addit *= Δt_left / Δt
@@ -1513,7 +1498,7 @@ function morrison_milbrandt_2015_style(
                 new_δ_0_shum = TD.vapor_specific_humidity(new_q) - new_q_eq.liq
                 new_δ_0i_shum = new_δ_0_shum # these are equal at freezing
             end
-            S_ql_addit, S_qi_addit = morrison_milbrandt_2015_style(new_regime, param_set, area, new_ρ, new_p, new_T, w, τ_liq, τ_ice, new_q_vap, new_q, new_q_eq, Δt_left, new_ts; use_fix = use_fix, return_mixing_ratio = true, depth = depth + 1, δ_0_shum = new_δ_0_shum, δ_0i_shum = new_δ_0i_shum, dqvdt=dqvdt, dTdt=dTdt, fallback_to_standard_supersaturation_limiter = fallback_to_standard_supersaturation_limiter)
+            S_ql_addit, S_qi_addit = morrison_milbrandt_2015_style(new_regime, param_set, area, new_ρ, new_p, new_T, w, τ_liq, τ_ice, new_q_vap, new_q, new_q_eq, Δt_left, new_ts; opts = MM2015Opts{FT}(use_fix = use_fix, return_mixing_ratio = true, depth = depth + 1, δ_0_shum = new_δ_0_shum, δ_0i_shum = new_δ_0i_shum, dqvdt=dqvdt, dTdt=dTdt, fallback_to_standard_supersaturation_limiter = fallback_to_standard_supersaturation_limiter))
 
             S_ql *= (min_t / Δt) # rescale to the timestep
             S_qi *= (min_t / Δt) # rescale to the timestep
@@ -1538,23 +1523,16 @@ end
 function morrison_milbrandt_2015_style(
     regime::Union{WBF{true, true, true} ,  WBF{true, false, true}},# has liq, no matter what we'll end up with some ice
     param_set::APS, area::FT, ρ::FT, p::FT, T::FT, w::FT, τ_liq::FT, τ_ice::FT, q_vap::FT, q::TD.PhasePartition, q_eq::TD.PhasePartition, Δt::FT, ts::TD.ThermodynamicState;
-    use_fix::Bool = true, # i think something is wrong with the forumula for large timesteps... is less essential now w/ the limiter but still needed... (unless I just don't understand the physics of it)
-    return_mixing_ratio::Bool = false,
-    max_depth::Int = 12,
-    depth::Int = 0,
-    δ_0_shum::FT,
-    δ_0i_shum::FT,
-    dqvdt::FT = FT(0), # not used in this regime, but needed for the function signature
-    dTdt::FT = FT(0), # not used in this regime, but needed for the function signature
-    fallback_to_standard_supersaturation_limiter::Bool = false,
+    opts::MM2015Opts{FT} = MM2015Opts{FT}(),
     )::Tuple{FT, FT} where {FT}
+    (; use_fix, return_mixing_ratio, max_depth, depth, δ_0_shum, δ_0i_shum, dqvdt, dTdt, fallback_to_standard_supersaturation_limiter) = opts
 
     # @debug "Calling WBF{true, $(q.ice > FT(0)), true}"
 
 
     if depth == max_depth
         # @debug "Max depth reached, returning exponential part only fallback (no thermo adjustments)"
-        S_ql, S_qi = morrison_milbrandt_2015_style_exponential_part_only(regime, param_set, area, ρ, p, T, w, τ_liq, τ_ice, δ_0_shum, δ_0i_shum, q, q_eq, Δt, ts; use_fix = use_fix, return_mixing_ratio = false, dqvdt=dqvdt, dTdt=dTdt, fallback_to_standard_supersaturation_limiter = fallback_to_standard_supersaturation_limiter)
+        S_ql, S_qi = morrison_milbrandt_2015_style_exponential_part_only(regime, param_set, area, ρ, p, T, w, τ_liq, τ_ice, δ_0_shum, δ_0i_shum, q, q_eq, Δt, ts; opts = MM2015Opts{FT}(use_fix = use_fix, return_mixing_ratio = false, dqvdt=dqvdt, dTdt=dTdt, fallback_to_standard_supersaturation_limiter = fallback_to_standard_supersaturation_limiter))
         return return_mixing_ratio ? (S_shum_to_mixing_ratio(S_ql, q.tot), S_shum_to_mixing_ratio(S_qi, q.tot)) : (S_ql, S_qi) # exponential only doesn't bother with mixing ratios at the moment
     end
 
@@ -1563,7 +1541,7 @@ function morrison_milbrandt_2015_style(
     
     local use_ice_perspective::Bool    
 
-    (; g, L_i, L_l, c_p, e_sl, e_si, dqsl_dT, dqsi_dT, q_sl, q_si, q_vap, q_liq, q_ice, T_freeze, δ_0, δ_0i, Γ_l, Γ_i, dqvdt, dTdt) = get_params_and_go_to_mixing_ratio(param_set, area, ρ, p, T, w, τ_liq, τ_ice, q_vap, dqvdt, dTdt, δ_0_shum, δ_0i_shum, q, q_eq, Δt, ts)    
+    (; g, L_i, L_l, c_p, e_sl, e_si, dqsl_dT, dqsi_dT, q_sl, q_si, q_vap, q_liq, q_ice, T_freeze, δ_0, δ_0i, Γ_l, Γ_i) = get_params_and_go_to_mixing_ratio(param_set, area, ρ, p, T, w, τ_liq, τ_ice, q_vap, dqvdt, dTdt, δ_0_shum, δ_0i_shum, q, q_eq, Δt, ts)    
     
     # (δ_0i > FT(0) > δ_0) || error(" WBF but got δ_0 = $δ_0, δ_0i = $δ_0i, q_vap = $q_vap, q_sl = $q_sl, q_si = $q_si")
 
@@ -1692,7 +1670,7 @@ function morrison_milbrandt_2015_style(
             # @debug "Ran out of liquid before timestep is over... transitioning to $(typeof(new_regime)) at t = $(min_t)..."
             new_δ_0_shum = TD.vapor_specific_humidity(new_q) - new_q_eq.liq
             new_δ_0i_shum = TD.vapor_specific_humidity(new_q) - new_q_eq.ice
-            S_ql_addit, S_qi_addit = morrison_milbrandt_2015_style(new_regime, param_set, area, new_ρ, new_p, new_T, w, τ_liq, τ_ice, new_q_vap, new_q, new_q_eq, Δt_left, new_ts; use_fix = use_fix, return_mixing_ratio = true, depth = depth + 1, δ_0_shum = new_δ_0_shum, δ_0i_shum = new_δ_0i_shum, dqvdt=dqvdt, dTdt=dTdt, fallback_to_standard_supersaturation_limiter = fallback_to_standard_supersaturation_limiter)
+            S_ql_addit, S_qi_addit = morrison_milbrandt_2015_style(new_regime, param_set, area, new_ρ, new_p, new_T, w, τ_liq, τ_ice, new_q_vap, new_q, new_q_eq, Δt_left, new_ts; opts = MM2015Opts{FT}(use_fix = use_fix, return_mixing_ratio = true, depth = depth + 1, δ_0_shum = new_δ_0_shum, δ_0i_shum = new_δ_0i_shum, dqvdt=dqvdt, dTdt=dTdt, fallback_to_standard_supersaturation_limiter = fallback_to_standard_supersaturation_limiter))
             S_ql *= min_t / Δt # rescale to the timestep
             S_qi *= min_t / Δt # rescale to the timestep 
             S_qi_addit *= Δt_left / Δt # rescale to the remaining time
@@ -1711,7 +1689,7 @@ function morrison_milbrandt_2015_style(
             # @debug "Ran out of ice before timestep is over... transitioning to $(typeof(new_regime)) at t = $(min_t)..."
             new_δ_0_shum = TD.vapor_specific_humidity(new_q) - new_q_eq.liq
             new_δ_0i_shum = TD.vapor_specific_humidity(new_q) - new_q_eq.ice
-            S_ql_addit, S_qi_addit = morrison_milbrandt_2015_style(new_regime, param_set, area, new_ρ, new_p, new_T, w, τ_liq, τ_ice, new_q_vap, new_q, new_q_eq, Δt_left, new_ts; use_fix = use_fix, return_mixing_ratio = true, depth = depth + 1, δ_0_shum = new_δ_0_shum, δ_0i_shum = new_δ_0i_shum, dqvdt=dqvdt, dTdt=dTdt, fallback_to_standard_supersaturation_limiter = fallback_to_standard_supersaturation_limiter)
+            S_ql_addit, S_qi_addit = morrison_milbrandt_2015_style(new_regime, param_set, area, new_ρ, new_p, new_T, w, τ_liq, τ_ice, new_q_vap, new_q, new_q_eq, Δt_left, new_ts; opts = MM2015Opts{FT}(use_fix = use_fix, return_mixing_ratio = true, depth = depth + 1, δ_0_shum = new_δ_0_shum, δ_0i_shum = new_δ_0i_shum, dqvdt=dqvdt, dTdt=dTdt, fallback_to_standard_supersaturation_limiter = fallback_to_standard_supersaturation_limiter))
 
             S_ql *= min_t / Δt # rescale to the timestep
             S_qi *= min_t / Δt # rescale to the timestep
@@ -1751,7 +1729,7 @@ function morrison_milbrandt_2015_style(
                 new_δ_0i_shum = new_δ_0_shum # these are equal at freezing
             end
 
-            S_ql_addit, S_qi_addit = morrison_milbrandt_2015_style(new_regime, param_set, area, new_ρ, new_p, new_T, w, τ_liq, τ_ice, new_q_vap, new_q, new_q_eq, Δt_left, new_ts; use_fix = use_fix, return_mixing_ratio = true, depth = depth + 1, δ_0_shum = new_δ_0_shum, δ_0i_shum = new_δ_0i_shum, dqvdt=dqvdt, dTdt=dTdt, fallback_to_standard_supersaturation_limiter = fallback_to_standard_supersaturation_limiter)
+            S_ql_addit, S_qi_addit = morrison_milbrandt_2015_style(new_regime, param_set, area, new_ρ, new_p, new_T, w, τ_liq, τ_ice, new_q_vap, new_q, new_q_eq, Δt_left, new_ts; opts = MM2015Opts{FT}(use_fix = use_fix, return_mixing_ratio = true, depth = depth + 1, δ_0_shum = new_δ_0_shum, δ_0i_shum = new_δ_0i_shum, dqvdt=dqvdt, dTdt=dTdt, fallback_to_standard_supersaturation_limiter = fallback_to_standard_supersaturation_limiter))
             S_ql *= min_t / Δt # rescale to the timestep
             S_qi *= min_t / Δt # rescale to the timestep
             S_ql_addit *= Δt_left / Δt # rescale to the remaining time
@@ -1779,22 +1757,15 @@ end
 function morrison_milbrandt_2015_style(
     regime::Union{WBF{true, false, false}}, # above freezing, so liq sat is lower. so we can lose liq. can't gain ice above freezing and we're subsat anyway
     param_set::APS, area::FT, ρ::FT, p::FT, T::FT, w::FT, τ_liq::FT, τ_ice::FT, q_vap::FT, q::TD.PhasePartition, q_eq::TD.PhasePartition, Δt::FT, ts::TD.ThermodynamicState;
-    use_fix::Bool = true, # i think something is wrong with the forumula for large timesteps... is less essential now w/ the limiter but still needed... (unless I just don't understand the physics of it)
-    return_mixing_ratio::Bool = false,
-    max_depth::Int = 12,
-    depth::Int = 0,
-    δ_0_shum::FT,
-    δ_0i_shum::FT,
-    dqvdt::FT = FT(0), # not used in this regime, but needed for the function signature
-    dTdt::FT = FT(0), # not used in this regime, but needed for the function signature
-    fallback_to_standard_supersaturation_limiter::Bool = false,
+    opts::MM2015Opts{FT} = MM2015Opts{FT}(),
     )::Tuple{FT, FT} where {FT}
+    (; use_fix, return_mixing_ratio, max_depth, depth, δ_0_shum, δ_0i_shum, dqvdt, dTdt, fallback_to_standard_supersaturation_limiter) = opts
 
     # @debug "Calling WBF{true, false, false}"
     # although we'd be moving towards liquid sat, with outside forcing could still be either, so still need to choose perspectives
     if depth == max_depth
         # @debug "Max depth reached, returning exponential part only fallback (no thermo adjustments)"
-        S_ql, S_qi = morrison_milbrandt_2015_style_exponential_part_only(regime, param_set, area, ρ, p, T, w, τ_liq, τ_ice, δ_0_shum, δ_0i_shum, q, q_eq, Δt, ts; use_fix = use_fix, return_mixing_ratio = false, dqvdt=dqvdt, dTdt=dTdt, fallback_to_standard_supersaturation_limiter = fallback_to_standard_supersaturation_limiter)
+        S_ql, S_qi = morrison_milbrandt_2015_style_exponential_part_only(regime, param_set, area, ρ, p, T, w, τ_liq, τ_ice, δ_0_shum, δ_0i_shum, q, q_eq, Δt, ts; opts = MM2015Opts{FT}(use_fix = use_fix, return_mixing_ratio = false, dqvdt=dqvdt, dTdt=dTdt, fallback_to_standard_supersaturation_limiter = fallback_to_standard_supersaturation_limiter))
         return return_mixing_ratio ? (S_shum_to_mixing_ratio(S_ql, q.tot), S_shum_to_mixing_ratio(S_qi, q.tot)) : (S_ql, S_qi) # exponential only doesn't bother with mixing ratios at the moment
     end
 
@@ -1811,7 +1782,7 @@ function morrison_milbrandt_2015_style(
     # ======================================================================================== #
     local use_ice_perspective::Bool    
 
-    (; g, L_i, L_l, c_p, e_sl, e_si, dqsl_dT, dqsi_dT, q_sl, q_si, q_vap, q_liq, q_ice, T_freeze, δ_0, δ_0i, Γ_l, Γ_i, dqvdt, dTdt) = get_params_and_go_to_mixing_ratio(param_set, area, ρ, p, T, w, τ_liq, τ_ice_here, q_vap, dqvdt, dTdt, δ_0_shum, δ_0i_shum, q, q_eq, Δt, ts)
+    (; g, L_i, L_l, c_p, e_sl, e_si, dqsl_dT, dqsi_dT, q_sl, q_si, q_vap, q_liq, q_ice, T_freeze, δ_0, δ_0i, Γ_l, Γ_i) = get_params_and_go_to_mixing_ratio(param_set, area, ρ, p, T, w, τ_liq, τ_ice_here, q_vap, dqvdt, dTdt, δ_0_shum, δ_0i_shum, q, q_eq, Δt, ts)
 
     
     A_cL = A_c_func(τ_ice, Γ_l, q_sl, q_si, g, w, c_p, e_sl, L_i, dqsl_dT, dqvdt, dTdt, p, ρ) # Eq C4
@@ -1922,7 +1893,7 @@ function morrison_milbrandt_2015_style(
             # @debug "Ran out of liquid before timestep is over... transitioning to $(typeof(new_regime)) at t = $(min_t)..."
             new_δ_0_shum = TD.vapor_specific_humidity(new_q) - new_q_eq.liq
             new_δ_0i_shum = TD.vapor_specific_humidity(new_q) - new_q_eq.ice
-            S_ql_addit, S_qi_addit = morrison_milbrandt_2015_style(new_regime, param_set, area, new_ρ, new_p, new_T, w, τ_liq, τ_ice, new_q_vap, new_q, new_q_eq, Δt_left, new_ts; use_fix = use_fix, return_mixing_ratio = true, depth = depth + 1, δ_0_shum = new_δ_0_shum, δ_0i_shum = new_δ_0i_shum, dqvdt=dqvdt, dTdt=dTdt, fallback_to_standard_supersaturation_limiter = fallback_to_standard_supersaturation_limiter)
+            S_ql_addit, S_qi_addit = morrison_milbrandt_2015_style(new_regime, param_set, area, new_ρ, new_p, new_T, w, τ_liq, τ_ice, new_q_vap, new_q, new_q_eq, Δt_left, new_ts; opts = MM2015Opts{FT}(use_fix = use_fix, return_mixing_ratio = true, depth = depth + 1, δ_0_shum = new_δ_0_shum, δ_0i_shum = new_δ_0i_shum, dqvdt=dqvdt, dTdt=dTdt, fallback_to_standard_supersaturation_limiter = fallback_to_standard_supersaturation_limiter))
             
 
             S_ql *= min_t / Δt # rescale to the timestep
@@ -1937,7 +1908,7 @@ function morrison_milbrandt_2015_style(
 
             if (S_qi > FT(0))
                 # @debug "S_qi > 0 in WBF above freezing... can't happen. Remedying by recalling with τ_ice = Inf"
-                return morrison_milbrandt_2015_style(regime, param_set, area, ρ, p, T, w, τ_liq, FT(Inf), q_vap, q, q_eq, Δt, ts; use_fix = use_fix, return_mixing_ratio = return_mixing_ratio, max_depth = max_depth, depth = depth, dqvdt=dqvdt, dTdt=dTdt, fallback_to_standard_supersaturation_limiter = fallback_to_standard_supersaturation_limiter) # we had ice growth instead of loss, set τ_ice to infinity and recall
+                return morrison_milbrandt_2015_style(regime, param_set, area, ρ, p, T, w, τ_liq, FT(Inf), q_vap, q, q_eq, Δt, ts; opts = MM2015Opts{FT}(use_fix = use_fix, return_mixing_ratio = return_mixing_ratio, max_depth = max_depth, depth = depth, dqvdt=dqvdt, dTdt=dTdt, fallback_to_standard_supersaturation_limiter = fallback_to_standard_supersaturation_limiter)) # we had ice growth instead of loss, set τ_ice to infinity and recall
             end
 
 
@@ -1971,7 +1942,7 @@ function morrison_milbrandt_2015_style(
                 new_δ_0i_shum = new_δ_0_shum # these are the same at freezing
             end
 
-            S_ql_addit, S_qi_addit = morrison_milbrandt_2015_style(new_regime, param_set, area, new_ρ, new_p, new_T, w, τ_liq, τ_ice, new_q_vap, new_q, new_q_eq, Δt_left, new_ts; use_fix = use_fix, return_mixing_ratio = true, depth = depth + 1, δ_0_shum = new_δ_0_shum, δ_0i_shum = new_δ_0i_shum, dqvdt=dqvdt, dTdt=dTdt, fallback_to_standard_supersaturation_limiter = fallback_to_standard_supersaturation_limiter)
+            S_ql_addit, S_qi_addit = morrison_milbrandt_2015_style(new_regime, param_set, area, new_ρ, new_p, new_T, w, τ_liq, τ_ice, new_q_vap, new_q, new_q_eq, Δt_left, new_ts; opts = MM2015Opts{FT}(use_fix = use_fix, return_mixing_ratio = true, depth = depth + 1, δ_0_shum = new_δ_0_shum, δ_0i_shum = new_δ_0i_shum, dqvdt=dqvdt, dTdt=dTdt, fallback_to_standard_supersaturation_limiter = fallback_to_standard_supersaturation_limiter))
 
             S_ql *= min_t / Δt # rescale to the timestep
             S_qi *= min_t / Δt # rescale to the timestep
@@ -1987,7 +1958,7 @@ function morrison_milbrandt_2015_style(
 
         if (S_qi > FT(0))
             # @debug "S_qi > 0 in WBF above freezing... can't happen. Remedying by recalling with τ_ice = Inf"
-            return morrison_milbrandt_2015_style(regime, param_set, area, ρ, p, T, w, τ_liq, FT(Inf), q_vap, q, q_eq, Δt, ts; use_fix = use_fix, return_mixing_ratio = return_mixing_ratio, max_depth = max_depth, depth = depth, dqvdt=dqvdt, dTdt=dTdt, fallback_to_standard_supersaturation_limiter = fallback_to_standard_supersaturation_limiter) # we had ice growth instead of loss, set τ_ice to infinity and recall
+            return morrison_milbrandt_2015_style(regime, param_set, area, ρ, p, T, w, τ_liq, FT(Inf), q_vap, q, q_eq, Δt, ts; opts = MM2015Opts{FT}(use_fix = use_fix, return_mixing_ratio = return_mixing_ratio, max_depth = max_depth, depth = depth, dqvdt=dqvdt, dTdt=dTdt, fallback_to_standard_supersaturation_limiter = fallback_to_standard_supersaturation_limiter)) # we had ice growth instead of loss, set τ_ice to infinity and recall
         end
 
         S_ql, S_qi = S_above_floor(S_ql, S_qi, q_liq, q_ice, Δt) # if t was too small for t_out_of_q for example, this makes sure we put a floor on S_ql and S_qi
@@ -2008,29 +1979,22 @@ end
 function morrison_milbrandt_2015_style(
     regime::WBF{true, true, false}, # above freezing so we're subsat over ice, supersat over liq. ice can shrink, never grow bc above freeezing.
     param_set::APS, area::FT, ρ::FT, p::FT, T::FT, w::FT, τ_liq::FT, τ_ice::FT, q_vap::FT, q::TD.PhasePartition, q_eq::TD.PhasePartition, Δt::FT, ts::TD.ThermodynamicState;
-    use_fix::Bool = true, # i think something is wrong with the forumula for large timesteps... is less essential now w/ the limiter but still needed... (unless I just don't understand the physics of it)
-    return_mixing_ratio::Bool = false,
-    max_depth::Int = 12,
-    depth::Int = 0,
-    δ_0_shum::FT,
-    δ_0i_shum::FT,
-    dqvdt::FT = FT(0), # not used in this regime, but needed for the function signature
-    dTdt::FT = FT(0), # not used in this regime, but needed for the function signature
-    fallback_to_standard_supersaturation_limiter::Bool = false,
+    opts::MM2015Opts{FT} = MM2015Opts{FT}(),
     )::Tuple{FT, FT} where {FT}
+    (; use_fix, return_mixing_ratio, max_depth, depth, δ_0_shum, δ_0i_shum, dqvdt, dTdt, fallback_to_standard_supersaturation_limiter) = opts
 
     # @debug "Calling WBF{true, true, false}"
 
     if depth == max_depth
         # @debug "Max depth reached, returning exponential part only fallback (no thermo adjustments)"
-        S_ql, S_qi = morrison_milbrandt_2015_style_exponential_part_only(regime, param_set, area, ρ, p, T, w, τ_liq, τ_ice, δ_0_shum, δ_0i_shum, q, q_eq, Δt, ts; use_fix = use_fix, return_mixing_ratio = false, dqvdt=dqvdt, dTdt=dTdt, fallback_to_standard_supersaturation_limiter = fallback_to_standard_supersaturation_limiter)
+        S_ql, S_qi = morrison_milbrandt_2015_style_exponential_part_only(regime, param_set, area, ρ, p, T, w, τ_liq, τ_ice, δ_0_shum, δ_0i_shum, q, q_eq, Δt, ts; opts = MM2015Opts{FT}(use_fix = use_fix, return_mixing_ratio = false, dqvdt=dqvdt, dTdt=dTdt, fallback_to_standard_supersaturation_limiter = fallback_to_standard_supersaturation_limiter))
         return return_mixing_ratio ? (S_shum_to_mixing_ratio(S_ql, q.tot), S_shum_to_mixing_ratio(S_qi, q.tot)) : (S_ql, S_qi) # exponential only doesn't bother with mixing ratios at the moment
     end
 
     local S_ql_addit::FT
     local S_qi_addit::FT
 
-    (; g, L_i, L_l, c_p, e_sl, e_si, dqsl_dT, dqsi_dT, q_sl, q_si, q_vap, q_liq, q_ice, T_freeze, δ_0, δ_0i, Γ_l, Γ_i, dqvdt, dTdt) = get_params_and_go_to_mixing_ratio(param_set, area, ρ, p, T, w, τ_liq, τ_ice, q_vap, dqvdt, dTdt, δ_0_shum, δ_0i_shum, q, q_eq, Δt, ts) 
+    (; g, L_i, L_l, c_p, e_sl, e_si, dqsl_dT, dqsi_dT, q_sl, q_si, q_vap, q_liq, q_ice, T_freeze, δ_0, δ_0i, Γ_l, Γ_i) = get_params_and_go_to_mixing_ratio(param_set, area, ρ, p, T, w, τ_liq, τ_ice, q_vap, dqvdt, dTdt, δ_0_shum, δ_0i_shum, q, q_eq, Δt, ts) 
 
     # No ice growth, only liq shrink
     # A_c = A_c_func_no_WBF(q_sl, g, w, c_p, e_sl, dqsl_dT, dqvdt, dTdt, p, ρ) # supersaturated so no loss and now growth because above freezing
@@ -2173,7 +2137,7 @@ function morrison_milbrandt_2015_style(
 
             if (S_qi > FT(0))
                 # @debug "S_qi > 0 in WBF above freezing... can't happen. Remedying by recalling with τ_ice = Inf"
-                return morrison_milbrandt_2015_style(regime, param_set, area, ρ, p, T, w, τ_liq, FT(Inf), q_vap, q, q_eq, Δt, ts; use_fix = use_fix, return_mixing_ratio = return_mixing_ratio, max_depth = max_depth, depth = depth, dqvdt=dqvdt, dTdt=dTdt, fallback_to_standard_supersaturation_limiter = fallback_to_standard_supersaturation_limiter) # we had ice growth instead of loss, set τ_ice to infinity and recall
+                return morrison_milbrandt_2015_style(regime, param_set, area, ρ, p, T, w, τ_liq, FT(Inf), q_vap, q, q_eq, Δt, ts; opts = MM2015Opts{FT}(use_fix = use_fix, return_mixing_ratio = return_mixing_ratio, max_depth = max_depth, depth = depth, dqvdt=dqvdt, dTdt=dTdt, fallback_to_standard_supersaturation_limiter = fallback_to_standard_supersaturation_limiter)) # we had ice growth instead of loss, set τ_ice to infinity and recall
             end
 
             S_ql, S_qi = S_above_floor(S_ql, S_qi, q_liq, q_ice, min_t) # if t was too small for t_out_of_q for example, this makes sure we put a floor on S_ql and S_qi
@@ -2183,7 +2147,7 @@ function morrison_milbrandt_2015_style(
             # @debug "Ran out of liquid before timestep is over... transitioning to $(typeof(new_regime)) at t = $(min_t)..."
             new_δ_0_shum = TD.vapor_specific_humidity(new_q) - new_q_eq.liq
             new_δ_0i_shum = TD.vapor_specific_humidity(new_q) - new_q_eq.ice
-            S_ql_addit, S_qi_addit = morrison_milbrandt_2015_style(new_regime, param_set, area, new_ρ, new_p, new_T, w, τ_liq, τ_ice, new_q_vap, new_q, new_q_eq, Δt_left, new_ts; use_fix = use_fix, return_mixing_ratio = true, depth = depth + 1, δ_0_shum = new_δ_0_shum, δ_0i_shum = new_δ_0i_shum, dqvdt=dqvdt, dTdt=dTdt, fallback_to_standard_supersaturation_limiter = fallback_to_standard_supersaturation_limiter)
+            S_ql_addit, S_qi_addit = morrison_milbrandt_2015_style(new_regime, param_set, area, new_ρ, new_p, new_T, w, τ_liq, τ_ice, new_q_vap, new_q, new_q_eq, Δt_left, new_ts; opts = MM2015Opts{FT}(use_fix = use_fix, return_mixing_ratio = true, depth = depth + 1, δ_0_shum = new_δ_0_shum, δ_0i_shum = new_δ_0i_shum, dqvdt=dqvdt, dTdt=dTdt, fallback_to_standard_supersaturation_limiter = fallback_to_standard_supersaturation_limiter))
             
 
             S_ql *= min_t / Δt # rescale to the timestep
@@ -2202,7 +2166,7 @@ function morrison_milbrandt_2015_style(
             # @debug "Ran out of liquid before timestep is over... transitioning to $(typeof(new_regime)) at t = $(min_t)..."
             new_δ_0_shum = TD.vapor_specific_humidity(new_q) - new_q_eq.liq
             new_δ_0i_shum = TD.vapor_specific_humidity(new_q) - new_q_eq.ice
-            S_ql_addit, S_qi_addit = morrison_milbrandt_2015_style(new_regime, param_set, area, new_ρ, new_p, new_T, w, τ_liq, τ_ice, new_q_vap, new_q, new_q_eq, Δt_left, new_ts; use_fix = use_fix, return_mixing_ratio = true, depth = depth + 1, δ_0_shum = new_δ_0_shum, δ_0i_shum = new_δ_0i_shum, dqvdt=dqvdt, dTdt=dTdt, fallback_to_standard_supersaturation_limiter = fallback_to_standard_supersaturation_limiter)
+            S_ql_addit, S_qi_addit = morrison_milbrandt_2015_style(new_regime, param_set, area, new_ρ, new_p, new_T, w, τ_liq, τ_ice, new_q_vap, new_q, new_q_eq, Δt_left, new_ts; opts = MM2015Opts{FT}(use_fix = use_fix, return_mixing_ratio = true, depth = depth + 1, δ_0_shum = new_δ_0_shum, δ_0i_shum = new_δ_0i_shum, dqvdt=dqvdt, dTdt=dTdt, fallback_to_standard_supersaturation_limiter = fallback_to_standard_supersaturation_limiter))
             
 
             S_ql *= min_t / Δt # rescale to the timestep
@@ -2220,7 +2184,7 @@ function morrison_milbrandt_2015_style(
 
             if (S_qi > FT(0))
                 # @debug "S_qi > 0 in WBF above freezing... can't happen. Remedying by recalling with τ_ice = Inf"
-                return morrison_milbrandt_2015_style(regime, param_set, area, ρ, p, T, w, τ_liq, FT(Inf), q_vap, q, q_eq, Δt, ts; use_fix = use_fix, return_mixing_ratio = return_mixing_ratio, max_depth = max_depth, depth = depth, dqvdt=dqvdt, dTdt=dTdt, fallback_to_standard_supersaturation_limiter = fallback_to_standard_supersaturation_limiter) # we had ice growth instead of loss, set τ_ice to infinity and recall
+                return morrison_milbrandt_2015_style(regime, param_set, area, ρ, p, T, w, τ_liq, FT(Inf), q_vap, q, q_eq, Δt, ts; opts = MM2015Opts{FT}(use_fix = use_fix, return_mixing_ratio = return_mixing_ratio, max_depth = max_depth, depth = depth, dqvdt=dqvdt, dTdt=dTdt, fallback_to_standard_supersaturation_limiter = fallback_to_standard_supersaturation_limiter)) # we had ice growth instead of loss, set τ_ice to infinity and recall
             end
 
 
@@ -2253,7 +2217,7 @@ function morrison_milbrandt_2015_style(
                 new_δ_0i_shum = new_δ_0_shum # these are the same at freezing
             end
 
-            S_ql_addit, S_qi_addit = morrison_milbrandt_2015_style(new_regime, param_set, area, new_ρ, new_p, new_T, w, τ_liq, τ_ice, new_q_vap, new_q, new_q_eq, Δt_left, new_ts; use_fix = use_fix, return_mixing_ratio = true, depth = depth + 1, δ_0_shum = new_δ_0_shum, δ_0i_shum = new_δ_0i_shum, dqvdt=dqvdt, dTdt=dTdt, fallback_to_standard_supersaturation_limiter = fallback_to_standard_supersaturation_limiter)
+            S_ql_addit, S_qi_addit = morrison_milbrandt_2015_style(new_regime, param_set, area, new_ρ, new_p, new_T, w, τ_liq, τ_ice, new_q_vap, new_q, new_q_eq, Δt_left, new_ts; opts = MM2015Opts{FT}(use_fix = use_fix, return_mixing_ratio = true, depth = depth + 1, δ_0_shum = new_δ_0_shum, δ_0i_shum = new_δ_0i_shum, dqvdt=dqvdt, dTdt=dTdt, fallback_to_standard_supersaturation_limiter = fallback_to_standard_supersaturation_limiter))
 
             S_ql *= min_t / Δt # rescale to the timestep
             S_qi *= min_t / Δt # rescale to the timestep
@@ -2271,7 +2235,7 @@ function morrison_milbrandt_2015_style(
 
         if (S_qi > FT(0))
             # @debug "S_qi > 0 in WBF above freezing... can't happen. Remedying by recalling with τ_ice = Inf"
-            return morrison_milbrandt_2015_style(regime, param_set, area, ρ, p, T, w, τ_liq, FT(Inf), q_vap, q, q_eq, Δt, ts; use_fix = use_fix, return_mixing_ratio = return_mixing_ratio, max_depth = max_depth, depth = depth, fallback_to_standard_supersaturation_limiter=fallback_to_standard_supersaturation_limiter) # we had ice growth instead of loss, set τ_ice to infinity and recall
+            return morrison_milbrandt_2015_style(regime, param_set, area, ρ, p, T, w, τ_liq, FT(Inf), q_vap, q, q_eq, Δt, ts; opts = MM2015Opts{FT}(use_fix = use_fix, return_mixing_ratio = return_mixing_ratio, max_depth = max_depth, depth = depth, fallback_to_standard_supersaturation_limiter=fallback_to_standard_supersaturation_limiter)) # we had ice growth instead of loss, set τ_ice to infinity and recall
         end
 
         S_ql, S_qi = S_above_floor(S_ql, S_qi, q_liq, q_ice, Δt) # if t was too small for t_out_of_q for example, this makes sure we put a floor on S_ql and S_qi
@@ -2289,22 +2253,15 @@ end
 function morrison_milbrandt_2015_style(
     regime::Union{WBF{false, true, true}, WBF{false, false, true}}, # no liq, no matter what we'll end up with some ice
     param_set::APS, area::FT, ρ::FT, p::FT, T::FT, w::FT, τ_liq::FT, τ_ice::FT, q_vap::FT, q::TD.PhasePartition, q_eq::TD.PhasePartition, Δt::FT, ts::TD.ThermodynamicState;
-    use_fix::Bool = true, # i think something is wrong with the forumula for large timesteps... is less essential now w/ the limiter but still needed... (unless I just don't understand the physics of it)
-    return_mixing_ratio::Bool = false,
-    max_depth::Int = 12,
-    depth::Int = 0,
-    δ_0_shum::FT,
-    δ_0i_shum::FT,
-    dqvdt::FT = FT(0), # not used in this regime, but needed for the function signature
-    dTdt::FT = FT(0), # not used in this regime, but needed for the function signature
-    fallback_to_standard_supersaturation_limiter::Bool = false,
+    opts::MM2015Opts{FT} = MM2015Opts{FT}(),
     )::Tuple{FT, FT} where {FT}
+    (; use_fix, return_mixing_ratio, max_depth, depth, δ_0_shum, δ_0i_shum, dqvdt, dTdt, fallback_to_standard_supersaturation_limiter) = opts
 
     # @debug "Calling WBF{false, $(q.ice > FT(0)), true}"
 
     if depth == max_depth
         # @debug "Max depth reached, returning exponential part only fallback (no thermo adjustments)"
-        S_ql, S_qi = morrison_milbrandt_2015_style_exponential_part_only(regime, param_set, area, ρ, p, T, w, τ_liq, τ_ice, δ_0_shum, δ_0i_shum, q, q_eq, Δt, ts; use_fix = use_fix, return_mixing_ratio = false, dqvdt=dqvdt, dTdt=dTdt, fallback_to_standard_supersaturation_limiter = fallback_to_standard_supersaturation_limiter)
+        S_ql, S_qi = morrison_milbrandt_2015_style_exponential_part_only(regime, param_set, area, ρ, p, T, w, τ_liq, τ_ice, δ_0_shum, δ_0i_shum, q, q_eq, Δt, ts; opts = MM2015Opts{FT}(use_fix = use_fix, return_mixing_ratio = false, dqvdt=dqvdt, dTdt=dTdt, fallback_to_standard_supersaturation_limiter = fallback_to_standard_supersaturation_limiter))
         return return_mixing_ratio ? (S_shum_to_mixing_ratio(S_ql, q.tot), S_shum_to_mixing_ratio(S_qi, q.tot)) : (S_ql, S_qi) # exponential only doesn't bother with mixing ratios at the moment
     end
 
@@ -2315,7 +2272,7 @@ function morrison_milbrandt_2015_style(
     τ_liq_here = FT(Inf) # we have no liq and can't immediately grow it while in WBF mode (don't actually set in case need to pass to another func)
     τ = τ_ice # no liq growth, only ice growth
 
-    (; g, L_i, L_l, c_p, e_sl, e_si, dqsl_dT, dqsi_dT, q_sl, q_si, q_vap, q_liq, q_ice, T_freeze, δ_0, δ_0i, Γ_l, Γ_i, dqvdt, dTdt) = get_params_and_go_to_mixing_ratio(param_set, area, ρ, p, T, w, τ_liq_here, τ_ice, q_vap, dqvdt, dTdt, δ_0_shum, δ_0i_shum, q, q_eq, Δt, ts)
+    (; g, L_i, L_l, c_p, e_sl, e_si, dqsl_dT, dqsi_dT, q_sl, q_si, q_vap, q_liq, q_ice, T_freeze, δ_0, δ_0i, Γ_l, Γ_i) = get_params_and_go_to_mixing_ratio(param_set, area, ρ, p, T, w, τ_liq_here, τ_ice, q_vap, dqvdt, dTdt, δ_0_shum, δ_0i_shum, q, q_eq, Δt, ts)
 
     # iszero(q.liq) ||  error("we have liq $(q.liq), this is wrong")
 
@@ -2417,7 +2374,7 @@ function morrison_milbrandt_2015_style(
             # @debug "Ran out of ice before timestep is over... transitioning to $(typeof(new_regime)) at t = $(min_t)..."
             new_δ_0_shum = TD.vapor_specific_humidity(new_q) - new_q_eq.liq
             new_δ_0i_shum = TD.vapor_specific_humidity(new_q) - new_q_eq.ice
-            S_ql_addit, S_qi_addit = morrison_milbrandt_2015_style(new_regime, param_set, area, new_ρ, new_p, new_T, w, τ_liq, τ_ice, new_q_vap, new_q, new_q_eq, Δt_left, new_ts; use_fix = use_fix, return_mixing_ratio = true, depth = depth + 1, δ_0_shum = new_δ_0_shum, δ_0i_shum = new_δ_0i_shum, dqvdt=dqvdt, dTdt=dTdt, fallback_to_standard_supersaturation_limiter = fallback_to_standard_supersaturation_limiter)
+            S_ql_addit, S_qi_addit = morrison_milbrandt_2015_style(new_regime, param_set, area, new_ρ, new_p, new_T, w, τ_liq, τ_ice, new_q_vap, new_q, new_q_eq, Δt_left, new_ts; opts = MM2015Opts{FT}(use_fix = use_fix, return_mixing_ratio = true, depth = depth + 1, δ_0_shum = new_δ_0_shum, δ_0i_shum = new_δ_0i_shum, dqvdt=dqvdt, dTdt=dTdt, fallback_to_standard_supersaturation_limiter = fallback_to_standard_supersaturation_limiter))
             S_ql *= min_t / Δt # rescale to the timestep
             S_qi *= min_t / Δt # rescale to the timestep
             S_qi_addit *= Δt_left / Δt # rescale to the remaining time
@@ -2456,7 +2413,7 @@ function morrison_milbrandt_2015_style(
                 new_δ_0i_shum = new_δ_0_shum # these are the same at freezing
             end
 
-            S_ql_addit, S_qi_addit = morrison_milbrandt_2015_style(new_regime, param_set, area, new_ρ, new_p, new_T, w, τ_liq, τ_ice, new_q_vap, new_q, new_q_eq, Δt_left, new_ts; use_fix = use_fix, return_mixing_ratio = true, depth = depth + 1, δ_0_shum = new_δ_0_shum, δ_0i_shum = new_δ_0i_shum, dqvdt=dqvdt, dTdt=dTdt, fallback_to_standard_supersaturation_limiter = fallback_to_standard_supersaturation_limiter)
+            S_ql_addit, S_qi_addit = morrison_milbrandt_2015_style(new_regime, param_set, area, new_ρ, new_p, new_T, w, τ_liq, τ_ice, new_q_vap, new_q, new_q_eq, Δt_left, new_ts; opts = MM2015Opts{FT}(use_fix = use_fix, return_mixing_ratio = true, depth = depth + 1, δ_0_shum = new_δ_0_shum, δ_0i_shum = new_δ_0i_shum, dqvdt=dqvdt, dTdt=dTdt, fallback_to_standard_supersaturation_limiter = fallback_to_standard_supersaturation_limiter))
             S_ql *= min_t / Δt # rescale to the timestep
             S_qi *= min_t / Δt # rescale to the timestep
             S_ql_addit *= Δt_left / Δt # rescale to the remaining time
@@ -2485,20 +2442,13 @@ end
 function morrison_milbrandt_2015_style(
     regime::Union{WBF{false, true, false}, WBF{false, false, false}}, # above freezing, no liq, ice can't shrink.
     param_set::APS, area::FT, ρ::FT, p::FT, T::FT, w::FT, τ_liq::FT, τ_ice::FT, q_vap::FT, q::TD.PhasePartition, q_eq::TD.PhasePartition, Δt::FT, ts::TD.ThermodynamicState;
-    use_fix::Bool = true, # i think something is wrong with the forumula for large timesteps... is less essential now w/ the limiter but still needed... (unless I just don't understand the physics of it)
-    return_mixing_ratio::Bool = false,
-    max_depth::Int = 12,
-    depth::Int = 0,
-    δ_0_shum::FT,
-    δ_0i_shum::FT,
-    dqvdt::FT = FT(0), # not used in this regime, but needed for the function signature
-    dTdt::FT = FT(0), # not used in this regime, but needed for the function signature
-    fallback_to_standard_supersaturation_limiter::Bool = false,
+    opts::MM2015Opts{FT} = MM2015Opts{FT}(),
     )::Tuple{FT, FT} where {FT}
+    (; use_fix, return_mixing_ratio, max_depth, depth, δ_0_shum, δ_0i_shum, dqvdt, dTdt, fallback_to_standard_supersaturation_limiter) = opts
 
     if depth == max_depth
         # @debug "Max depth reached, returning exponential part only fallback (no thermo adjustments)"
-        S_ql, S_qi = morrison_milbrandt_2015_style_exponential_part_only(regime, param_set, area, ρ, p, T, w, τ_liq, τ_ice, δ_0_shum, δ_0i_shum, q, q_eq, Δt, ts; use_fix = use_fix, return_mixing_ratio = false, dqvdt=dqvdt, dTdt=dTdt, fallback_to_standard_supersaturation_limiter = fallback_to_standard_supersaturation_limiter)
+        S_ql, S_qi = morrison_milbrandt_2015_style_exponential_part_only(regime, param_set, area, ρ, p, T, w, τ_liq, τ_ice, δ_0_shum, δ_0i_shum, q, q_eq, Δt, ts; opts = MM2015Opts{FT}(use_fix = use_fix, return_mixing_ratio = false, dqvdt=dqvdt, dTdt=dTdt, fallback_to_standard_supersaturation_limiter = fallback_to_standard_supersaturation_limiter))
         return return_mixing_ratio ? (S_shum_to_mixing_ratio(S_ql, q.tot), S_shum_to_mixing_ratio(S_qi, q.tot)) : (S_ql, S_qi) # exponential only doesn't bother with mixing ratios at the moment
     end
 
@@ -2513,7 +2463,7 @@ function morrison_milbrandt_2015_style(
     τ_ice_here = FT(Inf) # no ice growth above freezing
     τ_here = FT(Inf)
 
-    (; g, L_i, L_l, c_p, e_sl, e_si, dqsl_dT, dqsi_dT, q_sl, q_si, q_vap, q_liq, q_ice, T_freeze, δ_0, δ_0i, Γ_l, Γ_i, dqvdt, dTdt) = get_params_and_go_to_mixing_ratio(param_set, area, ρ, p, T, w, τ_liq_here, τ_ice, q_vap, dqvdt, dTdt, δ_0_shum, δ_0i_shum, q, q_eq, Δt, ts)
+    (; g, L_i, L_l, c_p, e_sl, e_si, dqsl_dT, dqsi_dT, q_sl, q_si, q_vap, q_liq, q_ice, T_freeze, δ_0, δ_0i, Γ_l, Γ_i) = get_params_and_go_to_mixing_ratio(param_set, area, ρ, p, T, w, τ_liq_here, τ_ice, q_vap, dqvdt, dTdt, δ_0_shum, δ_0i_shum, q, q_eq, Δt, ts)
 
 
     A_c = A_c_func_no_WBF( q_sl, g, w, c_p, e_sl, dqsl_dT, dqvdt, dTdt, p, ρ)
@@ -2558,7 +2508,7 @@ function morrison_milbrandt_2015_style(
             new_δ_0i_shum = new_δ_0_shum # these are the same at freezing
         end
 
-        S_ql_addit, S_qi_addit = morrison_milbrandt_2015_style(new_regime, param_set, area, new_ρ, new_p, new_T, w, τ_liq, τ_ice, new_q_vap, new_q, new_q_eq, Δt_left, new_ts; use_fix = use_fix, return_mixing_ratio = true, depth = depth + 1, δ_0_shum = new_δ_0_shum, δ_0i_shum = new_δ_0i_shum, dqvdt=dqvdt, dTdt=dTdt, fallback_to_standard_supersaturation_limiter = fallback_to_standard_supersaturation_limiter)
+        S_ql_addit, S_qi_addit = morrison_milbrandt_2015_style(new_regime, param_set, area, new_ρ, new_p, new_T, w, τ_liq, τ_ice, new_q_vap, new_q, new_q_eq, Δt_left, new_ts; opts = MM2015Opts{FT}(use_fix = use_fix, return_mixing_ratio = true, depth = depth + 1, δ_0_shum = new_δ_0_shum, δ_0i_shum = new_δ_0i_shum, dqvdt=dqvdt, dTdt=dTdt, fallback_to_standard_supersaturation_limiter = fallback_to_standard_supersaturation_limiter))
 
         S_ql *= min_t / Δt # rescale to the timestep
         S_qi *= min_t / Δt # rescale to the timestep
@@ -2587,28 +2537,21 @@ end
 function morrison_milbrandt_2015_style(
     regime::Union{Subsaturated{true, true, true}, Subsaturated{true, true, false}}, # can run out of either first
     param_set::APS, area::FT, ρ::FT, p::FT, T::FT, w::FT, τ_liq::FT, τ_ice::FT, q_vap::FT, q::TD.PhasePartition, q_eq::TD.PhasePartition, Δt::FT, ts::TD.ThermodynamicState;
-    use_fix::Bool = true, # i think something is wrong with the forumula for large timesteps... is less essential now w/ the limiter but still needed... (unless I just don't understand the physics of it)
-    return_mixing_ratio::Bool = false,
-    max_depth::Int = 12,
-    depth::Int = 0,
-    δ_0_shum::FT,
-    δ_0i_shum::FT,
-    dqvdt::FT = FT(0), # not used in this regime, but needed for the function signature
-    dTdt::FT = FT(0), # not used in this regime, but needed for the function signature
-    fallback_to_standard_supersaturation_limiter::Bool = false,
+    opts::MM2015Opts{FT} = MM2015Opts{FT}(),
     )::Tuple{FT, FT} where {FT}
+    (; use_fix, return_mixing_ratio, max_depth, depth, δ_0_shum, δ_0i_shum, dqvdt, dTdt, fallback_to_standard_supersaturation_limiter) = opts
 
 
     if depth == max_depth
         # @debug "Max depth reached, returning exponential part only fallback (no thermo adjustments)"
-        S_ql, S_qi = morrison_milbrandt_2015_style_exponential_part_only(regime, param_set, area, ρ, p, T, w, τ_liq, τ_ice, δ_0_shum, δ_0i_shum, q, q_eq, Δt, ts; use_fix = use_fix, return_mixing_ratio = false, dqvdt=dqvdt, dTdt=dTdt, fallback_to_standard_supersaturation_limiter = fallback_to_standard_supersaturation_limiter)
+        S_ql, S_qi = morrison_milbrandt_2015_style_exponential_part_only(regime, param_set, area, ρ, p, T, w, τ_liq, τ_ice, δ_0_shum, δ_0i_shum, q, q_eq, Δt, ts; opts = MM2015Opts{FT}(use_fix = use_fix, return_mixing_ratio = false, dqvdt=dqvdt, dTdt=dTdt, fallback_to_standard_supersaturation_limiter = fallback_to_standard_supersaturation_limiter))
         return return_mixing_ratio ? (S_shum_to_mixing_ratio(S_ql, q.tot), S_shum_to_mixing_ratio(S_qi, q.tot)) : (S_ql, S_qi) # exponential only doesn't bother with mixing ratios at the moment
     end
 
     local S_ql_addit::FT
     local S_qi_addit::FT
 
-    (; g, L_i, L_l, c_p, e_sl, e_si, dqsl_dT, dqsi_dT, q_sl, q_si, q_vap, q_liq, q_ice, T_freeze, δ_0, δ_0i, Γ_l, Γ_i, dqvdt, dTdt) = get_params_and_go_to_mixing_ratio(param_set, area, ρ, p, T, w, τ_liq, τ_ice, q_vap, dqvdt, dTdt, δ_0_shum, δ_0i_shum, q, q_eq, Δt, ts) 
+    (; g, L_i, L_l, c_p, e_sl, e_si, dqsl_dT, dqsi_dT, q_sl, q_si, q_vap, q_liq, q_ice, T_freeze, δ_0, δ_0i, Γ_l, Γ_i) = get_params_and_go_to_mixing_ratio(param_set, area, ρ, p, T, w, τ_liq, τ_ice, q_vap, dqvdt, dTdt, δ_0_shum, δ_0i_shum, q, q_eq, Δt, ts) 
 
     local BF::Bool = T < T_freeze
     # @debug "Calling Subsaturated{true, true, $BF}"
@@ -2710,7 +2653,7 @@ function morrison_milbrandt_2015_style(
 
             if !BF && (S_qi > FT(0))
                 # @debug "S_qi > 0 in Subsaturated{false, true, false}... setting to zero by making ice time scale infinite"
-                return morrison_milbrandt_2015_style(regime, param_set, area, ρ, p, T, w, τ_liq, FT(Inf), q_vap, q, q_eq, Δt, ts; use_fix = use_fix, return_mixing_ratio = return_mixing_ratio, max_depth = max_depth, depth = depth) # we had ice growth instead of loss, set τ_ice to infinity and recall
+                return morrison_milbrandt_2015_style(regime, param_set, area, ρ, p, T, w, τ_liq, FT(Inf), q_vap, q, q_eq, Δt, ts; opts = MM2015Opts{FT}(use_fix = use_fix, return_mixing_ratio = return_mixing_ratio, max_depth = max_depth, depth = depth)) # we had ice growth instead of loss, set τ_ice to infinity and recall
             end
 
 
@@ -2721,7 +2664,7 @@ function morrison_milbrandt_2015_style(
             # @debug "Ran out of liq before timestep is over... transitioning to $(typeof(new_regime)) at t = $(min_t)..."
             new_δ_0_shum = TD.vapor_specific_humidity(new_q) - new_q_eq.liq
             new_δ_0i_shum = TD.vapor_specific_humidity(new_q) - new_q_eq.ice
-            S_ql_addit, S_qi_addit = morrison_milbrandt_2015_style(new_regime, param_set, area, new_ρ, new_p, new_T, w, τ_liq, τ_ice, new_q_vap, new_q, new_q_eq, Δt_left, new_ts; use_fix = use_fix, return_mixing_ratio = true, depth = depth + 1, δ_0_shum = new_δ_0_shum, δ_0i_shum = new_δ_0i_shum, dqvdt=dqvdt, dTdt=dTdt, fallback_to_standard_supersaturation_limiter = fallback_to_standard_supersaturation_limiter)
+            S_ql_addit, S_qi_addit = morrison_milbrandt_2015_style(new_regime, param_set, area, new_ρ, new_p, new_T, w, τ_liq, τ_ice, new_q_vap, new_q, new_q_eq, Δt_left, new_ts; opts = MM2015Opts{FT}(use_fix = use_fix, return_mixing_ratio = true, depth = depth + 1, δ_0_shum = new_δ_0_shum, δ_0i_shum = new_δ_0i_shum, dqvdt=dqvdt, dTdt=dTdt, fallback_to_standard_supersaturation_limiter = fallback_to_standard_supersaturation_limiter))
             
             S_ql *= min_t / Δt # rescale to the timestep
             S_qi *= min_t / Δt # rescale to the timestep
@@ -2739,7 +2682,7 @@ function morrison_milbrandt_2015_style(
             # @debug "Ran out of ice before timestep is over... transitioning to $(typeof(new_regime)) at t = $(min_t)..."
             new_δ_0_shum = TD.vapor_specific_humidity(new_q) - new_q_eq.liq
             new_δ_0i_shum = TD.vapor_specific_humidity(new_q) - new_q_eq.ice
-            S_ql_addit, S_qi_addit = morrison_milbrandt_2015_style(new_regime, param_set, area, new_ρ, new_p, new_T, w, τ_liq, τ_ice, new_q_vap, new_q, new_q_eq, Δt_left, new_ts; use_fix = use_fix, return_mixing_ratio = true, depth = depth + 1, δ_0_shum = new_δ_0_shum, δ_0i_shum = new_δ_0i_shum, dqvdt=dqvdt, dTdt=dTdt, fallback_to_standard_supersaturation_limiter = fallback_to_standard_supersaturation_limiter)
+            S_ql_addit, S_qi_addit = morrison_milbrandt_2015_style(new_regime, param_set, area, new_ρ, new_p, new_T, w, τ_liq, τ_ice, new_q_vap, new_q, new_q_eq, Δt_left, new_ts; opts = MM2015Opts{FT}(use_fix = use_fix, return_mixing_ratio = true, depth = depth + 1, δ_0_shum = new_δ_0_shum, δ_0i_shum = new_δ_0i_shum, dqvdt=dqvdt, dTdt=dTdt, fallback_to_standard_supersaturation_limiter = fallback_to_standard_supersaturation_limiter))
 
             S_ql *= min_t / Δt # rescale to the timestep
             S_qi *= min_t / Δt # rescale to the timestep
@@ -2752,7 +2695,7 @@ function morrison_milbrandt_2015_style(
 
             if !BF && (S_qi > FT(0))
                 # @debug "S_qi > 0 in Subsaturated{false, true, false}... setting to zero by making ice time scale infinite"
-                return morrison_milbrandt_2015_style(regime, param_set, area, ρ, p, T, w, τ_liq, FT(Inf), q_vap, q, q_eq, Δt, ts; use_fix = use_fix, return_mixing_ratio = return_mixing_ratio, max_depth = max_depth, depth = depth, δ_0_shum = δ_0, δ_0i_shum = δ_0i, dqvdt=dqvdt, dTdt=dTdt, fallback_to_standard_supersaturation_limiter = fallback_to_standard_supersaturation_limiter) # we had ice growth instead of loss, set τ_ice to infinity and recall
+                return morrison_milbrandt_2015_style(regime, param_set, area, ρ, p, T, w, τ_liq, FT(Inf), q_vap, q, q_eq, Δt, ts; opts = MM2015Opts{FT}(use_fix = use_fix, return_mixing_ratio = return_mixing_ratio, max_depth = max_depth, depth = depth, δ_0_shum = δ_0, δ_0i_shum = δ_0i, dqvdt=dqvdt, dTdt=dTdt, fallback_to_standard_supersaturation_limiter = fallback_to_standard_supersaturation_limiter)) # we had ice growth instead of loss, set τ_ice to infinity and recall
             end
 
             S_ql, S_qi = S_above_floor(S_ql, S_qi, q_liq, q_ice, min_t) # if t was too small for t_out_of_q for example, this makes sure we put a floor on S_ql and S_qi
@@ -2770,7 +2713,7 @@ function morrison_milbrandt_2015_style(
                 new_δ_0i_shum = new_δ_0_shum # these are the same at freezing
             end
 
-            S_ql_addit, S_qi_addit = morrison_milbrandt_2015_style(new_regime, param_set, area, new_ρ, new_p, new_T, w, τ_liq, τ_ice, new_q_vap, new_q, new_q_eq, Δt_left, new_ts; use_fix = use_fix, return_mixing_ratio = true, depth = depth + 1, δ_0_shum = new_δ_0_shum, δ_0i_shum = new_δ_0i_shum, dqvdt=dqvdt, dTdt=dTdt, fallback_to_standard_supersaturation_limiter = fallback_to_standard_supersaturation_limiter)
+            S_ql_addit, S_qi_addit = morrison_milbrandt_2015_style(new_regime, param_set, area, new_ρ, new_p, new_T, w, τ_liq, τ_ice, new_q_vap, new_q, new_q_eq, Δt_left, new_ts; opts = MM2015Opts{FT}(use_fix = use_fix, return_mixing_ratio = true, depth = depth + 1, δ_0_shum = new_δ_0_shum, δ_0i_shum = new_δ_0i_shum, dqvdt=dqvdt, dTdt=dTdt, fallback_to_standard_supersaturation_limiter = fallback_to_standard_supersaturation_limiter))
             S_ql *= min_t / Δt # rescale to the timestep
             S_qi *= min_t / Δt # rescale to the timestep
             S_ql_addit *= Δt_left / Δt # rescale to the remaining time
@@ -2785,7 +2728,7 @@ function morrison_milbrandt_2015_style(
 
         if !BF && (S_qi > FT(0))
             # @debug "S_qi > 0 in Subsaturated{false, true, false}... setting to zero by making ice time scale infinite"
-            return morrison_milbrandt_2015_style(regime, param_set, area, ρ, p, T, w, τ_liq, FT(Inf), q_vap, q, q_eq, Δt, ts; use_fix = use_fix, return_mixing_ratio = return_mixing_ratio, max_depth = max_depth, depth = depth, fallback_to_standard_supersaturation_limiter=fallback_to_standard_supersaturation_limiter) # we had ice growth instead of loss, set τ_ice to infinity and recall
+            return morrison_milbrandt_2015_style(regime, param_set, area, ρ, p, T, w, τ_liq, FT(Inf), q_vap, q, q_eq, Δt, ts; opts = MM2015Opts{FT}(use_fix = use_fix, return_mixing_ratio = return_mixing_ratio, max_depth = max_depth, depth = depth, fallback_to_standard_supersaturation_limiter=fallback_to_standard_supersaturation_limiter)) # we had ice growth instead of loss, set τ_ice to infinity and recall
         end
 
         S_ql, S_qi = S_above_floor(S_ql, S_qi, q_liq, q_ice, Δt) # if t was too small for t_out_of_q for example, this makes sure we put a floor on S_ql and S_qi
@@ -2807,21 +2750,14 @@ end
 function morrison_milbrandt_2015_style(
     regime::Union{Subsaturated{true, false, true}, Subsaturated{true, false, false}}, # can run out of liq first. if not and we make it to ice sat, transition to WBF
     param_set::APS, area::FT, ρ::FT, p::FT, T::FT, w::FT, τ_liq::FT, τ_ice::FT, q_vap::FT, q::TD.PhasePartition, q_eq::TD.PhasePartition, Δt::FT, ts::TD.ThermodynamicState;
-    use_fix::Bool = true, # i think something is wrong with the forumula for large timesteps... is less essential now w/ the limiter but still needed... (unless I just don't understand the physics of it)
-    return_mixing_ratio::Bool = false,
-    max_depth::Int = 12,
-    depth::Int = 0,
-    δ_0_shum::FT,
-    δ_0i_shum::FT,
-    dqvdt::FT = FT(0), # not used in this regime, but needed for the function signature
-    dTdt::FT = FT(0), # not used in this regime, but needed for the function signature
-    fallback_to_standard_supersaturation_limiter::Bool = false,
+    opts::MM2015Opts{FT} = MM2015Opts{FT}(),
     )::Tuple{FT, FT} where {FT}
+    (; use_fix, return_mixing_ratio, max_depth, depth, δ_0_shum, δ_0i_shum, dqvdt, dTdt, fallback_to_standard_supersaturation_limiter) = opts
 
 
     if depth == max_depth
         # @debug "Max depth reached, returning exponential part only fallback (no thermo adjustments)"
-        S_ql, S_qi = morrison_milbrandt_2015_style_exponential_part_only(regime, param_set, area, ρ, p, T, w, τ_liq, τ_ice, δ_0_shum, δ_0i_shum, q, q_eq, Δt, ts; use_fix = use_fix, return_mixing_ratio = false, dqvdt=dqvdt, dTdt=dTdt, fallback_to_standard_supersaturation_limiter = fallback_to_standard_supersaturation_limiter)
+        S_ql, S_qi = morrison_milbrandt_2015_style_exponential_part_only(regime, param_set, area, ρ, p, T, w, τ_liq, τ_ice, δ_0_shum, δ_0i_shum, q, q_eq, Δt, ts; opts = MM2015Opts{FT}(use_fix = use_fix, return_mixing_ratio = false, dqvdt=dqvdt, dTdt=dTdt, fallback_to_standard_supersaturation_limiter = fallback_to_standard_supersaturation_limiter))
         return return_mixing_ratio ? (S_shum_to_mixing_ratio(S_ql, q.tot), S_shum_to_mixing_ratio(S_qi, q.tot)) : (S_ql, S_qi) # exponential only doesn't bother with mixing ratios at the moment
     end
 
@@ -2831,7 +2767,7 @@ function morrison_milbrandt_2015_style(
     τ_ice_here = FT(Inf) # we have no ice, and ice can't grow bc subsat
     τ = τ_liq # liq can decay
     
-    (; g, L_i, L_l, c_p, e_sl, e_si, dqsl_dT, dqsi_dT, q_sl, q_si, q_vap, q_liq, q_ice, T_freeze, δ_0, δ_0i, Γ_l, Γ_i, dqvdt, dTdt) = get_params_and_go_to_mixing_ratio(param_set, area, ρ, p, T, w, τ_liq, τ_ice_here, q_vap, dqvdt, dTdt, δ_0_shum, δ_0i_shum, q, q_eq, Δt, ts)
+    (; g, L_i, L_l, c_p, e_sl, e_si, dqsl_dT, dqsi_dT, q_sl, q_si, q_vap, q_liq, q_ice, T_freeze, δ_0, δ_0i, Γ_l, Γ_i) = get_params_and_go_to_mixing_ratio(param_set, area, ρ, p, T, w, τ_liq, τ_ice_here, q_vap, dqvdt, dTdt, δ_0_shum, δ_0i_shum, q, q_eq, Δt, ts)
 
     
     local BF::Bool = T < T_freeze
@@ -2879,7 +2815,7 @@ function morrison_milbrandt_2015_style(
             # @debug "Ran out of liq before timestep is over... transitioning to $(typeof(new_regime)) at t = $(min_t)..."
             new_δ_0_shum = TD.vapor_specific_humidity(new_q) - new_q_eq.liq
             new_δ_0i_shum = TD.vapor_specific_humidity(new_q) - new_q_eq.ice
-            S_ql_addit, S_qi_addit = morrison_milbrandt_2015_style(new_regime, param_set, area, new_ρ, new_p, new_T, w, τ_liq, τ_ice, new_q_vap, new_q, new_q_eq, Δt - min_t, new_ts; use_fix = use_fix, return_mixing_ratio = true, depth = depth + 1, δ_0_shum = new_δ_0_shum, δ_0i_shum = new_δ_0i_shum, dqvdt=dqvdt, dTdt=dTdt, fallback_to_standard_supersaturation_limiter = fallback_to_standard_supersaturation_limiter)
+            S_ql_addit, S_qi_addit = morrison_milbrandt_2015_style(new_regime, param_set, area, new_ρ, new_p, new_T, w, τ_liq, τ_ice, new_q_vap, new_q, new_q_eq, Δt - min_t, new_ts; opts = MM2015Opts{FT}(use_fix = use_fix, return_mixing_ratio = true, depth = depth + 1, δ_0_shum = new_δ_0_shum, δ_0i_shum = new_δ_0i_shum, dqvdt=dqvdt, dTdt=dTdt, fallback_to_standard_supersaturation_limiter = fallback_to_standard_supersaturation_limiter))
             S_ql *= min_t / Δt # rescale to the timestep
             S_qi *= min_t / Δt # rescale to the timestep
             S_qi_addit *= Δt_left / Δt # rescale to the remaining time
@@ -2904,7 +2840,7 @@ function morrison_milbrandt_2015_style(
                 new_δ_0_shum = TD.vapor_specific_humidity(new_q) - new_q_eq.liq
                 new_δ_0i_shum = new_δ_0_shum # these are the same at freezing
             end
-            S_ql_addit, S_qi_addit = morrison_milbrandt_2015_style(new_regime, param_set, area, new_ρ, new_p, new_T, w, τ_liq, τ_ice, new_q_vap, new_q, new_q_eq, Δt_left, new_ts; use_fix = use_fix, return_mixing_ratio = true, depth = depth + 1, δ_0_shum = new_δ_0_shum, δ_0i_shum = new_δ_0i_shum, dqvdt=dqvdt, dTdt=dTdt, fallback_to_standard_supersaturation_limiter = fallback_to_standard_supersaturation_limiter)
+            S_ql_addit, S_qi_addit = morrison_milbrandt_2015_style(new_regime, param_set, area, new_ρ, new_p, new_T, w, τ_liq, τ_ice, new_q_vap, new_q, new_q_eq, Δt_left, new_ts; opts = MM2015Opts{FT}(use_fix = use_fix, return_mixing_ratio = true, depth = depth + 1, δ_0_shum = new_δ_0_shum, δ_0i_shum = new_δ_0i_shum, dqvdt=dqvdt, dTdt=dTdt, fallback_to_standard_supersaturation_limiter = fallback_to_standard_supersaturation_limiter))
 
             S_ql *= min_t / Δt # rescale to the timestep
             S_qi *= min_t / Δt # rescale to the timestep
@@ -2935,20 +2871,13 @@ end
 function morrison_milbrandt_2015_style(
     regime::Union{Subsaturated{false, true, true}, Subsaturated{false, true, false}}, # can run out of ice first. then we're stuck.
     param_set::APS, area::FT, ρ::FT, p::FT, T::FT, w::FT, τ_liq::FT, τ_ice::FT, q_vap::FT, q::TD.PhasePartition, q_eq::TD.PhasePartition, Δt::FT, ts::TD.ThermodynamicState;
-    use_fix::Bool = true, # i think something is wrong with the forumula for large timesteps... is less essential now w/ the limiter but still needed... (unless I just don't understand the physics of it)
-    return_mixing_ratio::Bool = false,
-    max_depth::Int = 12,
-    depth::Int = 0,
-    δ_0_shum::FT,
-    δ_0i_shum::FT,
-    dqvdt::FT = FT(0), # not used in this regime, but needed for the function signature
-    dTdt::FT = FT(0), # not used in this regime, but needed for the function signature
-    fallback_to_standard_supersaturation_limiter::Bool = false,
+    opts::MM2015Opts{FT} = MM2015Opts{FT}(),
     )::Tuple{FT, FT} where {FT}
+    (; use_fix, return_mixing_ratio, max_depth, depth, δ_0_shum, δ_0i_shum, dqvdt, dTdt, fallback_to_standard_supersaturation_limiter) = opts
 
     if depth == max_depth
         # @debug "Max depth reached, returning exponential part only fallback (no thermo adjustments)"
-        S_ql, S_qi = morrison_milbrandt_2015_style_exponential_part_only(regime, param_set, area, ρ, p, T, w, τ_liq, τ_ice, δ_0_shum, δ_0i_shum, q, q_eq, Δt, ts; use_fix = use_fix, return_mixing_ratio = false, dqvdt=dqvdt, dTdt=dTdt, fallback_to_standard_supersaturation_limiter = fallback_to_standard_supersaturation_limiter)
+        S_ql, S_qi = morrison_milbrandt_2015_style_exponential_part_only(regime, param_set, area, ρ, p, T, w, τ_liq, τ_ice, δ_0_shum, δ_0i_shum, q, q_eq, Δt, ts; opts = MM2015Opts{FT}(use_fix = use_fix, return_mixing_ratio = false, dqvdt=dqvdt, dTdt=dTdt, fallback_to_standard_supersaturation_limiter = fallback_to_standard_supersaturation_limiter))
         return return_mixing_ratio ? (S_shum_to_mixing_ratio(S_ql, q.tot), S_shum_to_mixing_ratio(S_qi, q.tot)) : (S_ql, S_qi) # exponential only doesn't bother with mixing ratios at the moment
     end
 
@@ -2963,7 +2892,7 @@ function morrison_milbrandt_2015_style(
     # (q.ice > eps(FT)) || error("should have some ice here (up to floating point error)..., got q_ice = $(q.ice)")
 
 
-    (; g, L_i, L_l, c_p, e_sl, e_si, dqsl_dT, dqsi_dT, q_sl, q_si, q_vap, q_liq, q_ice, T_freeze, δ_0, δ_0i, Γ_l, Γ_i, dqvdt, dTdt) = get_params_and_go_to_mixing_ratio(param_set, area, ρ, p, T, w, τ_liq_here, τ_ice, q_vap, dqvdt, dTdt, δ_0_shum, δ_0i_shum, q, q_eq, Δt, ts)
+    (; g, L_i, L_l, c_p, e_sl, e_si, dqsl_dT, dqsi_dT, q_sl, q_si, q_vap, q_liq, q_ice, T_freeze, δ_0, δ_0i, Γ_l, Γ_i) = get_params_and_go_to_mixing_ratio(param_set, area, ρ, p, T, w, τ_liq_here, τ_ice, q_vap, dqvdt, dTdt, δ_0_shum, δ_0i_shum, q, q_eq, Δt, ts)
 
 
     (q_vap < q_si)  || error("should be subsaturated, got q_vap = $q_vap, q_si = $q_si, (q_vap - q_si) = $(q_vap - q_si)")
@@ -3009,7 +2938,7 @@ function morrison_milbrandt_2015_style(
             # @debug "Ran out of ice before timestep is over... transitioning to $(typeof(new_regime)) at t = $(min_t)..."
             new_δ_0_shum = TD.vapor_specific_humidity(new_q) - new_q_eq.liq
             new_δ_0i_shum = TD.vapor_specific_humidity(new_q) - new_q_eq.ice
-            S_ql_addit, S_qi_addit = morrison_milbrandt_2015_style(new_regime, param_set, area, new_ρ, new_p, new_T, w, τ_liq, τ_ice, new_q_vap, new_q, new_q_eq, Δt_left, new_ts; use_fix = use_fix, return_mixing_ratio = true, depth = depth + 1, δ_0_shum = new_δ_0_shum, δ_0i_shum = new_δ_0i_shum, dqvdt=dqvdt, dTdt=dTdt, fallback_to_standard_supersaturation_limiter = fallback_to_standard_supersaturation_limiter)
+            S_ql_addit, S_qi_addit = morrison_milbrandt_2015_style(new_regime, param_set, area, new_ρ, new_p, new_T, w, τ_liq, τ_ice, new_q_vap, new_q, new_q_eq, Δt_left, new_ts; opts = MM2015Opts{FT}(use_fix = use_fix, return_mixing_ratio = true, depth = depth + 1, δ_0_shum = new_δ_0_shum, δ_0i_shum = new_δ_0i_shum, dqvdt=dqvdt, dTdt=dTdt, fallback_to_standard_supersaturation_limiter = fallback_to_standard_supersaturation_limiter))
             S_ql *= min_t / Δt # rescale to the timestep
             S_qi *= min_t / Δt # rescale to the timestep
             S_qi_addit *= Δt_left / Δt # rescale to the remaining time
@@ -3038,7 +2967,7 @@ function morrison_milbrandt_2015_style(
                 new_δ_0_shum = TD.vapor_specific_humidity(new_q) - new_q_eq.liq
                 new_δ_0i_shum = new_δ_0_shum # these are the same at freezing
             end
-            S_ql_addit, S_qi_addit = morrison_milbrandt_2015_style(new_regime, param_set, area, new_ρ, new_p, new_T, w, τ_liq, τ_ice, new_q_vap, new_q, new_q_eq, Δt_left, new_ts; use_fix = use_fix, return_mixing_ratio = true, depth = depth + 1, δ_0_shum = new_δ_0_shum, δ_0i_shum = new_δ_0i_shum, dqvdt=dqvdt, dTdt=dTdt, fallback_to_standard_supersaturation_limiter = fallback_to_standard_supersaturation_limiter)
+            S_ql_addit, S_qi_addit = morrison_milbrandt_2015_style(new_regime, param_set, area, new_ρ, new_p, new_T, w, τ_liq, τ_ice, new_q_vap, new_q, new_q_eq, Δt_left, new_ts; opts = MM2015Opts{FT}(use_fix = use_fix, return_mixing_ratio = true, depth = depth + 1, δ_0_shum = new_δ_0_shum, δ_0i_shum = new_δ_0i_shum, dqvdt=dqvdt, dTdt=dTdt, fallback_to_standard_supersaturation_limiter = fallback_to_standard_supersaturation_limiter))
             S_ql *= min_t / Δt # rescale to the timestep
             S_qi *= min_t / Δt # rescale to the timestep
             S_ql_addit *= Δt_left / Δt # rescale to the remaining time
@@ -3053,7 +2982,7 @@ function morrison_milbrandt_2015_style(
         S_qi = S_qi_func_indiv( A_c, τ_ice, δ_0i, Δt, Γ_i)
         if !BF && (S_qi > FT(0))
             # @debug "S_qi > 0 in Subsaturated{false, true, false}... setting to zero by making ice time scale infinite"
-            return morrison_milbrandt_2015_style(regime, param_set, area, ρ, p, T, w, τ_liq, FT(Inf), q_vap, q, q_eq, Δt, ts; use_fix = use_fix, return_mixing_ratio = return_mixing_ratio, max_depth = max_depth, depth = depth, dqvdt=dqvdt, dTdt=dTdt, fallback_to_standard_supersaturation_limiter = fallback_to_standard_supersaturation_limiter) # we had ice growth instead of loss, set τ_ice to infinity and recall
+            return morrison_milbrandt_2015_style(regime, param_set, area, ρ, p, T, w, τ_liq, FT(Inf), q_vap, q, q_eq, Δt, ts; opts = MM2015Opts{FT}(use_fix = use_fix, return_mixing_ratio = return_mixing_ratio, max_depth = max_depth, depth = depth, dqvdt=dqvdt, dTdt=dTdt, fallback_to_standard_supersaturation_limiter = fallback_to_standard_supersaturation_limiter)) # we had ice growth instead of loss, set τ_ice to infinity and recall
         end
         S_ql, S_qi = S_above_floor(S_ql, S_qi, q_liq, q_ice, Δt) # if t was too small for t_out_of_q for example, this makes sure we put a floor on S_ql and S_qi
         return return_mixing_ratio ? (S_ql, S_qi) : (S_mixing_ratio_to_shum(S_ql, q.tot), S_mixing_ratio_to_shum(S_qi, q.tot))
@@ -3070,21 +2999,14 @@ end
 function morrison_milbrandt_2015_style(
     regime::Union{Subsaturated{false, false, false}, Subsaturated{false, false, true}}, # kind of null, you have nothing and can't make anything
     param_set::APS, area::FT, ρ::FT, p::FT, T::FT, w::FT, τ_liq::FT, τ_ice::FT, q_vap::FT, q::TD.PhasePartition, q_eq::TD.PhasePartition, Δt::FT, ts::TD.ThermodynamicState;
-    use_fix::Bool = true, # i think something is wrong with the forumula for large timesteps... is less essential now w/ the limiter but still needed... (unless I just don't understand the physics of it)
-    return_mixing_ratio::Bool = false,
-    max_depth::Int = 12,
-    depth::Int = 0,
-    δ_0_shum::FT,
-    δ_0i_shum::FT,
-    dqvdt::FT = FT(0), # not used in this regime, but needed for the function signature
-    dTdt::FT = FT(0), # not used in this regime, but needed for the function signature
-    fallback_to_standard_supersaturation_limiter::Bool = false,
+    opts::MM2015Opts{FT} = MM2015Opts{FT}(),
     )::Tuple{FT, FT} where {FT}
+    (; use_fix, return_mixing_ratio, max_depth, depth, δ_0_shum, δ_0i_shum, dqvdt, dTdt, fallback_to_standard_supersaturation_limiter) = opts
 
     if depth == max_depth
         # @debug "Max depth reached, returning exponential part only fallback (no thermo adjustments)"
         q_vap = TD.vapor_specific_humidity(q)
-        S_ql, S_qi = morrison_milbrandt_2015_style_exponential_part_only(regime, param_set, area, ρ, p, T, w, τ_liq, τ_ice, δ_0_shum, δ_0i_shum, q, q_eq, Δt, ts; use_fix = use_fix, return_mixing_ratio = false, dqvdt=dqvdt, dTdt=dTdt, fallback_to_standard_supersaturation_limiter = fallback_to_standard_supersaturation_limiter)
+        S_ql, S_qi = morrison_milbrandt_2015_style_exponential_part_only(regime, param_set, area, ρ, p, T, w, τ_liq, τ_ice, δ_0_shum, δ_0i_shum, q, q_eq, Δt, ts; opts = MM2015Opts{FT}(use_fix = use_fix, return_mixing_ratio = false, dqvdt=dqvdt, dTdt=dTdt, fallback_to_standard_supersaturation_limiter = fallback_to_standard_supersaturation_limiter))
         return return_mixing_ratio ? (S_shum_to_mixing_ratio(S_ql, q.tot), S_shum_to_mixing_ratio(S_qi, q.tot)) : (S_ql, S_qi) # exponential only doesn't bother with mixing ratios at the moment
     end
 
@@ -3092,7 +3014,7 @@ function morrison_milbrandt_2015_style(
     τ_ice_here = FT(Inf) # no ice growth and no ice to sublimate
     τ_here = FT(Inf) # no liq or ice
 
-    (; g, L_i, L_l, c_p, e_sl, e_si, dqsl_dT, dqsi_dT, q_sl, q_si, q_vap, q_liq, q_ice, T_freeze, δ_0, δ_0i, Γ_l, Γ_i, dqvdt, dTdt) = get_params_and_go_to_mixing_ratio(param_set, area, ρ, p, T, w, τ_liq_here, τ_ice_here, q_vap, dqvdt, dTdt, δ_0_shum, δ_0i_shum, q, q_eq, Δt, ts)
+    (; g, L_i, L_l, c_p, e_sl, e_si, dqsl_dT, dqsi_dT, q_sl, q_si, q_vap, q_liq, q_ice, T_freeze, δ_0, δ_0i, Γ_l, Γ_i) = get_params_and_go_to_mixing_ratio(param_set, area, ρ, p, T, w, τ_liq_here, τ_ice_here, q_vap, dqvdt, dTdt, δ_0_shum, δ_0i_shum, q, q_eq, Δt, ts)
 
 
     local BF::Bool = T < T_freeze
@@ -3130,7 +3052,7 @@ function morrison_milbrandt_2015_style(
             new_δ_0_shum = TD.vapor_specific_humidity(new_q) - new_q_eq.liq
             new_δ_0i_shum = new_δ_0_shum # these are the same at freezing
         end
-        S_ql_addit, S_qi_addit = morrison_milbrandt_2015_style(new_regime, param_set, area, new_ρ, new_p, new_T, w, τ_liq, τ_ice, new_q_vap, new_q, new_q_eq, Δt_left, new_ts; use_fix = use_fix, return_mixing_ratio = true, depth = depth + 1, δ_0_shum = new_δ_0_shum, δ_0i_shum = new_δ_0i_shum, dqvdt=dqvdt, dTdt=dTdt, fallback_to_standard_supersaturation_limiter = fallback_to_standard_supersaturation_limiter)
+        S_ql_addit, S_qi_addit = morrison_milbrandt_2015_style(new_regime, param_set, area, new_ρ, new_p, new_T, w, τ_liq, τ_ice, new_q_vap, new_q, new_q_eq, Δt_left, new_ts; opts = MM2015Opts{FT}(use_fix = use_fix, return_mixing_ratio = true, depth = depth + 1, δ_0_shum = new_δ_0_shum, δ_0i_shum = new_δ_0i_shum, dqvdt=dqvdt, dTdt=dTdt, fallback_to_standard_supersaturation_limiter = fallback_to_standard_supersaturation_limiter))
         S_ql *= min_t / Δt # rescale to the timestep
         S_qi *= min_t / Δt # rescale to the timestep
         S_ql_addit *= Δt_left / Δt # rescale to the remaining time

@@ -521,7 +521,7 @@ get_N_l(param_set::APS, relaxation_timescale::RelaxToEquilibrium, ts::TD.Thermod
 get_N_l_raw_and_adjusted(param_set::APS, relaxation_timescale::RelaxToEquilibrium, ts::TD.ThermodynamicState, w::FT) where {FT} = (N_l_raw=FT(NaN), N_l_adjusted=FT(NaN))
 get_N_l_raw(param_set::APS, relaxation_timescale::RelaxToEquilibrium, ts::TD.ThermodynamicState, w::FT) where {FT} = FT(NaN)
 
-function get_N_l(param_set::APS, relaxation_timescale::AbstractRelaxationTimescaleType, ts::TD.ThermodynamicState, w::FT) where {FT}
+function get_N_l(param_set::APS, relaxation_timescale::AbstractNonEquillibriumSourcesType, ts::TD.ThermodynamicState, w::FT) where {FT}
     thermo_params::TDPS = TCP.thermodynamics_params(param_set)
     q::TD.PhasePartition{FT} = TD.PhasePartition(thermo_params, ts)
     T::FT = TD.air_temperature(thermo_params, ts)
@@ -530,7 +530,7 @@ function get_N_l(param_set::APS, relaxation_timescale::AbstractRelaxationTimesca
     return get_N_l(param_set, relaxation_timescale, q, T, ρ, w)
 end
 
-function get_N_l_raw_and_adjusted(param_set::APS, relaxation_timescale::AbstractRelaxationTimescaleType, ts::TD.ThermodynamicState, w::FT) where {FT}
+function get_N_l_raw_and_adjusted(param_set::APS, relaxation_timescale::AbstractNonEquillibriumSourcesType, ts::TD.ThermodynamicState, w::FT) where {FT}
     thermo_params::TDPS = TCP.thermodynamics_params(param_set)
     q::TD.PhasePartition{FT} = TD.PhasePartition(thermo_params, ts)
     T::FT = TD.air_temperature(thermo_params, ts)
@@ -539,7 +539,7 @@ function get_N_l_raw_and_adjusted(param_set::APS, relaxation_timescale::Abstract
     return get_N_l_raw_and_adjusted(param_set, relaxation_timescale, q, T, ρ, w)
 end
 
-function get_N_l_raw(param_set::APS, relaxation_timescale::AbstractRelaxationTimescaleType, ts::TD.ThermodynamicState, w::FT) where {FT}
+function get_N_l_raw(param_set::APS, relaxation_timescale::AbstractNonEquillibriumSourcesType, ts::TD.ThermodynamicState, w::FT) where {FT}
     thermo_params::TDPS = TCP.thermodynamics_params(param_set)
     q::TD.PhasePartition{FT} = TD.PhasePartition(thermo_params, ts)
     T::FT = TD.air_temperature(thermo_params, ts)

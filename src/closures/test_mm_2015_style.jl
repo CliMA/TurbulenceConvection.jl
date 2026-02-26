@@ -307,13 +307,13 @@ if test_loop
 
             (; T, w, area, q_tot, q_liq, q_ice, dTdt, dqvdt, τ_ice, τ_liq, Δt, q, ts, ρ, q_vap, q_vap_0, q_eq) = get_mm_2015_style_verification_data_from_nc_file(t_ind, updraft_or_env)
             # S_ql, S_qi = morrison_milbrandt_2015_style(param_set, area, ρ, p_c, T, w, τ_liq, τ_ice, q_vap_0, dqvdt, dTdt, q, q_eq, Δt*Δt_factor, ts; use_fix = use_fix)
-            S_ql, S_qi = morrison_milbrandt_2015_style_exponential_part_only(param_set, area, ρ, p_c, T, w, τ_liq, τ_ice, q_vap_0, dqvdt, dTdt, q, q_eq, Δt*Δt_factor, ts; use_fix = true)
+            S_ql, S_qi = morrison_milbrandt_2015_style_exponential_part_only(param_set, area, ρ, p_c, T, w, τ_liq, τ_ice, q_vap_0, dqvdt, dTdt, q, q_eq, Δt*Δt_factor, ts; opts = MM2015Opts{FT}(use_fix = true))
             S[updraft_or_env][t_ind] = OrderedCollections.OrderedDict(:area => area, :S_ql => S_ql, :S_qi => S_qi)
             println("------------------------------------------------")
             p = p_c
             δ_0 = q_vap - q_eq.liq
             δ_0i = q_vap - q_eq.ice
-            (; g, L_i, L_l, c_p, e_sl, e_si, dqsl_dT, dqsi_dT, q_sl, q_si, q_liq, q_ice, T_freeze, δ_0, δ_0i, Γ_l, Γ_i, dqvdt, dTdt) = get_params_and_go_to_mixing_ratio_exponential_part_only(param_set, area, ρ, p, T, w, τ_liq, τ_ice, δ_0, δ_0i, dqvdt, dTdt, q, q_eq, Δt, ts; use_fix = true)
+            (; g, L_i, L_l, c_p, e_sl, e_si, dqsl_dT, dqsi_dT, q_sl, q_si, q_liq, q_ice, T_freeze, δ_0, δ_0i, Γ_l, Γ_i, dqvdt, dTdt) = get_params_and_go_to_mixing_ratio_exponential_part_only(param_set, area, ρ, p, T, w, τ_liq, τ_ice, δ_0, δ_0i, dqvdt, dTdt, q, q_eq, Δt, ts; opts = MM2015Opts{FT}(use_fix = true))
             A_c = A_c_func_EPA(τ_ice, Γ_l, q_sl, q_si, g, w, c_p, e_sl, L_i, dqsl_dT, dqvdt, dTdt, p, ρ) # Eq C4
             τ = τ_func_EPA(τ_liq, τ_ice, L_i, c_p, dqsl_dT, Γ_i)
             t_hit_liq_sat = t_δ_hit_value(FT(0), δ_0, A_c, τ)
@@ -439,7 +439,7 @@ for t_ind in t_inds
 
             qls_exp[i], qis_exp[i] = 
                 # (q_vap_0 .* FT(NaN), q_vap_0 * FT(NaN))
-                morrison_milbrandt_2015_style_exponential_part_only(param_set, area, ρ, p, T, w, τ_liq, τ_ice, q_vap_0, dqvdt, dTdt, q, q_eq, Δt, ts; use_fix = use_fix)
+                morrison_milbrandt_2015_style_exponential_part_only(param_set, area, ρ, p, T, w, τ_liq, τ_ice, q_vap_0, dqvdt, dTdt, q, q_eq, Δt, ts; opts = MM2015Opts{FT}(use_fix = use_fix))
 
             # qls[i] = qls_exp[i]
             # qis[i] = qis_exp[i]

@@ -24,8 +24,9 @@ This is in line w/ neglecting T changes, unlike the other regular MM2015 that fi
 
 
 function do_standard_fallback(milestone_t::FT, milestone::MilestoneType, time_tolerance::FT, S_ql::FT, S_qi::FT, q_liq::FT, q_ice::FT, δ_eq::FT, δi_eq::FT, dδdt_no_S::FT, Γ_l::FT, Γ_i::FT,
-    regime::AbstractSaturationRegime, param_set::APS, area::FT, ρ::FT, p::FT, T::FT, w::FT, τ_liq::FT, τ_ice::FT, δ_0::FT, δ_0i::FT, q::TD.PhasePartition, q_eq::TD.PhasePartition, Δt::FT, ts::TD.ThermodynamicState; use_fix::Bool = true, return_mixing_ratio::Bool = false, depth::Int = 0, dqvdt::FT = FT(0), dTdt::FT = FT(0), fallback_to_standard_supersaturation_limiter::Bool = false
+    regime::AbstractSaturationRegime, param_set::APS, area::FT, ρ::FT, p::FT, T::FT, w::FT, τ_liq::FT, τ_ice::FT, δ_0::FT, δ_0i::FT, q::TD.PhasePartition, q_eq::TD.PhasePartition, Δt::FT, ts::TD.ThermodynamicState; opts::MM2015EPAOpts{FT} = MM2015EPAOpts{FT}()
     )::Tuple{FT, FT} where {FT}
+    (; return_mixing_ratio, depth, dqvdt, dTdt, fallback_to_standard_supersaturation_limiter, time_tolerance) = opts
 
     # @debug "do_standard_fallback: milestone_t = $milestone_t; milestone = $milestone; time_tolerance = $time_tolerance; S_ql = $S_ql; S_qi = $S_qi; q_liq = $q_liq; q_ice = $q_ice; δ_eq = $δ_eq; δi_eq = $δi_eq; dδdt_no_S = $dδdt_no_S; Γ_l = $Γ_l; Γ_i = $Γ_i; regime = $regime; area = $area; ρ = $ρ; p = $p; T = $T; w = $w; τ_liq = $τ_liq; τ_ice = $τ_ice; δ_0 = $δ_0; δ_0i = $δ_0i; q_eq = $q_eq; Δt = $Δt"
 
@@ -103,7 +104,7 @@ function do_standard_fallback(milestone_t::FT, milestone::MilestoneType, time_to
 
 
         # @debug "new_regime = $new_regime; milestone_t = $milestone_t; Δt_left = $Δt_left; milestone = $milestone; S_ql = $S_ql; S_qi = $S_qi; q_liq = $q_liq; q_ice = $q_ice; δ_0 = $δ_0; δ_0i = $δ_0i"
-        S_ql_addit, S_qi_addit = morrison_milbrandt_2015_style_exponential_part_only(new_regime, param_set, area, ρ, p, T, w, τ_liq, τ_ice, δ_0, δ_0i, new_q, q_eq, Δt_left, ts; use_fix = use_fix, return_mixing_ratio = true, depth = depth+1, dqvdt=dqvdt, dTdt=dTdt, fallback_to_standard_supersaturation_limiter = fallback_to_standard_supersaturation_limiter, time_tolerance = time_tolerance)::Tuple{FT, FT}
+        S_ql_addit, S_qi_addit = morrison_milbrandt_2015_style_exponential_part_only(new_regime, param_set, area, ρ, p, T, w, τ_liq, τ_ice, δ_0, δ_0i, new_q, q_eq, Δt_left, ts; opts = update(opts; return_mixing_ratio = true, depth = depth+1))::Tuple{FT, FT}
         S_ql, S_qi = resolve_S_S_addit(S_ql, S_qi, dt, S_ql_addit, S_qi_addit, Δt_left, Δt)
 
 
@@ -135,8 +136,9 @@ function get_params_and_go_to_mixing_ratio_exponential_part_only(
     q_eq::TD.PhasePartition,
     Δt::FT,
     ts::TD.ThermodynamicState;
-    use_fix::Bool = false, # i think something is wrong with the forumula for large timesteps... is less essential now w/ the limiter but still needed... (unless I just don't understand the physics of it),
+    opts::MM2015EPAOpts{FT} = MM2015EPAOpts{FT}(),
     ) where {FT}
+    (; use_fix) = opts
 
     thermo_params = TCP.thermodynamics_params(param_set) # currently repeated in both places, pare down later
     g = TCP.grav(param_set) # acceleration of gravity
@@ -638,11 +640,9 @@ function morrison_milbrandt_2015_style_exponential_part_only(
     q_eq::TD.PhasePartition,
     Δt::FT,
     ts::TD.ThermodynamicState;
-    use_fix::Bool = true, # i think something is wrong with the forumula for large timesteps... is less essential now w/ the limiter but still needed... (unless I just don't understand the physics of it)
-    emit_warnings::Bool = true,
-    fallback_to_standard_supersaturation_limiter::Bool = false, # whether to pass through failures or retry with BigFloat
-    time_tolerance::FT = FT(1e-8), # if time is shorter than the tolerance, we do a StandardSupersaturation step first, since we can't guarantee success w/ the lambert W methods...
+    opts::MM2015EPAOpts{FT} = MM2015EPAOpts{FT}(),
 ) where {FT}
+    (; return_mixing_ratio, fallback_to_standard_supersaturation_limiter, emit_warnings, time_tolerance) = opts
 
     # TODO: Track supersaturation directly... should fix floating point problems...
 
@@ -666,14 +666,14 @@ function morrison_milbrandt_2015_style_exponential_part_only(
         # regime = get_saturation_regime(q_vap, q, q_eq, below_freezing)
 
         if iszero(δ_0) || iszero(δ_0i) # possible but unlikely
-            (; g, L_i, L_l, c_p, e_sl, e_si, dqsl_dT, dqsi_dT, q_sl, q_si, q_liq, q_ice, T_freeze, δ_0, δ_0i, Γ_l, Γ_i, dqvdt, dTdt) = get_params_and_go_to_mixing_ratio_exponential_part_only(param_set, area, ρ, p, T, w, τ_liq, τ_ice, δ_0, δ_0i, dqvdt, dTdt, q, q_eq, Δt, ts; use_fix=use_fix)
+            (; g, L_i, L_l, c_p, e_sl, e_si, dqsl_dT, dqsi_dT, q_sl, q_si, q_liq, q_ice, T_freeze, δ_0, δ_0i, Γ_l, Γ_i) = get_params_and_go_to_mixing_ratio_exponential_part_only(param_set, area, ρ, p, T, w, τ_liq, τ_ice, δ_0, δ_0i, dqvdt, dTdt, q, q_eq, Δt, ts; opts = opts)
             dδdt_no_S = A_c_func_no_WBF_EPA(q_sl, g, w, c_p, e_sl, dqsl_dT, dqvdt, dTdt, p, ρ)  # Eq C4 no WBF
             dδdt_0 = get_dδdt_0(δ_0, δ_0i, q.liq, q.ice, τ_liq, τ_ice, dδdt_no_S, below_freezing)
             regime = get_saturation_regime(δ_0, δ_0i, q.liq, q.ice, below_freezing; dδdt = dδdt_0) # use this version to break ties and make sure we start going the right direction.
         else
             regime = get_saturation_regime(δ_0, δ_0i, q.liq, q.ice, below_freezing)
         end
-        return morrison_milbrandt_2015_style_exponential_part_only(regime, param_set, area, ρ, p, T, w, τ_liq, τ_ice, δ_0, δ_0i, q, q_eq, Δt, ts; use_fix = use_fix, return_mixing_ratio = true, dqvdt=dqvdt, dTdt=dTdt, fallback_to_standard_supersaturation_limiter = fallback_to_standard_supersaturation_limiter, time_tolerance = time_tolerance)::Tuple{FT,FT} # right now we aren't using mixing ratio, so setting return_mixing_ratio to true means that no conversions happen at all. if you ever bring it back, you'd want to combine false on the output here, with true on all nested calls for summations, but we'd need to ensure everything passed to the next layer is not in mixing ratio which we haven't done
+        return morrison_milbrandt_2015_style_exponential_part_only(regime, param_set, area, ρ, p, T, w, τ_liq, τ_ice, δ_0, δ_0i, q, q_eq, Δt, ts; opts = update(opts; return_mixing_ratio = true))::Tuple{FT,FT} # right now we aren't using mixing ratio, so setting return_mixing_ratio to true means that no conversions happen at all. if you ever bring it back, you'd want to combine false on the output here, with true on all nested calls for summations, but we'd need to ensure everything passed to the next layer is not in mixing ratio which we haven't done
     else
         return FT(0), FT(0)
     end
@@ -718,14 +718,9 @@ end
 function morrison_milbrandt_2015_style_exponential_part_only(
     regime::Union{Supersaturated{true, true, true}, Supersaturated{true, false, true}, Supersaturated{false, true, true}, Supersaturated{false, false, true}}, # these should all work the same, right? you'll end up with some liq/ice at the end no matter what
     param_set::APS, area::FT, ρ::FT, p::FT, T::FT, w::FT, τ_liq::FT, τ_ice::FT, δ_0::FT, δ_0i::FT, q::TD.PhasePartition, q_eq::TD.PhasePartition, Δt::FT, ts::TD.ThermodynamicState;
-    use_fix::Bool = true, # i think something is wrong with the forumula for large timesteps... is less essential now w/ the limiter but still needed... (unless I just don't understand the physics of it)
-    return_mixing_ratio::Bool = false,
-    depth::Int = 0,
-    dqvdt::FT = FT(0),
-    dTdt::FT = FT(0),
-    fallback_to_standard_supersaturation_limiter::Bool = false,
-    time_tolerance::FT = FT(1e-8),
+    opts::MM2015EPAOpts{FT} = MM2015EPAOpts{FT}(),
     )::Tuple{FT,FT} where {FT}
+    (; return_mixing_ratio, depth, dqvdt, dTdt, fallback_to_standard_supersaturation_limiter, time_tolerance) = opts
     
     if depth ≥ 10
         @error "Failed on inputs area = $area; ρ = $ρ; p = $p; T = $T; w = $w; τ_liq = $τ_liq; τ_ice = $τ_ice; δ_0 = $δ_0; δ_0i = $δ_0i; q = $q; q_eq = $q_eq; Δt = $Δt; ts = $ts; dTdt = $dTdt; dqvdt = $dqvdt;"
@@ -738,7 +733,7 @@ function morrison_milbrandt_2015_style_exponential_part_only(
 
 
     # --- Thermo  constants ------------------------------------------------------------------------------------ #
-   (; g, L_i, L_l, c_p, e_sl, e_si, dqsl_dT, dqsi_dT, q_sl, q_si, q_liq, q_ice, T_freeze, δ_0, δ_0i, Γ_l, Γ_i, dqvdt, dTdt) = get_params_and_go_to_mixing_ratio_exponential_part_only(param_set, area, ρ, p, T, w, τ_liq, τ_ice, δ_0, δ_0i, dqvdt, dTdt, q, q_eq, Δt, ts; use_fix=use_fix)
+   (; g, L_i, L_l, c_p, e_sl, e_si, dqsl_dT, dqsi_dT, q_sl, q_si, q_liq, q_ice, T_freeze, δ_0, δ_0i, Γ_l, Γ_i) = get_params_and_go_to_mixing_ratio_exponential_part_only(param_set, area, ρ, p, T, w, τ_liq, τ_ice, δ_0, δ_0i, dqvdt, dTdt, q, q_eq, Δt, ts; opts = opts)
 
 
     # Both are growing..., no explicit need for WBF right
@@ -756,7 +751,7 @@ function morrison_milbrandt_2015_style_exponential_part_only(
         # @debug "falling bacc"
         return do_standard_fallback(
             standard_milestone_t, standard_milestone, time_tolerance, S_ql, S_qi, q_liq, q_ice, δ_eq, δi_eq, A_c_no_WBF, Γ_l, Γ_i,
-            regime, param_set, area, ρ, p, T, w, τ_liq, τ_ice, δ_0, δ_0i, q, q_eq, Δt, ts; use_fix = use_fix, return_mixing_ratio = true, depth = depth, dqvdt=dqvdt, dTdt=dTdt, fallback_to_standard_supersaturation_limiter = fallback_to_standard_supersaturation_limiter
+            regime, param_set, area, ρ, p, T, w, τ_liq, τ_ice, δ_0, δ_0i, q, q_eq, Δt, ts; opts = update(opts; return_mixing_ratio = true)
             )
     end
     # =========================== #
@@ -788,7 +783,7 @@ function morrison_milbrandt_2015_style_exponential_part_only(
         new_q = morrison_milbrandt_2015_get_new_status_helper_EPA(q, q_liq, q_ice, S_ql, S_qi, min_t, dqvdt)
         new_regime = add_regime_parameters(WBF, new_q.liq, new_q.ice, true) # not sure if we can have underflow problems here... don't think so
         
-        S_ql_addit, S_qi_addit = morrison_milbrandt_2015_style_exponential_part_only(new_regime, param_set, area, ρ, p, T, w, τ_liq, τ_ice, new_δ_0, new_δ_0i, new_q, q_eq, Δt_left, ts; use_fix = use_fix, return_mixing_ratio = true, depth = depth+1, dqvdt=dqvdt, dTdt=dTdt, fallback_to_standard_supersaturation_limiter = fallback_to_standard_supersaturation_limiter, time_tolerance = time_tolerance)
+        S_ql_addit, S_qi_addit = morrison_milbrandt_2015_style_exponential_part_only(new_regime, param_set, area, ρ, p, T, w, τ_liq, τ_ice, new_δ_0, new_δ_0i, new_q, q_eq, Δt_left, ts; opts = update(opts; return_mixing_ratio = true, depth = depth+1))
         S_ql, S_qi = resolve_S_S_addit(S_ql, S_qi, min_t, S_ql_addit, S_qi_addit, Δt_left, Δt)
         # @debug "q_ice = $q_ice; S_qi = $S_qi; Δt = $Δt; (q_ice +  S_qi * Δt) = $(q_ice + S_qi * Δt);"
         return return_mixing_ratio ? (S_ql, S_qi) : (S_mixing_ratio_to_shum(S_ql, q.tot), S_mixing_ratio_to_shum(S_qi, q.tot))
@@ -815,14 +810,9 @@ end
 function morrison_milbrandt_2015_style_exponential_part_only(
     regime::Union{Supersaturated{true, true, false}, Supersaturated{true, false, false}, Supersaturated{false, true, false}, Supersaturated{false, false, false}}, # these should all work the same, right? you'll end up with some liq/ice at the end no matter what
     param_set::APS, area::FT, ρ::FT, p::FT, T::FT, w::FT, τ_liq::FT, τ_ice::FT, δ_0::FT, δ_0i::FT, q::TD.PhasePartition, q_eq::TD.PhasePartition, Δt::FT, ts::TD.ThermodynamicState;
-    use_fix::Bool = true, # i think something is wrong with the forumula for large timesteps... is less essential now w/ the limiter but still needed... (unless I just don't understand the physics of it)
-    return_mixing_ratio::Bool = false,
-    depth::Int = 0,
-    dqvdt::FT = FT(0),
-    dTdt::FT = FT(0),
-    fallback_to_standard_supersaturation_limiter::Bool = false,
-    time_tolerance::FT = FT(1e-8),
+    opts::MM2015EPAOpts{FT} = MM2015EPAOpts{FT}(),
     )::Tuple{FT,FT} where {FT}
+    (; return_mixing_ratio, depth, dqvdt, dTdt, fallback_to_standard_supersaturation_limiter, time_tolerance) = opts
 
     if depth ≥ 10
         @error "Failed on inputs area = $area; ρ = $ρ; p = $p; T = $T; w = $w; τ_liq = $τ_liq; τ_ice = $τ_ice; δ_0 = $δ_0; δ_0i = $δ_0i; q = $q; q_eq = $q_eq; Δt = $Δt; ts = $ts; dTdt = $dTdt; dqvdt = $dqvdt;"
@@ -832,7 +822,7 @@ function morrison_milbrandt_2015_style_exponential_part_only(
     # @debug "Calling Supersaturated{$(q.liq > FT(0)), $(q.ice > FT(0)), false}..."
 
 
-   (; g, L_i, L_l, c_p, e_sl, e_si, dqsl_dT, dqsi_dT, q_sl, q_si, q_liq, q_ice, T_freeze, δ_0, δ_0i, Γ_l, Γ_i, dqvdt, dTdt) = get_params_and_go_to_mixing_ratio_exponential_part_only(param_set, area, ρ, p, T, w, τ_liq, τ_ice, δ_0, δ_0i, dqvdt, dTdt, q, q_eq, Δt, ts; use_fix=use_fix)
+   (; g, L_i, L_l, c_p, e_sl, e_si, dqsl_dT, dqsi_dT, q_sl, q_si, q_liq, q_ice, T_freeze, δ_0, δ_0i, Γ_l, Γ_i) = get_params_and_go_to_mixing_ratio_exponential_part_only(param_set, area, ρ, p, T, w, τ_liq, τ_ice, δ_0, δ_0i, dqvdt, dTdt, q, q_eq, Δt, ts; opts = opts)
 
     A_c = A_c_func_no_WBF_EPA(q_sl, g, w, c_p, e_sl, dqsl_dT, dqvdt, dTdt, p, ρ)
     A_c_no_WBF = A_c # for clamping and fallback
@@ -845,7 +835,7 @@ function morrison_milbrandt_2015_style_exponential_part_only(
         # @debug "falling bacc"
         return do_standard_fallback(
             standard_milestone_t, standard_milestone, time_tolerance, S_ql, S_qi, q_liq, q_ice, δ_eq, δi_eq, A_c, Γ_l, Γ_i,
-            regime, param_set, area, ρ, p, T, w, τ_liq, τ_ice, δ_0, δ_0i, q, q_eq, Δt, ts; use_fix = use_fix, return_mixing_ratio = true, depth = depth, dqvdt=dqvdt, dTdt=dTdt, fallback_to_standard_supersaturation_limiter = fallback_to_standard_supersaturation_limiter
+            regime, param_set, area, ρ, p, T, w, τ_liq, τ_ice, δ_0, δ_0i, q, q_eq, Δt, ts; opts = update(opts; return_mixing_ratio = true)
             )
     end
     # =========================== #
@@ -870,7 +860,7 @@ function morrison_milbrandt_2015_style_exponential_part_only(
         Δt_left = Δt - min_t
         # maybe we should check that new_q actually has values, bc if τ or δ or Δt is really small it might not...
         new_regime = add_regime_parameters(WBF, new_q.liq, new_q.ice, false)
-        S_ql_addit, S_qi_addit = morrison_milbrandt_2015_style_exponential_part_only(new_regime, param_set, area, ρ, p, T, w, τ_liq, τ_ice, new_δ_0, new_δ_0i, new_q, q_eq, Δt_left, ts; use_fix = use_fix, return_mixing_ratio = true, depth = depth+1, dqvdt=dqvdt, dTdt=dTdt, fallback_to_standard_supersaturation_limiter = fallback_to_standard_supersaturation_limiter, time_tolerance = time_tolerance)
+        S_ql_addit, S_qi_addit = morrison_milbrandt_2015_style_exponential_part_only(new_regime, param_set, area, ρ, p, T, w, τ_liq, τ_ice, new_δ_0, new_δ_0i, new_q, q_eq, Δt_left, ts; opts = update(opts; return_mixing_ratio = true, depth = depth+1))
 
         S_ql, S_qi = resolve_S_S_addit(S_ql, S_qi, min_t, S_ql_addit, S_qi_addit, Δt_left, Δt)
         return return_mixing_ratio ? (S_ql, S_qi) : (S_mixing_ratio_to_shum(S_ql, q.tot), S_mixing_ratio_to_shum(S_qi, q.tot))
@@ -897,14 +887,9 @@ end
 function morrison_milbrandt_2015_style_exponential_part_only(
     regime::Union{WBF{true, true, true}, WBF{true, false, true}}, # has liq, no matter what we'll end up with some ice
     param_set::APS, area::FT, ρ::FT, p::FT, T::FT, w::FT, τ_liq::FT, τ_ice::FT, δ_0::FT, δ_0i::FT, q::TD.PhasePartition, q_eq::TD.PhasePartition, Δt::FT, ts::TD.ThermodynamicState;
-    use_fix::Bool = true, # i think something is wrong with the forumula for large timesteps... is less essential now w/ the limiter but still needed... (unless I just don't understand the physics of it)
-    return_mixing_ratio::Bool = false,
-    depth::Int = 0,
-    dqvdt::FT = FT(0),
-    dTdt::FT = FT(0),
-    fallback_to_standard_supersaturation_limiter::Bool = false,
-    time_tolerance::FT = FT(1e-8),
+    opts::MM2015EPAOpts{FT} = MM2015EPAOpts{FT}(),
     )::Tuple{FT,FT} where {FT}
+    (; return_mixing_ratio, depth, dqvdt, dTdt, fallback_to_standard_supersaturation_limiter, time_tolerance) = opts
 
     if depth ≥ 10
         @error "Failed on inputs area = $area; ρ = $ρ; p = $p; T = $T; w = $w; τ_liq = $τ_liq; τ_ice = $τ_ice; δ_0 = $δ_0; δ_0i = $δ_0i; q = $q; q_eq = $q_eq; Δt = $Δt; ts = $ts; dTdt = $dTdt; dqvdt = $dqvdt;"
@@ -915,7 +900,7 @@ function morrison_milbrandt_2015_style_exponential_part_only(
     # @debug "Calling WBF{true, $(q.ice > FT(0)), true}..."
 
 
-    (; g, L_i, L_l, c_p, e_sl, e_si, dqsl_dT, dqsi_dT, q_sl, q_si, q_liq, q_ice, T_freeze, δ_0, δ_0i, Γ_l, Γ_i, dqvdt, dTdt) = get_params_and_go_to_mixing_ratio_exponential_part_only(param_set, area, ρ, p, T, w, τ_liq, τ_ice, δ_0, δ_0i, dqvdt, dTdt, q, q_eq, Δt, ts; use_fix=use_fix)
+    (; g, L_i, L_l, c_p, e_sl, e_si, dqsl_dT, dqsi_dT, q_sl, q_si, q_liq, q_ice, T_freeze, δ_0, δ_0i, Γ_l, Γ_i) = get_params_and_go_to_mixing_ratio_exponential_part_only(param_set, area, ρ, p, T, w, τ_liq, τ_ice, δ_0, δ_0i, dqvdt, dTdt, q, q_eq, Δt, ts; opts = opts)
 
     # One is growing, one is shrinking...
     # A_c = A_c_func_EPA(τ_ice, Γ_l, q_sl, q_si, g, w, c_p, e_sl, L_i, dqsl_dT, dqvdt, dTdt, p, ρ) # Eq C4
@@ -932,7 +917,7 @@ function morrison_milbrandt_2015_style_exponential_part_only(
         # @debug "falling bacc"
         return do_standard_fallback(
             standard_milestone_t, standard_milestone, time_tolerance, S_ql, S_qi, q_liq, q_ice, δ_eq, δi_eq, A_c_no_WBF, Γ_l, Γ_i,
-            regime, param_set, area, ρ, p, T, w, τ_liq, τ_ice, δ_0, δ_0i, q, q_eq, Δt, ts; use_fix = use_fix, return_mixing_ratio = true, depth = depth, dqvdt=dqvdt, dTdt=dTdt, fallback_to_standard_supersaturation_limiter = fallback_to_standard_supersaturation_limiter
+            regime, param_set, area, ρ, p, T, w, τ_liq, τ_ice, δ_0, δ_0i, q, q_eq, Δt, ts; opts = update(opts; return_mixing_ratio = true)
             )
     end
     # =========================== #
@@ -989,7 +974,7 @@ function morrison_milbrandt_2015_style_exponential_part_only(
             
             new_q = morrison_milbrandt_2015_get_new_status_helper_EPA(q, q_liq, q_ice, -q_liq, S_qi*min_t, dqvdt*min_t) # use multiplied form for floating point accuracy
             new_regime = add_regime_parameters(WBF, new_q.liq, new_q.ice, true)
-            S_ql_addit, S_qi_addit = morrison_milbrandt_2015_style_exponential_part_only(new_regime, param_set, area, ρ, p, T, w, τ_liq, τ_ice, new_δ_0, new_δ_0i, new_q, q_eq, Δt_left, ts; use_fix = use_fix, return_mixing_ratio = true, depth = depth+1, dqvdt=dqvdt, dTdt=dTdt, fallback_to_standard_supersaturation_limiter = fallback_to_standard_supersaturation_limiter, time_tolerance = time_tolerance) 
+            S_ql_addit, S_qi_addit = morrison_milbrandt_2015_style_exponential_part_only(new_regime, param_set, area, ρ, p, T, w, τ_liq, τ_ice, new_δ_0, new_δ_0i, new_q, q_eq, Δt_left, ts; opts = update(opts; return_mixing_ratio = true, depth = depth+1)) 
 
 
             S_ql, S_qi = resolve_S_S_addit(S_ql, S_qi, min_t, S_ql_addit, S_qi_addit, Δt_left, Δt) # rescale to the timestep
@@ -1016,7 +1001,7 @@ function morrison_milbrandt_2015_style_exponential_part_only(
 
             new_q = morrison_milbrandt_2015_get_new_status_helper_EPA(q, q_liq, q_ice, S_ql, S_qi, min_t, dqvdt) # use multiplied form for floating point accuracy
             new_regime = add_regime_parameters(Supersaturated, new_q.liq, new_q.ice, true)
-            S_ql_addit, S_qi_addit = morrison_milbrandt_2015_style_exponential_part_only(new_regime, param_set, area, ρ, p, T, w, τ_liq, τ_ice, new_δ_0, new_δ_0i, new_q, q_eq, Δt_left, ts; use_fix = use_fix, return_mixing_ratio = true, depth = depth+1, dqvdt=dqvdt, dTdt=dTdt, fallback_to_standard_supersaturation_limiter = fallback_to_standard_supersaturation_limiter, time_tolerance = time_tolerance)
+            S_ql_addit, S_qi_addit = morrison_milbrandt_2015_style_exponential_part_only(new_regime, param_set, area, ρ, p, T, w, τ_liq, τ_ice, new_δ_0, new_δ_0i, new_q, q_eq, Δt_left, ts; opts = update(opts; return_mixing_ratio = true, depth = depth+1))
             # @debug "S_ql_addit = $S_ql_addit; S_qi_addit = $S_qi_addit; Δt_left = $Δt_left; Δt = $Δt; min_t = $min_t; dqvdt = $dqvdt; dTdt = $dTdt; dqsl_dT = $dqsl_dT; dqsi_dT = $dqsi_dT;"
             S_ql, S_qi = resolve_S_S_addit(S_ql, S_qi, min_t, S_ql_addit, S_qi_addit, Δt_left, Δt) # rescale to the timestep
             return return_mixing_ratio ? (S_ql, S_qi) : (S_mixing_ratio_to_shum(S_ql, q.tot), S_mixing_ratio_to_shum(S_qi, q.tot))
@@ -1034,7 +1019,7 @@ function morrison_milbrandt_2015_style_exponential_part_only(
             new_δ_0i = FT(0) # hit ice sat
             new_q = morrison_milbrandt_2015_get_new_status_helper_EPA(q, q_liq, q_ice, S_ql, S_qi, min_t, dqvdt) # use multiplied form for floating point accuracy
             new_regime = add_regime_parameters(Subsaturated, new_q.liq, new_q.ice, true)
-            S_ql_addit, S_qi_addit = morrison_milbrandt_2015_style_exponential_part_only(new_regime, param_set, area, ρ, p, T, w, τ_liq, τ_ice, new_δ_0, new_δ_0i, new_q, q_eq, Δt_left, ts; use_fix = use_fix, return_mixing_ratio = true, depth = depth+1, dqvdt=dqvdt, dTdt=dTdt, fallback_to_standard_supersaturation_limiter = fallback_to_standard_supersaturation_limiter, time_tolerance = time_tolerance)
+            S_ql_addit, S_qi_addit = morrison_milbrandt_2015_style_exponential_part_only(new_regime, param_set, area, ρ, p, T, w, τ_liq, τ_ice, new_δ_0, new_δ_0i, new_q, q_eq, Δt_left, ts; opts = update(opts; return_mixing_ratio = true, depth = depth+1))
             S_ql, S_qi = resolve_S_S_addit(S_ql, S_qi, min_t, S_ql_addit, S_qi_addit, Δt_left, Δt) # rescale to the timestep
             return return_mixing_ratio ? (S_ql, S_qi) : (S_mixing_ratio_to_shum(S_ql, q.tot), S_mixing_ratio_to_shum(S_qi, q.tot))
         end
@@ -1062,14 +1047,9 @@ end
 function morrison_milbrandt_2015_style_exponential_part_only(
     regime::Union{WBF{false, true, true}, WBF{false, false, true}}, # no liq, no matter what we'll end up with some ice
     param_set::APS, area::FT, ρ::FT, p::FT, T::FT, w::FT, τ_liq::FT, τ_ice::FT, δ_0::FT, δ_0i::FT, q::TD.PhasePartition, q_eq::TD.PhasePartition, Δt::FT, ts::TD.ThermodynamicState;
-    use_fix::Bool = true, # i think something is wrong with the forumula for large timesteps... is less essential now w/ the limiter but still needed... (unless I just don't understand the physics of it)
-    return_mixing_ratio::Bool = false,
-    depth::Int = 0,
-    dqvdt::FT = FT(0),
-    dTdt::FT = FT(0),
-    fallback_to_standard_supersaturation_limiter::Bool = false,
-    time_tolerance::FT = FT(1e-8),
+    opts::MM2015EPAOpts{FT} = MM2015EPAOpts{FT}(),
     )::Tuple{FT,FT} where {FT}
+    (; return_mixing_ratio, depth, dqvdt, dTdt, fallback_to_standard_supersaturation_limiter, time_tolerance) = opts
 
     if depth ≥ 10
         @error "Failed on inputs area = $area; ρ = $ρ; p = $p; T = $T; w = $w; τ_liq = $τ_liq; τ_ice = $τ_ice; δ_0 = $δ_0; δ_0i = $δ_0i; q = $q; q_eq = $q_eq; Δt = $Δt; ts = $ts; dTdt = $dTdt; dqvdt = $dqvdt;"
@@ -1078,7 +1058,7 @@ function morrison_milbrandt_2015_style_exponential_part_only(
 
     # @debug "Calling WBF{false, $(q.ice > FT(0)), true}..."
 
-   (; g, L_i, L_l, c_p, e_sl, e_si, dqsl_dT, dqsi_dT, q_sl, q_si, q_liq, q_ice, T_freeze, δ_0, δ_0i, Γ_l, Γ_i, dqvdt, dTdt) = get_params_and_go_to_mixing_ratio_exponential_part_only(param_set, area, ρ, p, T, w, τ_liq, τ_ice, δ_0, δ_0i, dqvdt, dTdt, q, q_eq, Δt, ts; use_fix=use_fix)
+   (; g, L_i, L_l, c_p, e_sl, e_si, dqsl_dT, dqsi_dT, q_sl, q_si, q_liq, q_ice, T_freeze, δ_0, δ_0i, Γ_l, Γ_i) = get_params_and_go_to_mixing_ratio_exponential_part_only(param_set, area, ρ, p, T, w, τ_liq, τ_ice, δ_0, δ_0i, dqvdt, dTdt, q, q_eq, Δt, ts; opts = opts)
 
 
     # no liq so this is just ice growth.
@@ -1095,7 +1075,7 @@ function morrison_milbrandt_2015_style_exponential_part_only(
         # @debug "falling bacc"
         return do_standard_fallback(
             standard_milestone_t, standard_milestone, time_tolerance, S_ql, S_qi, q_liq, q_ice, δ_eq, δi_eq, A_c, Γ_l, Γ_i,
-            regime, param_set, area, ρ, p, T, w, τ_liq, τ_ice, δ_0, δ_0i, q, q_eq, Δt, ts; use_fix = use_fix, return_mixing_ratio = true, depth = depth, dqvdt=dqvdt, dTdt=dTdt, fallback_to_standard_supersaturation_limiter = fallback_to_standard_supersaturation_limiter
+            regime, param_set, area, ρ, p, T, w, τ_liq, τ_ice, δ_0, δ_0i, q, q_eq, Δt, ts; opts = update(opts; return_mixing_ratio = true)
             )
     end
     # =========================== #
@@ -1125,7 +1105,7 @@ function morrison_milbrandt_2015_style_exponential_part_only(
                 new_q = morrison_milbrandt_2015_get_new_status_helper_EPA(q, q_liq, q_ice, S_ql, S_qi, min_t, dqvdt)
 
                 new_regime = add_regime_parameters(Subsaturated, new_q.liq, new_q.ice, true)
-                S_ql_addit, S_qi_addit = morrison_milbrandt_2015_style_exponential_part_only(new_regime, param_set, area, ρ, p, T, w, τ_liq, τ_ice, new_δ_0, new_δ_0i, new_q, q_eq, Δt_left, ts; use_fix = use_fix, return_mixing_ratio = true, depth = depth+1, dqvdt=dqvdt, dTdt=dTdt, fallback_to_standard_supersaturation_limiter = fallback_to_standard_supersaturation_limiter, time_tolerance = time_tolerance) # should have no liq still, no ice above freezing
+                S_ql_addit, S_qi_addit = morrison_milbrandt_2015_style_exponential_part_only(new_regime, param_set, area, ρ, p, T, w, τ_liq, τ_ice, new_δ_0, new_δ_0i, new_q, q_eq, Δt_left, ts; opts = update(opts; return_mixing_ratio = true, depth = depth+1)) # should have no liq still, no ice above freezing
                 # @debug "S_ql = $S_ql; S_qi = $S_qi; S_ql_addit = $S_ql_addit; S_qi_addit = $S_qi_addit; Δt_left = $Δt_left; min_t = $min_t; q_ice = $q_ice; new_q = $new_q"
                 S_ql, S_qi = resolve_S_S_addit(S_ql, S_qi, min_t, S_ql_addit, S_qi_addit, Δt_left, Δt)
                 # @debug "q_ice = $q_ice; S_qi = $S_qi; Δt = $Δt; (q_ice +  S_qi * Δt) = $(q_ice + S_qi * Δt);"
@@ -1142,7 +1122,7 @@ function morrison_milbrandt_2015_style_exponential_part_only(
 
                 new_q = morrison_milbrandt_2015_get_new_status_helper_EPA(q, q_liq, q_ice, S_ql, S_qi, min_t, dqvdt)
                 new_regime = add_regime_parameters(Supersaturated, new_q.liq, new_q.ice, true) # if T < T_freeze then we have subsat ice, otherwise we have supersat liq
-                S_ql_addit, S_qi_addit = morrison_milbrandt_2015_style_exponential_part_only(new_regime, param_set, area, ρ, p, T, w, τ_liq, τ_ice, new_δ_0, new_δ_0i, new_q, q_eq, Δt_left, ts; use_fix = use_fix, return_mixing_ratio = true, depth = depth+1, dqvdt=dqvdt, dTdt=dTdt, fallback_to_standard_supersaturation_limiter = fallback_to_standard_supersaturation_limiter, time_tolerance = time_tolerance) # should have no liq still
+                S_ql_addit, S_qi_addit = morrison_milbrandt_2015_style_exponential_part_only(new_regime, param_set, area, ρ, p, T, w, τ_liq, τ_ice, new_δ_0, new_δ_0i, new_q, q_eq, Δt_left, ts; opts = update(opts; return_mixing_ratio = true, depth = depth+1)) # should have no liq still
                 S_ql, S_qi = resolve_S_S_addit(S_ql, S_qi, min_t, S_ql_addit, S_qi_addit, Δt_left, Δt)
                 return return_mixing_ratio ? (S_ql, S_qi) : (S_mixing_ratio_to_shum(S_ql, q.tot), S_mixing_ratio_to_shum(S_qi, q.tot))
 
@@ -1174,14 +1154,9 @@ end
 function morrison_milbrandt_2015_style_exponential_part_only(
     regime::Union{WBF{false, true, false},  WBF{true, true, false}},
     param_set::APS, area::FT, ρ::FT, p::FT, T::FT, w::FT, τ_liq::FT, τ_ice::FT, δ_0::FT, δ_0i::FT, q::TD.PhasePartition, q_eq::TD.PhasePartition, Δt::FT, ts::TD.ThermodynamicState;
-    use_fix::Bool = true, # i think something is wrong with the forumula for large timesteps... is less essential now w/ the limiter but still needed... (unless I just don't understand the physics of it)
-    return_mixing_ratio::Bool = false,
-    depth::Int = 0,
-    dqvdt::FT = FT(0),
-    dTdt::FT = FT(0),
-    fallback_to_standard_supersaturation_limiter::Bool = false,
-    time_tolerance::FT = FT(1e-8), # if time is shorter than the tolerance, we do a StandardSupersaturation step first, since we can't guarantee success w/ the lambert W methods...
+    opts::MM2015EPAOpts{FT} = MM2015EPAOpts{FT}(), # if time is shorter than the tolerance, we do a StandardSupersaturation step first, since we can't guarantee success w/ the lambert W methods...
     )::Tuple{FT,FT} where {FT} 
+    (; return_mixing_ratio, depth, dqvdt, dTdt, fallback_to_standard_supersaturation_limiter, time_tolerance) = opts
 
     if depth ≥ 10
         @error "Failed on inputs area = $area; ρ = $ρ; p = $p; T = $T; w = $w; τ_liq = $τ_liq; τ_ice = $τ_ice; δ_0 = $δ_0; δ_0i = $δ_0i; q = $q; q_eq = $q_eq; Δt = $Δt; ts = $ts; dTdt = $dTdt; dqvdt = $dqvdt;"
@@ -1189,7 +1164,7 @@ function morrison_milbrandt_2015_style_exponential_part_only(
     end
     # @debug "Calling WBF{false, $(q.ice > FT(0)), false}..."
 
-    (; g, L_i, L_l, c_p, e_sl, e_si, dqsl_dT, dqsi_dT, q_sl, q_si, q_liq, q_ice, T_freeze, δ_0, δ_0i, Γ_l, Γ_i, dqvdt, dTdt) = get_params_and_go_to_mixing_ratio_exponential_part_only(param_set, area, ρ, p, T, w, τ_liq, τ_ice, δ_0, δ_0i, dqvdt, dTdt, q, q_eq, Δt, ts; use_fix=use_fix)
+    (; g, L_i, L_l, c_p, e_sl, e_si, dqsl_dT, dqsi_dT, q_sl, q_si, q_liq, q_ice, T_freeze, δ_0, δ_0i, Γ_l, Γ_i) = get_params_and_go_to_mixing_ratio_exponential_part_only(param_set, area, ρ, p, T, w, τ_liq, τ_ice, δ_0, δ_0i, dqvdt, dTdt, q, q_eq, Δt, ts; opts = opts)
    
     # A_c = A_c_func_EPA(τ_ice, Γ_l, q_sl, q_si, g, w, c_p, e_sl, L_i, dqsl_dT, dqvdt, dTdt, p, ρ) # Eq C4
     # A_c_no_WBF = A_c_func_no_WBF_EPA(q_sl, g, w, c_p, e_sl, dqsl_dT, dqvdt, dTdt, p, ρ)  # for clamping and fallback
@@ -1205,7 +1180,7 @@ function morrison_milbrandt_2015_style_exponential_part_only(
         # @debug "falling bacc"
         return do_standard_fallback(
             standard_milestone_t, standard_milestone, time_tolerance, S_ql, S_qi, q_liq, q_ice, δ_eq, δi_eq, A_c_no_WBF, Γ_l, Γ_i,
-            regime, param_set, area, ρ, p, T, w, τ_liq, τ_ice, δ_0, δ_0i, q, q_eq, Δt, ts; use_fix = use_fix, return_mixing_ratio = true, depth = depth, dqvdt=dqvdt, dTdt=dTdt, fallback_to_standard_supersaturation_limiter = fallback_to_standard_supersaturation_limiter
+            regime, param_set, area, ρ, p, T, w, τ_liq, τ_ice, δ_0, δ_0i, q, q_eq, Δt, ts; opts = update(opts; return_mixing_ratio = true)
             )
     end
     # =========================== #
@@ -1252,7 +1227,7 @@ function morrison_milbrandt_2015_style_exponential_part_only(
 
             new_q = morrison_milbrandt_2015_get_new_status_helper_EPA(q, q_liq, q_ice, S_ql*min_t, -q_ice, dqvdt*min_t) # use multiplied form for floating point accuracy
             new_regime = add_regime_parameters(WBF, new_q.liq, false, false)
-            S_ql_addit, S_qi_addit = morrison_milbrandt_2015_style_exponential_part_only(new_regime, param_set, area, ρ, p, T, w, τ_liq, τ_ice, new_δ_0, new_δ_0i, new_q, q_eq, Δt_left, ts; use_fix = use_fix, return_mixing_ratio = true, depth = depth+1, dqvdt=dqvdt, dTdt=dTdt, fallback_to_standard_supersaturation_limiter = fallback_to_standard_supersaturation_limiter, time_tolerance = time_tolerance)
+            S_ql_addit, S_qi_addit = morrison_milbrandt_2015_style_exponential_part_only(new_regime, param_set, area, ρ, p, T, w, τ_liq, τ_ice, new_δ_0, new_δ_0i, new_q, q_eq, Δt_left, ts; opts = update(opts; return_mixing_ratio = true, depth = depth+1))
             S_ql, S_qi = resolve_S_S_addit(S_ql, S_qi, min_t, S_ql_addit, S_qi_addit, Δt_left, Δt)
             return return_mixing_ratio ? (S_ql, S_qi) : (S_mixing_ratio_to_shum(S_ql, q.tot), S_mixing_ratio_to_shum(S_qi, q.tot))
 
@@ -1273,7 +1248,7 @@ function morrison_milbrandt_2015_style_exponential_part_only(
                 
                 new_q = morrison_milbrandt_2015_get_new_status_helper_EPA(q, q_liq, q_ice, S_ql, S_qi, min_t, dqvdt) # use multiplied form for floating point accuracy
                 new_regime = add_regime_parameters(Subsaturated, new_q.liq, new_q.ice, false) # more robust against floating point errors and such, if slightly slower... e.g. underflow in calculating get_q_out_of_q that leads to larger dt than truly needed
-                S_ql_addit, S_qi_addit = morrison_milbrandt_2015_style_exponential_part_only(new_regime, param_set, area, ρ, p, T, w, τ_liq, τ_ice, new_δ_0, new_δ_0i, new_q, q_eq, Δt_left, ts; use_fix = use_fix, return_mixing_ratio = true, depth = depth+1, dqvdt=dqvdt, dTdt=dTdt, fallback_to_standard_supersaturation_limiter = fallback_to_standard_supersaturation_limiter, time_tolerance = time_tolerance)
+                S_ql_addit, S_qi_addit = morrison_milbrandt_2015_style_exponential_part_only(new_regime, param_set, area, ρ, p, T, w, τ_liq, τ_ice, new_δ_0, new_δ_0i, new_q, q_eq, Δt_left, ts; opts = update(opts; return_mixing_ratio = true, depth = depth+1))
                 S_ql, S_qi = resolve_S_S_addit(S_ql, S_qi, min_t, S_ql_addit, S_qi_addit, Δt_left, Δt)
                 return return_mixing_ratio ? (S_ql, S_qi) : (S_mixing_ratio_to_shum(S_ql, q.tot), S_mixing_ratio_to_shum(S_qi, q.tot))
             end
@@ -1291,7 +1266,7 @@ function morrison_milbrandt_2015_style_exponential_part_only(
             new_δ_0i = FT(0)
             new_q = morrison_milbrandt_2015_get_new_status_helper_EPA(q, q_liq, q_ice, S_ql, S_qi, min_t, dqvdt) # use multiplied form for floating point accuracy
             new_regime = add_regime_parameters(Supersaturated, new_q.liq, new_q.ice, false) # more robust against floating point errors and such, if slightly slower... e.g. underflow in calculating get_q_out_of_q that leads to larger dt than truly needed
-            S_ql_addit, S_qi_addit = morrison_milbrandt_2015_style_exponential_part_only(new_regime, param_set, area, ρ, p, T, w, τ_liq, τ_ice, new_δ_0, new_δ_0i, new_q, q_eq, Δt_left, ts; use_fix = use_fix, return_mixing_ratio = true, depth = depth+1, dqvdt=dqvdt, dTdt=dTdt, fallback_to_standard_supersaturation_limiter = fallback_to_standard_supersaturation_limiter, time_tolerance = time_tolerance)
+            S_ql_addit, S_qi_addit = morrison_milbrandt_2015_style_exponential_part_only(new_regime, param_set, area, ρ, p, T, w, τ_liq, τ_ice, new_δ_0, new_δ_0i, new_q, q_eq, Δt_left, ts; opts = update(opts; return_mixing_ratio = true, depth = depth+1))
             S_ql, S_qi = resolve_S_S_addit(S_ql, S_qi, min_t, S_ql_addit, S_qi_addit, Δt_left, Δt)
             return return_mixing_ratio ? (S_ql, S_qi) : (S_mixing_ratio_to_shum(S_ql, q.tot), S_mixing_ratio_to_shum(S_qi, q.tot))
             # end
@@ -1321,14 +1296,9 @@ end
 function morrison_milbrandt_2015_style_exponential_part_only(
     regime::Union{WBF{false, false, false}, WBF{true, false, false}},
     param_set::APS, area::FT, ρ::FT, p::FT, T::FT, w::FT, τ_liq::FT, τ_ice::FT, δ_0::FT, δ_0i::FT, q::TD.PhasePartition, q_eq::TD.PhasePartition, Δt::FT, ts::TD.ThermodynamicState;
-    use_fix::Bool = true, # i think something is wrong with the forumula for large timesteps... is less essential now w/ the limiter but still needed... (unless I just don't understand the physics of it)
-    return_mixing_ratio::Bool = false,
-    depth::Int = 0,
-    dqvdt::FT = FT(0),
-    dTdt::FT = FT(0),
-    fallback_to_standard_supersaturation_limiter::Bool = false,
-    time_tolerance::FT = FT(1e-8), # if time is shorter than the tolerance, we do a StandardSupersaturation step first, since we can't guarantee success w/ the lambert W methods...
+    opts::MM2015EPAOpts{FT} = MM2015EPAOpts{FT}(), # if time is shorter than the tolerance, we do a StandardSupersaturation step first, since we can't guarantee success w/ the lambert W methods...
     )::Tuple{FT,FT} where {FT} 
+    (; return_mixing_ratio, depth, dqvdt, dTdt, fallback_to_standard_supersaturation_limiter, time_tolerance) = opts
 
     if depth ≥ 10
         @error "Failed on inputs area = $area; ρ = $ρ; p = $p; T = $T; w = $w; τ_liq = $τ_liq; τ_ice = $τ_ice; δ_0 = $δ_0; δ_0i = $δ_0i; q = $q; q_eq = $q_eq; Δt = $Δt; ts = $ts; dTdt = $dTdt; dqvdt = $dqvdt;"
@@ -1336,7 +1306,7 @@ function morrison_milbrandt_2015_style_exponential_part_only(
     end
     # @debug "Calling WBF{false, $(q.ice > FT(0)), false}..."
 
-    (; g, L_i, L_l, c_p, e_sl, e_si, dqsl_dT, dqsi_dT, q_sl, q_si, q_liq, q_ice, T_freeze, δ_0, δ_0i, Γ_l, Γ_i, dqvdt, dTdt) = get_params_and_go_to_mixing_ratio_exponential_part_only(param_set, area, ρ, p, T, w, τ_liq, τ_ice, δ_0, δ_0i, dqvdt, dTdt, q, q_eq, Δt, ts; use_fix=use_fix)
+    (; g, L_i, L_l, c_p, e_sl, e_si, dqsl_dT, dqsi_dT, q_sl, q_si, q_liq, q_ice, T_freeze, δ_0, δ_0i, Γ_l, Γ_i) = get_params_and_go_to_mixing_ratio_exponential_part_only(param_set, area, ρ, p, T, w, τ_liq, τ_ice, δ_0, δ_0i, dqvdt, dTdt, q, q_eq, Δt, ts; opts = opts)
 
     A_c = A_c_func_no_WBF_EPA(q_sl, g, w, c_p, e_sl, dqsl_dT, dqvdt, dTdt, p, ρ) # Eq C4
     A_c_no_WBF = A_c # no WBF so A_c = A_c_no_WBF
@@ -1350,7 +1320,7 @@ function morrison_milbrandt_2015_style_exponential_part_only(
         # @debug "falling bacc"
         return do_standard_fallback(
             standard_milestone_t, standard_milestone, time_tolerance, S_ql, S_qi, q_liq, q_ice, δ_eq, δi_eq, A_c, Γ_l, Γ_i,
-            regime, param_set, area, ρ, p, T, w, τ_liq, τ_ice, δ_0, δ_0i, q, q_eq, Δt, ts; use_fix = use_fix, return_mixing_ratio = true, depth = depth, dqvdt=dqvdt, dTdt=dTdt, fallback_to_standard_supersaturation_limiter = fallback_to_standard_supersaturation_limiter
+            regime, param_set, area, ρ, p, T, w, τ_liq, τ_ice, δ_0, δ_0i, q, q_eq, Δt, ts; opts = update(opts; return_mixing_ratio = true)
             )
     end
     # =========================== #
@@ -1380,7 +1350,7 @@ function morrison_milbrandt_2015_style_exponential_part_only(
                 new_δ_0i = q_sl - q_si # diff bewteen where we're at (q_sl) and q_si
                 new_q = morrison_milbrandt_2015_get_new_status_helper_EPA(q, q_liq, q_ice, S_ql, S_qi, min_t, dqvdt) # use multiplied form for floating point accuracy
                 new_regime = add_regime_parameters(Subsaturated, new_q.liq, false, false) # more robust against floating point errors and such, if slightly slower... e.g. underflow in calculating get_q_out_of_q that leads to larger dt than truly needed
-                S_ql_addit, S_qi_addit = morrison_milbrandt_2015_style_exponential_part_only(new_regime, param_set, area, ρ, p, T, w, τ_liq, τ_ice, new_δ_0, new_δ_0i, new_q, q_eq, Δt_left, ts; use_fix = use_fix, return_mixing_ratio = true, depth = depth+1, dqvdt=dqvdt, dTdt=dTdt, fallback_to_standard_supersaturation_limiter = fallback_to_standard_supersaturation_limiter, time_tolerance = time_tolerance)
+                S_ql_addit, S_qi_addit = morrison_milbrandt_2015_style_exponential_part_only(new_regime, param_set, area, ρ, p, T, w, τ_liq, τ_ice, new_δ_0, new_δ_0i, new_q, q_eq, Δt_left, ts; opts = update(opts; return_mixing_ratio = true, depth = depth+1))
                 S_ql, S_qi = resolve_S_S_addit(S_ql, S_qi, min_t, S_ql_addit, S_qi_addit, Δt_left, Δt)
                 return return_mixing_ratio ? (S_ql, S_qi) : (S_mixing_ratio_to_shum(S_ql, q.tot), S_mixing_ratio_to_shum(S_qi, q.tot))
             end
@@ -1398,7 +1368,7 @@ function morrison_milbrandt_2015_style_exponential_part_only(
                 new_δ_0i = FT(0)
                 new_q = morrison_milbrandt_2015_get_new_status_helper_EPA(q, q_liq, q_ice, S_ql, S_qi, min_t, dqvdt) # use multiplied form for floating point accuracy
                 new_regime = add_regime_parameters(Supersaturated, new_q.liq, false, false) # more robust against floating point errors and such, if slightly slower... e.g. underflow in calculating get_q_out_of_q that leads to larger dt than truly needed
-                S_ql_addit, S_qi_addit = morrison_milbrandt_2015_style_exponential_part_only(new_regime, param_set, area, ρ, p, T, w, τ_liq, τ_ice, new_δ_0, new_δ_0i, new_q, q_eq, Δt_left, ts; use_fix = use_fix, return_mixing_ratio = true, depth = depth+1, dqvdt=dqvdt, dTdt=dTdt, fallback_to_standard_supersaturation_limiter = fallback_to_standard_supersaturation_limiter, time_tolerance = time_tolerance)
+                S_ql_addit, S_qi_addit = morrison_milbrandt_2015_style_exponential_part_only(new_regime, param_set, area, ρ, p, T, w, τ_liq, τ_ice, new_δ_0, new_δ_0i, new_q, q_eq, Δt_left, ts; opts = update(opts; return_mixing_ratio = true, depth = depth+1))
                 S_ql, S_qi = resolve_S_S_addit(S_ql, S_qi, min_t, S_ql_addit, S_qi_addit, Δt_left, Δt)
                 return return_mixing_ratio ? (S_ql, S_qi) : (S_mixing_ratio_to_shum(S_ql, q.tot), S_mixing_ratio_to_shum(S_qi, q.tot))
             end
@@ -1430,14 +1400,9 @@ end
 function morrison_milbrandt_2015_style_exponential_part_only(
     regime::Union{Subsaturated{true, true, true}, Subsaturated{true, true, false}}, # can run out of either first
     param_set::APS, area::FT, ρ::FT, p::FT, T::FT, w::FT, τ_liq::FT, τ_ice::FT, δ_0::FT, δ_0i::FT, q::TD.PhasePartition, q_eq::TD.PhasePartition, Δt::FT, ts::TD.ThermodynamicState;
-    use_fix::Bool = true, # i think something is wrong with the forumula for large timesteps... is less essential now w/ the limiter but still needed... (unless I just don't understand the physics of it)
-    return_mixing_ratio::Bool = false,
-    depth::Int = 0,
-    dqvdt::FT = FT(0),
-    dTdt::FT = FT(0),
-    fallback_to_standard_supersaturation_limiter::Bool = false,
-    time_tolerance::FT = FT(1e-8),
+    opts::MM2015EPAOpts{FT} = MM2015EPAOpts{FT}(),
     )::Tuple{FT,FT} where {FT}
+    (; return_mixing_ratio, depth, dqvdt, dTdt, fallback_to_standard_supersaturation_limiter, time_tolerance) = opts
 
 
     if depth ≥ 10
@@ -1446,7 +1411,7 @@ function morrison_milbrandt_2015_style_exponential_part_only(
     end
 
 
-   (; g, L_i, L_l, c_p, e_sl, e_si, dqsl_dT, dqsi_dT, q_sl, q_si, q_liq, q_ice, T_freeze, δ_0, δ_0i, Γ_l, Γ_i, dqvdt, dTdt) = get_params_and_go_to_mixing_ratio_exponential_part_only(param_set, area, ρ, p, T, w, τ_liq, τ_ice, δ_0, δ_0i, dqvdt, dTdt, q, q_eq, Δt, ts; use_fix=use_fix)
+   (; g, L_i, L_l, c_p, e_sl, e_si, dqsl_dT, dqsi_dT, q_sl, q_si, q_liq, q_ice, T_freeze, δ_0, δ_0i, Γ_l, Γ_i) = get_params_and_go_to_mixing_ratio_exponential_part_only(param_set, area, ρ, p, T, w, τ_liq, τ_ice, δ_0, δ_0i, dqvdt, dTdt, q, q_eq, Δt, ts; opts = opts)
 
     BF::Bool = T < T_freeze
     # @debug "Calling Subsaturated{true, true, $BF}..."
@@ -1467,7 +1432,7 @@ function morrison_milbrandt_2015_style_exponential_part_only(
 
         return do_standard_fallback(
             standard_milestone_t, standard_milestone, time_tolerance, S_ql, S_qi, q_liq, q_ice, δ_eq, δi_eq, A_c_no_WBF, Γ_l, Γ_i,
-            regime, param_set, area, ρ, p, T, w, τ_liq, τ_ice, δ_0, δ_0i, q, q_eq, Δt, ts; use_fix = use_fix, return_mixing_ratio = true, depth = depth, dqvdt=dqvdt, dTdt=dTdt, fallback_to_standard_supersaturation_limiter = fallback_to_standard_supersaturation_limiter
+            regime, param_set, area, ρ, p, T, w, τ_liq, τ_ice, δ_0, δ_0i, q, q_eq, Δt, ts; opts = update(opts; return_mixing_ratio = true)
             )
     end
     # =========================== #
@@ -1528,7 +1493,7 @@ function morrison_milbrandt_2015_style_exponential_part_only(
             
             new_q = morrison_milbrandt_2015_get_new_status_helper_EPA(q, q_liq, q_ice, -q_liq, S_qi * min_t, dqvdt*min_t) # use multiplied form for floating point accuracy
             new_regime = add_regime_parameters(Subsaturated, new_q.liq, new_q.ice, BF)
-            S_ql_addit, S_qi_addit = morrison_milbrandt_2015_style_exponential_part_only(new_regime, param_set, area, ρ, p, T, w, τ_liq, τ_ice, new_δ_0, new_δ_0i, new_q, q_eq, Δt_left, ts; use_fix = use_fix, return_mixing_ratio = true, depth = depth+1, dqvdt=dqvdt, dTdt=dTdt, fallback_to_standard_supersaturation_limiter = fallback_to_standard_supersaturation_limiter, time_tolerance = time_tolerance)
+            S_ql_addit, S_qi_addit = morrison_milbrandt_2015_style_exponential_part_only(new_regime, param_set, area, ρ, p, T, w, τ_liq, τ_ice, new_δ_0, new_δ_0i, new_q, q_eq, Δt_left, ts; opts = update(opts; return_mixing_ratio = true, depth = depth+1))
             S_ql, S_qi = resolve_S_S_addit(S_ql, S_qi, min_t, S_ql_addit, S_qi_addit, Δt_left, Δt)
             return return_mixing_ratio ? (S_ql, S_qi) : (S_mixing_ratio_to_shum(S_ql, q.tot), S_mixing_ratio_to_shum(S_qi, q.tot))
         elseif i_min_t == 2
@@ -1549,7 +1514,7 @@ function morrison_milbrandt_2015_style_exponential_part_only(
 
             new_q = morrison_milbrandt_2015_get_new_status_helper_EPA(q, q_liq, q_ice, S_ql * min_t, -q_ice, dqvdt*min_t) # use multiplied form for floating point accuracy
             new_regime = add_regime_parameters(Subsaturated, new_q.liq, new_q.ice, BF)
-            S_ql_addit, S_qi_addit = morrison_milbrandt_2015_style_exponential_part_only(new_regime, param_set, area, ρ, p, T, w, τ_liq, τ_ice, new_δ_0, new_δ_0i, new_q, q_eq, Δt_left, ts; use_fix = use_fix, return_mixing_ratio = true, depth = depth+1, dqvdt=dqvdt, dTdt=dTdt, fallback_to_standard_supersaturation_limiter = fallback_to_standard_supersaturation_limiter, time_tolerance = time_tolerance)
+            S_ql_addit, S_qi_addit = morrison_milbrandt_2015_style_exponential_part_only(new_regime, param_set, area, ρ, p, T, w, τ_liq, τ_ice, new_δ_0, new_δ_0i, new_q, q_eq, Δt_left, ts; opts = update(opts; return_mixing_ratio = true, depth = depth+1))
             S_ql, S_qi = resolve_S_S_addit(S_ql, S_qi, min_t, S_ql_addit, S_qi_addit, Δt_left, Δt)
             return return_mixing_ratio ? (S_ql, S_qi) : (S_mixing_ratio_to_shum(S_ql, q.tot), S_mixing_ratio_to_shum(S_qi, q.tot))
         else # i_min_t == 3
@@ -1570,7 +1535,7 @@ function morrison_milbrandt_2015_style_exponential_part_only(
 
             new_q = morrison_milbrandt_2015_get_new_status_helper_EPA(q, q_liq, q_ice, S_ql, S_qi, min_t, dqvdt)
             new_regime = add_regime_parameters(WBF, new_q.liq, new_q.ice, BF)
-            S_ql_addit, S_qi_addit = morrison_milbrandt_2015_style_exponential_part_only(new_regime, param_set, area, ρ, p, T, w, τ_liq, τ_ice, new_δ_0, new_δ_0i, new_q, q_eq, Δt_left, ts; use_fix = use_fix, return_mixing_ratio = true, depth = depth+1, dqvdt=dqvdt, dTdt=dTdt, fallback_to_standard_supersaturation_limiter = fallback_to_standard_supersaturation_limiter, time_tolerance = time_tolerance)
+            S_ql_addit, S_qi_addit = morrison_milbrandt_2015_style_exponential_part_only(new_regime, param_set, area, ρ, p, T, w, τ_liq, τ_ice, new_δ_0, new_δ_0i, new_q, q_eq, Δt_left, ts; opts = update(opts; return_mixing_ratio = true, depth = depth+1))
             # @debug "S_ql = $S_ql; S_qi = $S_qi; S_ql_addit = $S_ql_addit; S_qi_addit = $S_qi_addit"
             S_ql, S_qi = resolve_S_S_addit(S_ql, S_qi, min_t, S_ql_addit, S_qi_addit, Δt_left, Δt)
             # @debug "after resolve_S_S_addit: S_ql = $S_ql; S_qi = $S_qi"
@@ -1599,21 +1564,16 @@ end
 function morrison_milbrandt_2015_style_exponential_part_only(
     regime::Union{Subsaturated{true, false, true}, Subsaturated{true, false, false}}, # can run out of liq first. if not and we make it to ice sat, transition to WBF
     param_set::APS, area::FT, ρ::FT, p::FT, T::FT, w::FT, τ_liq::FT, τ_ice::FT, δ_0::FT, δ_0i::FT, q::TD.PhasePartition, q_eq::TD.PhasePartition, Δt::FT, ts::TD.ThermodynamicState;
-    use_fix::Bool = true, # i think something is wrong with the forumula for large timesteps... is less essential now w/ the limiter but still needed... (unless I just don't understand the physics of it)
-    return_mixing_ratio::Bool = false,
-    depth::Int = 0,
-    dqvdt::FT = FT(0),
-    dTdt::FT = FT(0),
-    fallback_to_standard_supersaturation_limiter::Bool = false,
-    time_tolerance::FT = FT(1e-8),
+    opts::MM2015EPAOpts{FT} = MM2015EPAOpts{FT}(),
     )::Tuple{FT,FT} where {FT}
+    (; return_mixing_ratio, depth, dqvdt, dTdt, fallback_to_standard_supersaturation_limiter, time_tolerance) = opts
 
     if depth ≥ 10
         @error "Failed on inputs area = $area; ρ = $ρ; p = $p; T = $T; w = $w; τ_liq = $τ_liq; τ_ice = $τ_ice; δ_0 = $δ_0; δ_0i = $δ_0i; q = $q; q_eq = $q_eq; Δt = $Δt; ts = $ts; dTdt = $dTdt; dqvdt = $dqvdt;"
         error("Failed to converge after 10 iterations")
     end
 
-   (; g, L_i, L_l, c_p, e_sl, e_si, dqsl_dT, dqsi_dT, q_sl, q_si, q_liq, q_ice, T_freeze, δ_0, δ_0i, Γ_l, Γ_i, dqvdt, dTdt) = get_params_and_go_to_mixing_ratio_exponential_part_only(param_set, area, ρ, p, T, w, τ_liq, τ_ice, δ_0, δ_0i, dqvdt, dTdt, q, q_eq, Δt, ts; use_fix=use_fix)
+   (; g, L_i, L_l, c_p, e_sl, e_si, dqsl_dT, dqsi_dT, q_sl, q_si, q_liq, q_ice, T_freeze, δ_0, δ_0i, Γ_l, Γ_i) = get_params_and_go_to_mixing_ratio_exponential_part_only(param_set, area, ρ, p, T, w, τ_liq, τ_ice, δ_0, δ_0i, dqvdt, dTdt, q, q_eq, Δt, ts; opts = opts)
 
     BF::Bool = T < T_freeze
     # @debug "Calling Subsaturated{true, false, $BF}..."
@@ -1631,7 +1591,7 @@ function morrison_milbrandt_2015_style_exponential_part_only(
         # @debug "falling bacc"
         return do_standard_fallback(
             standard_milestone_t, standard_milestone, time_tolerance, S_ql, S_qi, q_liq, q_ice, δ_eq, δi_eq, A_c, Γ_l, Γ_i,
-            regime, param_set, area, ρ, p, T, w, τ_liq, τ_ice, δ_0, δ_0i, q, q_eq, Δt, ts; use_fix = use_fix, return_mixing_ratio = true, depth = depth, dqvdt=dqvdt, dTdt=dTdt, fallback_to_standard_supersaturation_limiter = fallback_to_standard_supersaturation_limiter
+            regime, param_set, area, ρ, p, T, w, τ_liq, τ_ice, δ_0, δ_0i, q, q_eq, Δt, ts; opts = update(opts; return_mixing_ratio = true)
             )
     end
     # =========================== #
@@ -1673,7 +1633,7 @@ function morrison_milbrandt_2015_style_exponential_part_only(
                 new_δ_0i = clamp_δi(new_δ_0i, regime, q_sl, q_si)
                 new_q = morrison_milbrandt_2015_get_new_status_helper_EPA(q, q_liq, q_ice, -q_liq, S_qi*min_t, dqvdt*min_t) # use multiplied form for floating point accuracy
                 new_regime = add_regime_parameters(Subsaturated, new_q.liq, new_q.ice, BF)
-                S_ql_addit, S_qi_addit = morrison_milbrandt_2015_style_exponential_part_only(new_regime, param_set, area, ρ, p, T, w, τ_liq, τ_ice, new_δ_0, new_δ_0i, new_q, q_eq, Δt_left, ts; use_fix = use_fix, return_mixing_ratio = true, depth = depth+1, dqvdt=dqvdt, dTdt=dTdt, fallback_to_standard_supersaturation_limiter = fallback_to_standard_supersaturation_limiter, time_tolerance = time_tolerance)
+                S_ql_addit, S_qi_addit = morrison_milbrandt_2015_style_exponential_part_only(new_regime, param_set, area, ρ, p, T, w, τ_liq, τ_ice, new_δ_0, new_δ_0i, new_q, q_eq, Δt_left, ts; opts = update(opts; return_mixing_ratio = true, depth = depth+1))
                 # @debug "S_ql = $S_ql; S_qi = $S_qi; S_ql_addit = $S_ql_addit; S_qi_addit = $S_qi_addit"
                 S_ql, S_qi = resolve_S_S_addit(S_ql, S_qi, min_t, S_ql_addit, S_qi_addit, Δt_left, Δt)
                 # @debug "after resolve_S_S_addit: S_ql = $S_ql; S_qi = $S_qi"
@@ -1699,7 +1659,7 @@ function morrison_milbrandt_2015_style_exponential_part_only(
 
             new_q = morrison_milbrandt_2015_get_new_status_helper_EPA(q, q_liq, q_ice, S_ql, S_qi, min_t, dqvdt) 
             new_regime = add_regime_parameters(WBF, new_q.liq, new_q.ice, BF)
-            S_ql_addit, S_qi_addit = morrison_milbrandt_2015_style_exponential_part_only(new_regime, param_set, area, ρ, p, T, w, τ_liq, τ_ice, new_δ_0, new_δ_0i, new_q, q_eq, Δt_left, ts; use_fix = use_fix, return_mixing_ratio = true, depth = depth+1, dqvdt=dqvdt, dTdt=dTdt, fallback_to_standard_supersaturation_limiter = fallback_to_standard_supersaturation_limiter, time_tolerance = time_tolerance)
+            S_ql_addit, S_qi_addit = morrison_milbrandt_2015_style_exponential_part_only(new_regime, param_set, area, ρ, p, T, w, τ_liq, τ_ice, new_δ_0, new_δ_0i, new_q, q_eq, Δt_left, ts; opts = update(opts; return_mixing_ratio = true, depth = depth+1))
             # @debug "S_ql = $S_ql; S_qi = $S_qi; S_ql_addit = $S_ql_addit; S_qi_addit = $S_qi_addit"
             S_ql, S_qi = resolve_S_S_addit(S_ql, S_qi, min_t, S_ql_addit, S_qi_addit, Δt_left, Δt)
             # @debug "after resolve_S_S_addit: S_ql = $S_ql; S_qi = $S_qi"
@@ -1726,14 +1686,9 @@ end
 function morrison_milbrandt_2015_style_exponential_part_only(
     regime::Union{Subsaturated{false, true, true}, Subsaturated{false, true, false}},
     param_set::APS, area::FT, ρ::FT, p::FT, T::FT, w::FT, τ_liq::FT, τ_ice::FT, δ_0::FT, δ_0i::FT, q::TD.PhasePartition, q_eq::TD.PhasePartition, Δt::FT, ts::TD.ThermodynamicState;
-    use_fix::Bool = true, # i think something is wrong with the forumula for large timesteps... is less essential now w/ the limiter but still needed... (unless I just don't understand the physics of it)
-    return_mixing_ratio::Bool = false,
-    depth::Int = 0,
-    dqvdt::FT = FT(0),
-    dTdt::FT = FT(0),
-    fallback_to_standard_supersaturation_limiter::Bool = false,
-    time_tolerance::FT = FT(1e-8),
+    opts::MM2015EPAOpts{FT} = MM2015EPAOpts{FT}(),
     )::Tuple{FT,FT} where {FT}
+    (; return_mixing_ratio, depth, dqvdt, dTdt, fallback_to_standard_supersaturation_limiter, time_tolerance) = opts
 
     if depth ≥ 10
         @error "Failed on inputs area = $area; ρ = $ρ; p = $p; T = $T; w = $w; τ_liq = $τ_liq; τ_ice = $τ_ice; δ_0 = $δ_0; δ_0i = $δ_0i; q = $q; q_eq = $q_eq; Δt = $Δt; ts = $ts; dTdt = $dTdt; dqvdt = $dqvdt;"
@@ -1741,7 +1696,7 @@ function morrison_milbrandt_2015_style_exponential_part_only(
     end
 
 
-    (; g, L_i, L_l, c_p, e_sl, e_si, dqsl_dT, dqsi_dT, q_sl, q_si, q_liq, q_ice, T_freeze, δ_0, δ_0i, Γ_l, Γ_i, dqvdt, dTdt) = get_params_and_go_to_mixing_ratio_exponential_part_only(param_set, area, ρ, p, T, w, τ_liq, τ_ice, δ_0, δ_0i, dqvdt, dTdt, q, q_eq, Δt, ts; use_fix=use_fix)
+    (; g, L_i, L_l, c_p, e_sl, e_si, dqsl_dT, dqsi_dT, q_sl, q_si, q_liq, q_ice, T_freeze, δ_0, δ_0i, Γ_l, Γ_i) = get_params_and_go_to_mixing_ratio_exponential_part_only(param_set, area, ρ, p, T, w, τ_liq, τ_ice, δ_0, δ_0i, dqvdt, dTdt, q, q_eq, Δt, ts; opts = opts)
 
     BF::Bool = T < T_freeze
     # ================================================================================= #
@@ -1759,7 +1714,7 @@ function morrison_milbrandt_2015_style_exponential_part_only(
         # @debug "falling bacc"
         return do_standard_fallback(
             standard_milestone_t, standard_milestone, time_tolerance, S_ql, S_qi, q_liq, q_ice, δ_eq, δi_eq, A_c, Γ_l, Γ_i,
-            regime, param_set, area, ρ, p, T, w, τ_liq, τ_ice, δ_0, δ_0i, q, q_eq, Δt, ts; use_fix = use_fix, return_mixing_ratio = true, depth = depth, dqvdt=dqvdt, dTdt=dTdt, fallback_to_standard_supersaturation_limiter = fallback_to_standard_supersaturation_limiter
+            regime, param_set, area, ρ, p, T, w, τ_liq, τ_ice, δ_0, δ_0i, q, q_eq, Δt, ts; opts = update(opts; return_mixing_ratio = true)
             )
     end
     # =========================== #
@@ -1804,7 +1759,7 @@ function morrison_milbrandt_2015_style_exponential_part_only(
                 new_δ_0i = clamp_δi(new_δ_0i, regime, q_sl, q_si)
                 new_q = morrison_milbrandt_2015_get_new_status_helper_EPA(q, q_liq, q_ice, S_ql*min_t, -q_ice, dqvdt*min_t)
                 new_regime = add_regime_parameters(Subsaturated, new_q.liq, new_q.ice, BF)
-                S_ql_addit, S_qi_addit = morrison_milbrandt_2015_style_exponential_part_only(new_regime, param_set, area, ρ, p, T, w, τ_liq, τ_ice, new_δ_0, new_δ_0i, new_q, q_eq, Δt_left, ts; use_fix = use_fix, return_mixing_ratio = true, depth = depth+1, dqvdt=dqvdt, dTdt=dTdt, fallback_to_standard_supersaturation_limiter = fallback_to_standard_supersaturation_limiter, time_tolerance = time_tolerance)
+                S_ql_addit, S_qi_addit = morrison_milbrandt_2015_style_exponential_part_only(new_regime, param_set, area, ρ, p, T, w, τ_liq, τ_ice, new_δ_0, new_δ_0i, new_q, q_eq, Δt_left, ts; opts = update(opts; return_mixing_ratio = true, depth = depth+1))
                 # @debug "S_ql = $S_ql; S_qi = $S_qi; S_ql_addit = $S_ql_addit; S_qi_addit = $S_qi_addit"
                 S_ql, S_qi = resolve_S_S_addit(S_ql, S_qi, min_t, S_ql_addit, S_qi_addit, Δt_left, Δt)
                 # @debug "after resolve_S_S_addit: S_ql = $S_ql; S_qi = $S_qi"
@@ -1828,7 +1783,7 @@ function morrison_milbrandt_2015_style_exponential_part_only(
                 new_δ_0i = FT(0) # we're at ice sat so δ_0i = 0
                 new_q = morrison_milbrandt_2015_get_new_status_helper_EPA(q, q_liq, q_ice, S_ql, S_qi, min_t, dqvdt)
                 new_regime = add_regime_parameters(WBF, new_q.liq, new_q.ice, BF)
-                S_ql_addit, S_qi_addit = morrison_milbrandt_2015_style_exponential_part_only(new_regime, param_set, area, ρ, p, T, w, τ_liq, τ_ice, new_δ_0, new_δ_0i, new_q, q_eq, Δt_left, ts; use_fix = use_fix, return_mixing_ratio = true, depth = depth+1, dqvdt=dqvdt, dTdt=dTdt, fallback_to_standard_supersaturation_limiter = fallback_to_standard_supersaturation_limiter, time_tolerance = time_tolerance)
+                S_ql_addit, S_qi_addit = morrison_milbrandt_2015_style_exponential_part_only(new_regime, param_set, area, ρ, p, T, w, τ_liq, τ_ice, new_δ_0, new_δ_0i, new_q, q_eq, Δt_left, ts; opts = update(opts; return_mixing_ratio = true, depth = depth+1))
                 # @debug "S_ql = $S_ql; S_qi = $S_qi; S_ql_addit = $S_ql_addit; S_qi_addit = $S_qi_addit"
                 S_ql, S_qi = resolve_S_S_addit(S_ql, S_qi, min_t, S_ql_addit, S_qi_addit, Δt_left, Δt)
                 # @debug "after resolve_S_S_addit: S_ql = $S_ql; S_qi = $S_qi"
@@ -1855,14 +1810,9 @@ end
 function morrison_milbrandt_2015_style_exponential_part_only(
     regime::Union{Subsaturated{false, false, true}, Subsaturated{false, false, false}}, # kind of null, you have nothing and can't make anything
     param_set::APS, area::FT, ρ::FT, p::FT, T::FT, w::FT, τ_liq::FT, τ_ice::FT, δ_0::FT, δ_0i::FT, q::TD.PhasePartition, q_eq::TD.PhasePartition, Δt::FT, ts::TD.ThermodynamicState;
-    use_fix::Bool = true, # i think something is wrong with the forumula for large timesteps... is less essential now w/ the limiter but still needed... (unless I just don't understand the physics of it)
-    return_mixing_ratio::Bool = false,
-    depth::Int = 0,
-    dqvdt::FT = FT(0),
-    dTdt::FT = FT(0),
-    fallback_to_standard_supersaturation_limiter::Bool = false,
-    time_tolerance::FT = FT(1e-8),
+    opts::MM2015EPAOpts{FT} = MM2015EPAOpts{FT}(),
     )::Tuple{FT,FT} where {FT}
+    (; return_mixing_ratio, depth, dqvdt, dTdt, fallback_to_standard_supersaturation_limiter, time_tolerance) = opts
 
 
 
@@ -1872,7 +1822,7 @@ function morrison_milbrandt_2015_style_exponential_part_only(
     end
 
 
-    (; g, L_i, L_l, c_p, e_sl, e_si, dqsl_dT, dqsi_dT, q_sl, q_si, q_liq, q_ice, T_freeze, δ_0, δ_0i, Γ_l, Γ_i, dqvdt, dTdt) = get_params_and_go_to_mixing_ratio_exponential_part_only(param_set, area, ρ, p, T, w, τ_liq, τ_ice, δ_0, δ_0i, dqvdt, dTdt, q, q_eq, Δt, ts; use_fix=use_fix)
+    (; g, L_i, L_l, c_p, e_sl, e_si, dqsl_dT, dqsi_dT, q_sl, q_si, q_liq, q_ice, T_freeze, δ_0, δ_0i, Γ_l, Γ_i) = get_params_and_go_to_mixing_ratio_exponential_part_only(param_set, area, ρ, p, T, w, τ_liq, τ_ice, δ_0, δ_0i, dqvdt, dTdt, q, q_eq, Δt, ts; opts = opts)
     BF::Bool = T < T_freeze
     # @debug "Calling Subsaturated{false, false, $(BF)}..."
 
@@ -1903,7 +1853,7 @@ function morrison_milbrandt_2015_style_exponential_part_only(
 
         new_regime = add_regime_parameters(WBF, FT(0), FT(0), BF)
         new_q = morrison_milbrandt_2015_get_new_status_helper_EPA(q, q_liq, q_ice, S_ql, S_qi, min_t, dqvdt) # use multiplied form for floating point accuracy
-        S_ql_addit, S_qi_addit = morrison_milbrandt_2015_style_exponential_part_only(new_regime, param_set, area, ρ, p, T, w, τ_liq, τ_ice, new_δ_0, new_δ_0i, new_q, q_eq, Δt_left, ts; use_fix = use_fix, return_mixing_ratio = true, depth = depth+1, dqvdt=dqvdt, dTdt=dTdt, fallback_to_standard_supersaturation_limiter = fallback_to_standard_supersaturation_limiter, time_tolerance = time_tolerance)
+        S_ql_addit, S_qi_addit = morrison_milbrandt_2015_style_exponential_part_only(new_regime, param_set, area, ρ, p, T, w, τ_liq, τ_ice, new_δ_0, new_δ_0i, new_q, q_eq, Δt_left, ts; opts = update(opts; return_mixing_ratio = true, depth = depth+1))
         S_ql, S_qi = resolve_S_S_addit(FT(0), FT(0), min_t, S_ql_addit, S_qi_addit, Δt_left, Δt)
         return return_mixing_ratio ? (S_ql, S_qi) : (S_mixing_ratio_to_shum(S_ql, q.tot), S_mixing_ratio_to_shum(S_qi, q.tot))
     else

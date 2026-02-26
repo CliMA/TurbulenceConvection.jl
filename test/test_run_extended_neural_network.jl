@@ -1,4 +1,4 @@
-## Standalone run script for SOCRATES using :extended_neural_network
+## Standalone run script for SOCRATES using :neural_network_extended
 ## Keeps test_run.jl untouched.
 using Pkg
 Pkg.activate(expanduser("~/Research_Schneider/CliMA/TurbulenceConvection.jl/"))
@@ -33,7 +33,7 @@ Revise.includet(joinpath(tc, "driver", "generate_namelist.jl"))
 forcing_str = forcing_type === :obs_data ? "Obs" : "ERA5"
 
 # Load base neural network namelist
-nonequilibrium_moisture_scheme = :neural_network
+nonequilibrium_moisture_scheme = :neural_network_extended
 dt_string = "adapt_dt__dt_min_5.0__dt_max_10.0"
 method = "best_particle_final"
 case_name = "SOCRATES_RF" * string(flight_number, pad=2) * "_" * lowercase(forcing_str) * "_data"
@@ -45,7 +45,7 @@ default_namelist = NameList.default_namelist(case_name)
 NameList.convert_namelist_types_to_default!(namelist, default_namelist)
 
 # Override with extended neural network
-namelist["user_args"]["nonequilibrium_moisture_scheme"] = :extended_neural_network
+namelist["user_args"]["nonequilibrium_moisture_scheme"] = :neural_network_extended
 
 
 conservative_interp_kwargs_in = Dict{String,Union{Bool,String,FT}}( # Dict for easier namelist parsing later since that's all a dict.
@@ -85,9 +85,10 @@ if dz_min <= FT(100)
 end
 
 
-apply_edits = false
+apply_edits = true
 if apply_edits
-    #
+    #  namelist["turbulence"]["EDMF_PrognosticTKE"]["convective_tke_model_type"] = "convective_tke"
+     namelist["turbulence"]["EDMF_PrognosticTKE"]["convective_tke_model_type"] = "no_convective_tke"
 end
 
 dt = namelist["time_stepping"]["dt_min"]

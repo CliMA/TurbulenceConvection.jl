@@ -266,7 +266,7 @@ function microphysics!(
                         end
                     end
 
-                    mph_neq_here = noneq_moisture_sources(param_set, nonequilibrium_moisture_scheme, moisture_sources_limiter, region_area, ρ_c[k], aux_en.p[k], T, Δt + ε, ts, w_noneq, q_vap_sat_liq, q_vap_sat_ice, dqvdt, dTdt, τ_liq_here, τ_ice_here)
+                    mph_neq_here = noneq_moisture_sources(param_set, nonequilibrium_moisture_scheme, moisture_sources_limiter, region_area, ρ_c[k], aux_en.p[k], T, Δt + ε, ts, w_noneq, q_vap_sat_liq, q_vap_sat_ice, dqvdt, dTdt, τ_liq_here, τ_ice_here, aux_en.frac_supersat_liq[k], aux_en.frac_supersat[k])
                     
                     # prevent excess losses when not using quadrature
                     mph_neq_here = NoneqMoistureSources(
@@ -464,7 +464,7 @@ function microphysics!(
 
                         q_vap_sat_liq = TD.q_vap_saturation_generic(thermo_params, T, ρ, TD.Liquid())
                         q_vap_sat_ice = TD.q_vap_saturation_generic(thermo_params, T, ρ, TD.Ice())
-                        mph_neq_quad = noneq_moisture_sources(param_set, nonequilibrium_moisture_scheme, moisture_sources_limiter, aux_en.area[k], ρ_c[k], aux_en.p[k], T, Δt + ε, ts_hat, w_noneq, q_vap_sat_liq, q_vap_sat_ice, dqvdt, dTdt, aux_en.τ_liq[k], aux_en.τ_ice[k])
+                        mph_neq_quad = noneq_moisture_sources(param_set, nonequilibrium_moisture_scheme, moisture_sources_limiter, aux_en.area[k], ρ_c[k], aux_en.p[k], T, Δt + ε, ts_hat, w_noneq, q_vap_sat_liq, q_vap_sat_ice, dqvdt, dTdt, aux_en.τ_liq[k], aux_en.τ_ice[k], aux_en.frac_supersat_liq[k], aux_en.frac_supersat[k])
 
                         # if at an extrema, we don't know where the peak is so we'll reweight based on probability of where it could be in between.
                         if reweight_processes_for_grid
@@ -1126,7 +1126,7 @@ function quad_loop(en_thermo::SGSQuadrature, grid::Grid, edmf::EDMFModel, moistu
                 (; mph_neq, mph_neq_other, mph_precip) = microphysics_helper(grid, edmf, Δt, param_set, use_fallback_tendency_limiters, aux_en, aux_en_f, k,
                     subdomain_area, h_hat, qt_hat, q_liq_en, q_ice_en, q_rai, q_sno, N_l, N_i, N_i_no_boost, term_vel_liq, term_vel_ice, term_vel_rain, term_vel_snow, ρ_c, p_c, T, ts, precip_frac,
                     ql_tendency_sedimentation, ql_tendency_sedimentation_other, qi_tendency_sedimentation, qi_tendency_sedimentation_other;
-                    q_vap_sat_liq = q_vap_sat_liq, q_vap_sat_ice = q_vap_sat_ice, dqvdt = dqvdt, dTdt = dTdt, w=w, tke = tke, S_i = S_i, τ_liq = τ_liq, τ_ice = τ_ice, dN_i_dz = dN_i_dz, dqidz = dqidz, N_INP = N_INP, massflux = massflux, ∂b∂z = ∂b∂z, ∂qt∂z = ∂qt∂z)
+                    q_vap_sat_liq = q_vap_sat_liq, q_vap_sat_ice = q_vap_sat_ice, dqvdt = dqvdt, dTdt = dTdt, w=w, tke = tke, S_i = S_i, τ_liq = τ_liq, τ_ice = τ_ice, dN_i_dz = dN_i_dz, dqidz = dqidz, N_INP = N_INP, massflux = massflux, ∂b∂z = ∂b∂z, ∂qt∂z = ∂qt∂z, frac_supersat_liq = aux_en.frac_supersat_liq[k], frac_supersat = aux_en.frac_supersat[k])
             else
                 (; use_fallback_tendency_limiters, aux_en, aux_en_f, k, N_l, N_i, N_i_no_boost, term_vel_liq, term_vel_ice, term_vel_rain, term_vel_snow, w, tke, ql_tendency_sedimentation, ql_tendency_sedimentation_other, qi_tendency_sedimentation, qi_tendency_sedimentation_other) = vars # unpack
 
@@ -1639,7 +1639,7 @@ function microphysics!(
                     (aux_en.area[k] > FT(0)) ? aux_en.qi_tendency_sedimentation[k] / aux_en.area[k] : FT(0),
                     (aux_en.area[k] > FT(0)) ? aux_en.qi_tendency_sedimentation_other[k] / aux_en.area[k] : FT(0)
                     ;
-                    q_vap_sat_liq = aux_en.q_vap_sat_liq[k], q_vap_sat_ice = aux_en.q_vap_sat_ice[k], dqvdt = aux_tc.dqvdt[k], dTdt = aux_tc.dTdt[k], w=w[k], tke = aux_en.tke[k], S_i = S_i, τ_liq = aux_en.τ_liq[k], τ_ice = aux_en.τ_ice[k], dN_i_dz = aux_en.dN_i_dz[k], dqidz = aux_en.dqidz[k], N_INP = N_INP, massflux = aux_tc.massflux[k], ∂b∂z = aux_tc.∂b∂z[k], ∂qt∂z = aux_tc.∂qt∂z[k])
+                    q_vap_sat_liq = aux_en.q_vap_sat_liq[k], q_vap_sat_ice = aux_en.q_vap_sat_ice[k], dqvdt = aux_tc.dqvdt[k], dTdt = aux_tc.dTdt[k], w=w[k], tke = aux_en.tke[k], S_i = S_i, τ_liq = aux_en.τ_liq[k], τ_ice = aux_en.τ_ice[k], dN_i_dz = aux_en.dN_i_dz[k], dqidz = aux_en.dqidz[k], N_INP = N_INP, massflux = aux_tc.massflux[k], ∂b∂z = aux_tc.∂b∂z[k], ∂qt∂z = aux_tc.∂qt∂z[k], frac_supersat_liq = aux_en.frac_supersat_liq[k], frac_supersat = aux_en.frac_supersat[k])
             else                
                 (; mph_neq, mph_neq_other, mph_precip) = microphysics_helper(grid, edmf, Δt, param_set, use_fallback_tendency_limiters, aux_en, aux_en_f, k,
                     aux_en.area[k], aux_en.θ_liq_ice[k], aux_en.q_tot[k], aux_en.q_liq[k], aux_en.q_ice[k], prog_pr.q_rai[k], prog_pr.q_sno[k], aux_en.N_l[k], aux_en.N_i[k], aux_en.N_i_no_boost[k], w_l, w_i, aux_tc.term_vel_rain[k], aux_tc.term_vel_snow[k], ρ_c[k], p_c[k], aux_en.T[k], ts, precip_fraction,
@@ -1804,6 +1804,8 @@ function microphysics_helper(grid::Grid, edmf::EDMFModel, Δt::FT, param_set::AP
     dqvdt::FT = FT(0), # only needed for NonEq
     dTdt::FT = FT(0),
     w::FT = FT(0),
+    frac_supersat_liq::FT = FT(1),
+    frac_supersat::FT = FT(1),
     #
     tke::FT = FT(NaN),
     S_i::FT = FT(NaN),
@@ -1845,7 +1847,7 @@ function microphysics_helper(grid::Grid, edmf::EDMFModel, Δt::FT, param_set::AP
 
 
     if moisture_model isa NonEquilibriumMoisture
-        mph_neq = noneq_moisture_sources(param_set, nonequilibrium_moisture_scheme, moisture_sources_limiter, area, ρ_c, p, T, Δt + ε, ts, w, q_vap_sat_liq, q_vap_sat_ice, dqvdt, dTdt, τ_liq, τ_ice)
+        mph_neq = noneq_moisture_sources(param_set, nonequilibrium_moisture_scheme, moisture_sources_limiter, area, ρ_c, p, T, Δt + ε, ts, w, q_vap_sat_liq, q_vap_sat_ice, dqvdt, dTdt, τ_liq, τ_ice, frac_supersat_liq, frac_supersat)
 
         # if at an extrema, we don't know where the peak is so we'll reweight based on probability of where it could be in between.
         if reweight_processes_for_grid

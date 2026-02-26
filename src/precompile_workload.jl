@@ -370,8 +370,8 @@ if is_HPC # (if we can)
             # A. Exponential Part
             morrison_milbrandt_2015_style_exponential_part_only(
                 regime, param_set, area, ρ, p, T, w, τ_liq, τ_ice, δ_0, δ_0i, q, q_eq, Δt, ts; 
-                use_fix=false, return_mixing_ratio=false, dqvdt=dqvdt, dTdt=dTdt, 
-                fallback_to_standard_supersaturation_limiter=false, time_tolerance=FT(1e-6)
+                opts = MM2015Opts{FT}(use_fix=false, return_mixing_ratio=false, dqvdt=dqvdt, dTdt=dTdt, 
+                fallback_to_standard_supersaturation_limiter=false, time_tolerance=FT(1e-6))
             )
 
             # B. Standard Fallback
@@ -379,8 +379,8 @@ if is_HPC # (if we can)
                 milestone_t, milestone, FT(1e-6), S_ql, S_qi, q_liq, q_ice, δ_eq, δi_eq, 
                 dδdt_no_S, Γ_l, Γ_i, regime, param_set, area, ρ, p, T, w, τ_liq, τ_ice, 
                 δ_0, δ_0i, q, q_eq, Δt, ts; 
-                use_fix=false, return_mixing_ratio=true, depth=0, dqvdt=dqvdt, dTdt=dTdt, 
-                fallback_to_standard_supersaturation_limiter=false
+                opts = MM2015Opts{FT}(use_fix=false, return_mixing_ratio=true, depth=0, dqvdt=dqvdt, dTdt=dTdt, 
+                fallback_to_standard_supersaturation_limiter=false)
             )
 
             # ======================================================================
@@ -389,7 +389,7 @@ if is_HPC # (if we can)
             # Get params helper
             get_params_and_go_to_mixing_ratio_exponential_part_only(
                 param_set, area, ρ, p, T, w, τ_liq, τ_ice, δ_0, δ_0i, dqvdt, dTdt, q, q_eq, Δt, ts; 
-                use_fix=false
+                opts = MM2015Opts{FT}(use_fix=false)
             )
             
             # Helper variables for EPA calls
