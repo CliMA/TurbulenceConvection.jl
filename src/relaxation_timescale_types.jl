@@ -89,7 +89,7 @@ end
 # struct KorolevMazin2007 <: AbstractNonEquillibriumSourcesType end  # placeholder to keep that code around
 struct RelaxToEquilibrium{FT} <: AbstractNonEquillibriumSourcesType
     adjust_ice_N::Bool
-    args::RelaxationTimescaleArgs{FT} # Maybe pare this down to remove tau
+    args::RelaxationTimescaleArgs{FT}
 end  # placeholder to keep that code around
 
 function RelaxToEquilibrium(param_set::APS, namelist)
@@ -102,8 +102,6 @@ end
 
 # :Base
 struct BaseRelaxationTimescale{FT} <: AbstractRelaxationTimescaleType
-    τ_liq::FT
-    τ_ice::FT
     args::RelaxationTimescaleArgs{FT}
 end
 
@@ -283,17 +281,7 @@ get_adjust_liq_N(relaxation_timescale::RelaxToEquilibrium) = false
 # :Base
 function get_relaxation_timescale_type(::Val{:Base}, param_set::APS, microphys_params::ACMP, namelist) # added namelist
     FT = eltype(param_set)
-
-    if haskey(namelist, "relaxation_timescale_params") && haskey(namelist["relaxation_timescale_params"], "tau_weights_liq_params") && haskey(namelist["relaxation_timescale_params"], "tau_weights_ice_params")
-        liq_params = namelist["relaxation_timescale_params"]["tau_weights_liq_params"]
-        ice_params = namelist["relaxation_timescale_params"]["tau_weights_ice_params"]
-        τ_liq, τ_ice = FT(10) .^ liq_params.log10_tau_liq, FT(10) .^ ice_params.log10_tau_ice # log fcn hand implementation...
-    else
-        τ_liq = CMNe.τ_relax(microphys_params, liq_type)
-        τ_ice = CMNe.τ_relax(microphys_params, ice_type)
-    end
-
-    return BaseRelaxationTimescale(τ_liq, τ_ice, get_relaxation_timescale_args(namelist, FT))
+    return BaseRelaxationTimescale(get_relaxation_timescale_args(namelist, FT))
 end
 
 #: exponential_T_scaling_ice

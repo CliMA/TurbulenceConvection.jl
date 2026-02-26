@@ -28,7 +28,7 @@ function calculate_τ(D::FT, N::FT, r::FT, ρ::FT;
 end
 # ======================================================================================================================================== #
 
-function get_τs(param_set::APS, microphys_params::ACMP, relaxation_timescale::AbstractRelaxationTimescaleType, q::TD.PhasePartition, T::FT, p::FT, ρ::FT, w::FT; N_l::FT=FT(NaN), N_i_raw::FT=FT(NaN), N_i_adjusted::FT=FT(NaN), N_INP_top::FT=FT(NaN), f_ice_mult::FT=FT(1), q_sno::FT=FT(0), massflux::FT=FT(0), dTdz::FT=FT(0), w_i::FT=FT(0), apply_massflux_boost::Bool=false, apply_sedimentation_boost::Bool=false, apply_supersaturation_scaling=true) where {FT}
+function get_τs(param_set::APS, microphys_params::ACMP, relaxation_timescale::AbstractNonEquillibriumSourcesType, q::TD.PhasePartition, T::FT, p::FT, ρ::FT, w::FT; N_l::FT=FT(NaN), N_i_raw::FT=FT(NaN), N_i_adjusted::FT=FT(NaN), N_INP_top::FT=FT(NaN), f_ice_mult::FT=FT(1), q_sno::FT=FT(0), massflux::FT=FT(0), dTdz::FT=FT(0), w_i::FT=FT(0), apply_massflux_boost::Bool=false, apply_sedimentation_boost::Bool=false, apply_supersaturation_scaling=true) where {FT}
     τ_liq, τ_ice = get_τ_helper(param_set, microphys_params, relaxation_timescale, q, T, p, ρ, w; N_l=N_l, N_i_raw=N_i_raw, N_i_adjusted=N_i_adjusted, N_INP_top=N_INP_top, f_ice_mult=f_ice_mult, q_sno=q_sno, massflux=massflux, dTdz=dTdz, w_i=w_i, apply_massflux_boost=apply_massflux_boost, apply_sedimentation_boost=apply_sedimentation_boost)
 
     # limit effective tau to at least one second for stability (stable with dt == limit timescale is unstable, gotta go faster... change to be dt related) [used to have FT(1)]
@@ -64,7 +64,7 @@ function get_τs(param_set::APS, microphys_params::ACMP, relaxation_timescale::A
 
     return (; τ_liq=τ_liq, τ_ice=τ_ice)
 end
-get_τs(param_set::APS, relaxation_timescale::AbstractRelaxationTimescaleType, ts::TD.ThermodynamicState, q::TD.PhasePartition, T::FT, p::FT, ρ::FT, w::FT; N_l::FT=FT(NaN), N_i_raw::FT=FT(NaN), N_i_adjusted::FT=FT(NaN), N_INP_top::FT=FT(NaN), f_ice_mult::FT=FT(1), q_sno::FT=FT(0), massflux::FT=FT(0), dTdz::FT=FT(0), w_i::FT=FT(0), apply_massflux_boost::Bool=false, apply_sedimentation_boost::Bool=false) where {FT} = get_τs(param_set, TCP.microphysics_params(param_set), relaxation_timescale, q, T, p, ρ, w; N_l=N_l, N_i_raw=N_i_raw, N_i_adjusted=N_i_adjusted, N_INP_top=N_INP_top, f_ice_mult=f_ice_mult, q_sno=q_sno, massflux=massflux, dTdz=dTdz, w_i=w_i, apply_massflux_boost=apply_massflux_boost, apply_sedimentation_boost=apply_sedimentation_boost)
+get_τs(param_set::APS, relaxation_timescale::AbstractNonEquillibriumSourcesType, ts::TD.ThermodynamicState, q::TD.PhasePartition, T::FT, p::FT, ρ::FT, w::FT; N_l::FT=FT(NaN), N_i_raw::FT=FT(NaN), N_i_adjusted::FT=FT(NaN), N_INP_top::FT=FT(NaN), f_ice_mult::FT=FT(1), q_sno::FT=FT(0), massflux::FT=FT(0), dTdz::FT=FT(0), w_i::FT=FT(0), apply_massflux_boost::Bool=false, apply_sedimentation_boost::Bool=false) where {FT} = get_τs(param_set, TCP.microphysics_params(param_set), relaxation_timescale, q, T, p, ρ, w; N_l=N_l, N_i_raw=N_i_raw, N_i_adjusted=N_i_adjusted, N_INP_top=N_INP_top, f_ice_mult=f_ice_mult, q_sno=q_sno, massflux=massflux, dTdz=dTdz, w_i=w_i, apply_massflux_boost=apply_massflux_boost, apply_sedimentation_boost=apply_sedimentation_boost)
 
 
 # the symbol methods now use namelist...
@@ -78,7 +78,7 @@ get_τs(param_set::APS, relaxation_timescale::AbstractRelaxationTimescaleType, t
 # get_τs(param_set::APS, relaxation_timescale_type::Symbol, ts::TD.ThermodynamicState, w::FT) where{FT} = get_τs(param_set, TCP.microphysics_params(param_set), relaxation_timescale_type, ts, w)
 
 
-function get_τs(param_set::APS, microphys_params::ACMP, relaxation_timescale::AbstractRelaxationTimescaleType, ts::TD.ThermodynamicState, w::FT; N_l::FT=FT(NaN), N_i_raw::FT=FT(NaN), N_i_adjusted::FT=FT(NaN), N_INP_top::FT=FT(NaN), f_ice_mult::FT=FT(1), q_sno::FT=FT(0), massflux::FT=FT(0), dTdz::FT=FT(0), w_i::FT=FT(0), apply_massflux_boost::Bool=false, apply_sedimentation_boost::Bool=false) where {FT}
+function get_τs(param_set::APS, microphys_params::ACMP, relaxation_timescale::AbstractNonEquillibriumSourcesType, ts::TD.ThermodynamicState, w::FT; N_l::FT=FT(NaN), N_i_raw::FT=FT(NaN), N_i_adjusted::FT=FT(NaN), N_INP_top::FT=FT(NaN), f_ice_mult::FT=FT(1), q_sno::FT=FT(0), massflux::FT=FT(0), dTdz::FT=FT(0), w_i::FT=FT(0), apply_massflux_boost::Bool=false, apply_sedimentation_boost::Bool=false) where {FT}
     thermo_params::TDPS = TCP.thermodynamics_params(param_set)
     q::TD.PhasePartition{FT} = TD.PhasePartition(thermo_params, ts)
     T::FT = TD.air_temperature(thermo_params, ts)
@@ -86,13 +86,18 @@ function get_τs(param_set::APS, microphys_params::ACMP, relaxation_timescale::A
     ρ::FT = TD.air_density(thermo_params, ts)
     return get_τs(param_set, microphys_params, relaxation_timescale, q, T, p, ρ, w; N_l=N_l, N_i_raw=N_i_raw, N_i_adjusted=N_i_adjusted, N_INP_top=N_INP_top, f_ice_mult=f_ice_mult, q_sno=q_sno, massflux=massflux, dTdz=dTdz, w_i=w_i, apply_massflux_boost=apply_massflux_boost, apply_sedimentation_boost=apply_sedimentation_boost)
 end
-get_τs(param_set::APS, relaxation_timescale::AbstractRelaxationTimescaleType, ts::TD.ThermodynamicState, w::FT; N_l::FT=FT(NaN), N_i_raw::FT=FT(NaN), N_i_adjusted::FT=FT(NaN), N_INP_top::FT=FT(NaN), f_ice_mult::FT=FT(1), q_sno::FT=FT(0), massflux::FT=FT(0), dTdz::FT=FT(0), w_i::FT=FT(0), apply_massflux_boost::Bool=false, apply_sedimentation_boost::Bool=false) where {FT} = get_τs(param_set, TCP.microphysics_params(param_set), relaxation_timescale, ts, w; N_l=N_l, N_i_raw=N_i_raw, N_i_adjusted=N_i_adjusted, N_INP_top=N_INP_top, f_ice_mult=f_ice_mult, q_sno=q_sno, massflux=massflux, dTdz=dTdz, w_i=w_i, apply_massflux_boost=apply_massflux_boost, apply_sedimentation_boost=apply_sedimentation_boost)
+get_τs(param_set::APS, relaxation_timescale::AbstractNonEquillibriumSourcesType, ts::TD.ThermodynamicState, w::FT; N_l::FT=FT(NaN), N_i_raw::FT=FT(NaN), N_i_adjusted::FT=FT(NaN), N_INP_top::FT=FT(NaN), f_ice_mult::FT=FT(1), q_sno::FT=FT(0), massflux::FT=FT(0), dTdz::FT=FT(0), w_i::FT=FT(0), apply_massflux_boost::Bool=false, apply_sedimentation_boost::Bool=false) where {FT} = get_τs(param_set, TCP.microphysics_params(param_set), relaxation_timescale, ts, w; N_l=N_l, N_i_raw=N_i_raw, N_i_adjusted=N_i_adjusted, N_INP_top=N_INP_top, f_ice_mult=f_ice_mult, q_sno=q_sno, massflux=massflux, dTdz=dTdz, w_i=w_i, apply_massflux_boost=apply_massflux_boost, apply_sedimentation_boost=apply_sedimentation_boost)
 
 # ---------------------------------------------------------------------------------------------------------------------------------------- #
 
 # :Base
 function get_τ_helper(param_set::APS, microphys_params::ACMP, relaxation_timescale::BaseRelaxationTimescale, q::TD.PhasePartition, T::FT, p::FT, ρ::FT, w::FT; N_l::FT=FT(NaN), N_i_raw::FT=FT(NaN), N_i_adjusted::FT=FT(NaN), N_INP_top::FT=FT(NaN), f_ice_mult::FT=FT(1), q_sno::FT=FT(0), massflux::FT=FT(0), dTdz::FT=FT(0), w_i::FT=FT(0), apply_massflux_boost::Bool=false, apply_sedimentation_boost::Bool=false) where {FT}
-    return relaxation_timescale.τ_liq, relaxation_timescale.τ_ice
+    return CMNe.τ_relax(microphys_params, liq_type), CMNe.τ_relax(microphys_params, ice_type)
+end
+
+# :RelaxToEquilibrium — use default microphysics timescales
+function get_τ_helper(param_set::APS, microphys_params::ACMP, relaxation_timescale::RelaxToEquilibrium, q::TD.PhasePartition, T::FT, p::FT, ρ::FT, w::FT; N_l::FT=FT(NaN), N_i_raw::FT=FT(NaN), N_i_adjusted::FT=FT(NaN), N_INP_top::FT=FT(NaN), f_ice_mult::FT=FT(1), q_sno::FT=FT(0), massflux::FT=FT(0), dTdz::FT=FT(0), w_i::FT=FT(0), apply_massflux_boost::Bool=false, apply_sedimentation_boost::Bool=false) where {FT}
+    return CMNe.τ_relax(microphys_params, liq_type), CMNe.τ_relax(microphys_params, ice_type)
 end
 
 # :exponential_T_scaling_ice
@@ -345,7 +350,7 @@ end
 # ======================================================================================================================================== #
 
 
-function get_N_i(param_set::APS, relaxation_timescale::RTT, q::TD.PhasePartition, T::FT, ρ::FT, w::FT; N_INP_top::FT=FT(NaN), f_ice_mult::FT=FT(1), q_sno::FT=FT(0), massflux::FT=FT(0), dTdz::FT=FT(0), w_i::FT=FT(0), apply_massflux_boost::Bool=false, apply_sedimentation_boost::Bool=false) where {FT,RTT<:Union{RelaxToEquilibrium,AbstractRelaxationTimescaleType}}
+function get_N_i(param_set::APS, relaxation_timescale::AbstractNonEquillibriumSourcesType, q::TD.PhasePartition, T::FT, ρ::FT, w::FT; N_INP_top::FT=FT(NaN), f_ice_mult::FT=FT(1), q_sno::FT=FT(0), massflux::FT=FT(0), dTdz::FT=FT(0), w_i::FT=FT(0), apply_massflux_boost::Bool=false, apply_sedimentation_boost::Bool=false) where {FT}
     N_i = get_N_i_helper(param_set, relaxation_timescale, q, T, ρ, w)
     if get_adjust_ice_N(relaxation_timescale)
         thermo_params = TCP.thermodynamics_params(param_set)
@@ -361,7 +366,7 @@ end
 # ======================================================================================================================================== #
 
 
-function get_N_i_and_N_i_no_boost(param_set::APS, relaxation_timescale::RTT, q::TD.PhasePartition, T::FT, ρ::FT, w::FT; N_INP_top::FT=FT(NaN), f_ice_mult::FT=FT(1), q_sno::FT=FT(0), massflux::FT=FT(0), dTdz::FT=FT(0), w_i::FT=FT(0), apply_massflux_boost::Bool=false, apply_sedimentation_boost::Bool=false) where {FT,RTT<:Union{RelaxToEquilibrium,AbstractRelaxationTimescaleType}}
+function get_N_i_and_N_i_no_boost(param_set::APS, relaxation_timescale::AbstractNonEquillibriumSourcesType, q::TD.PhasePartition, T::FT, ρ::FT, w::FT; N_INP_top::FT=FT(NaN), f_ice_mult::FT=FT(1), q_sno::FT=FT(0), massflux::FT=FT(0), dTdz::FT=FT(0), w_i::FT=FT(0), apply_massflux_boost::Bool=false, apply_sedimentation_boost::Bool=false) where {FT}
     N_i = get_N_i_helper(param_set, relaxation_timescale, q, T, ρ, w)
     N_i_no_boost = N_i
     if get_adjust_ice_N(relaxation_timescale)
@@ -383,7 +388,7 @@ function get_N_i_and_N_i_no_boost(param_set::APS, relaxation_timescale::RTT, q::
 end
 # ======================================================================================================================================== #
 
-function get_N_i_raw_and_adjusted(param_set::APS, relaxation_timescale::RTT, q::TD.PhasePartition, T::FT, ρ::FT, w::FT; N_INP_top::FT=FT(NaN), f_ice_mult::FT=FT(1), q_sno::FT=FT(0), massflux::FT=FT(0), dTdz::FT=FT(0), w_i::FT=FT(0), apply_massflux_boost::Bool=false, apply_sedimentation_boost::Bool=false) where {FT,RTT<:Union{RelaxToEquilibrium,AbstractRelaxationTimescaleType}}
+function get_N_i_raw_and_adjusted(param_set::APS, relaxation_timescale::AbstractNonEquillibriumSourcesType, q::TD.PhasePartition, T::FT, ρ::FT, w::FT; N_INP_top::FT=FT(NaN), f_ice_mult::FT=FT(1), q_sno::FT=FT(0), massflux::FT=FT(0), dTdz::FT=FT(0), w_i::FT=FT(0), apply_massflux_boost::Bool=false, apply_sedimentation_boost::Bool=false) where {FT}
     N_i = get_N_i_helper(param_set, relaxation_timescale, q, T, ρ, w)
     if get_adjust_ice_N(relaxation_timescale)
         thermo_params = TCP.thermodynamics_params(param_set)
@@ -401,7 +406,7 @@ function get_N_i_raw_and_adjusted(param_set::APS, relaxation_timescale::RTT, q::
 end
 # ======================================================================================================================================== #
 
-function get_N_i_raw_and_adjusted_and_N_i_no_boost(param_set::APS, relaxation_timescale::RTT, q::TD.PhasePartition, T::FT, ρ::FT, w::FT; N_INP_top::FT=FT(NaN), f_ice_mult::FT=FT(1), q_sno::FT=FT(0), massflux::FT=FT(0), dTdz::FT=FT(0), w_i::FT=FT(0), apply_massflux_boost::Bool=false, apply_sedimentation_boost::Bool=false) where {FT,RTT<:Union{RelaxToEquilibrium,AbstractRelaxationTimescaleType}}
+function get_N_i_raw_and_adjusted_and_N_i_no_boost(param_set::APS, relaxation_timescale::AbstractNonEquillibriumSourcesType, q::TD.PhasePartition, T::FT, ρ::FT, w::FT; N_INP_top::FT=FT(NaN), f_ice_mult::FT=FT(1), q_sno::FT=FT(0), massflux::FT=FT(0), dTdz::FT=FT(0), w_i::FT=FT(0), apply_massflux_boost::Bool=false, apply_sedimentation_boost::Bool=false) where {FT}
     N_i = get_N_i_helper(param_set, relaxation_timescale, q, T, ρ, w)
     N_i_no_boost = N_i
     if get_adjust_ice_N(relaxation_timescale)
@@ -426,14 +431,14 @@ function get_N_i_raw_and_adjusted_and_N_i_no_boost(param_set::APS, relaxation_ti
 end
 # ======================================================================================================================================== #
 
-function get_N_i_raw(param_set::APS, relaxation_timescale::RTT, q::TD.PhasePartition, T::FT, ρ::FT, w::FT) where {FT,RTT<:Union{RelaxToEquilibrium,AbstractRelaxationTimescaleType}}
+function get_N_i_raw(param_set::APS, relaxation_timescale::AbstractNonEquillibriumSourcesType, q::TD.PhasePartition, T::FT, ρ::FT, w::FT) where {FT}
     N_i = get_N_i_helper(param_set, relaxation_timescale, q, T, ρ, w)
     N_i = clamp(N_i, relaxation_timescale.args.min_N_ice, relaxation_timescale.args.max_N_ice)
     return N_i
 end
 # ======================================================================================================================================== #
 
-function get_N_l(param_set::APS, relaxation_timescale::RTT, q::TD.PhasePartition, T::FT, ρ::FT, w::FT) where {FT,RTT<:Union{RelaxToEquilibrium,AbstractRelaxationTimescaleType}}
+function get_N_l(param_set::APS, relaxation_timescale::AbstractNonEquillibriumSourcesType, q::TD.PhasePartition, T::FT, ρ::FT, w::FT) where {FT}
     N_l = get_N_l_helper(param_set, relaxation_timescale, q, T, ρ, w)
     if get_adjust_liq_N(relaxation_timescale)
         N_l = adjust_liq_N(param_set, N_l, q.liq; ρ=ρ, monodisperse=true, decrease_N_if_subsaturated=false)
@@ -443,7 +448,7 @@ function get_N_l(param_set::APS, relaxation_timescale::RTT, q::TD.PhasePartition
 end
 # ======================================================================================================================================== #
 
-function get_N_l_raw_and_adjusted(param_set::APS, relaxation_timescale::RTT, q::TD.PhasePartition, T::FT, ρ::FT, w::FT) where {FT,RTT<:Union{RelaxToEquilibrium,AbstractRelaxationTimescaleType}}
+function get_N_l_raw_and_adjusted(param_set::APS, relaxation_timescale::AbstractNonEquillibriumSourcesType, q::TD.PhasePartition, T::FT, ρ::FT, w::FT) where {FT}
     N_l = get_N_l_helper(param_set, relaxation_timescale, q, T, ρ, w)
     if get_adjust_liq_N(relaxation_timescale)
         N_l_adjusted = adjust_liq_N(param_set, N_l, q.liq; ρ=ρ, monodisperse=true, decrease_N_if_subsaturated=false)
@@ -455,7 +460,7 @@ function get_N_l_raw_and_adjusted(param_set::APS, relaxation_timescale::RTT, q::
 end
 # ======================================================================================================================================== #
 
-function get_N_l_raw(param_set::APS, relaxation_timescale::RTT, q::TD.PhasePartition, T::FT, ρ::FT, w::FT) where {FT,RTT<:Union{RelaxToEquilibrium,AbstractRelaxationTimescaleType}}
+function get_N_l_raw(param_set::APS, relaxation_timescale::AbstractNonEquillibriumSourcesType, q::TD.PhasePartition, T::FT, ρ::FT, w::FT) where {FT}
     N_l = get_N_l_helper(param_set, relaxation_timescale, q, T, ρ, w)
     N_l = clamp(N_l, relaxation_timescale.args.min_N_liq, relaxation_timescale.args.max_N_liq)
     return N_l
@@ -466,7 +471,7 @@ end
 
 # --------------------------------------- #
 
-function get_N_i(param_set::APS, relaxation_timescale::RTT, ts::TD.ThermodynamicState, w::FT; N_INP_top::FT=FT(NaN), f_ice_mult::FT=FT(1), q_sno::FT=FT(0), massflux::FT=FT(0), dTdz::FT=FT(0), w_i::FT=FT(0), apply_massflux_boost::Bool=false, apply_sedimentation_boost::Bool=false) where {FT,RTT<:Union{RelaxToEquilibrium,AbstractRelaxationTimescaleType}}
+function get_N_i(param_set::APS, relaxation_timescale::AbstractNonEquillibriumSourcesType, ts::TD.ThermodynamicState, w::FT; N_INP_top::FT=FT(NaN), f_ice_mult::FT=FT(1), q_sno::FT=FT(0), massflux::FT=FT(0), dTdz::FT=FT(0), w_i::FT=FT(0), apply_massflux_boost::Bool=false, apply_sedimentation_boost::Bool=false) where {FT}
     thermo_params::TDPS = TCP.thermodynamics_params(param_set)
     q::TD.PhasePartition{FT} = TD.PhasePartition(thermo_params, ts)
     T::FT = TD.air_temperature(thermo_params, ts)
@@ -475,7 +480,7 @@ function get_N_i(param_set::APS, relaxation_timescale::RTT, ts::TD.Thermodynamic
     return get_N_i(param_set, relaxation_timescale, q, T, ρ, w; N_INP_top=N_INP_top, f_ice_mult=f_ice_mult, q_sno=q_sno, massflux=massflux, dTdz=dTdz, w_i=w_i, apply_massflux_boost=apply_massflux_boost, apply_sedimentation_boost=apply_sedimentation_boost)
 end
 
-function get_N_i_and_N_i_no_boost(param_set::APS, relaxation_timescale::RTT, ts::TD.ThermodynamicState, w::FT; N_INP_top::FT=FT(NaN), f_ice_mult::FT=FT(1), q_sno::FT=FT(0), massflux::FT=FT(0), dTdz::FT=FT(0), w_i::FT=FT(0), apply_massflux_boost::Bool=false, apply_sedimentation_boost::Bool=false) where {FT,RTT<:Union{RelaxToEquilibrium,AbstractRelaxationTimescaleType}}
+function get_N_i_and_N_i_no_boost(param_set::APS, relaxation_timescale::AbstractNonEquillibriumSourcesType, ts::TD.ThermodynamicState, w::FT; N_INP_top::FT=FT(NaN), f_ice_mult::FT=FT(1), q_sno::FT=FT(0), massflux::FT=FT(0), dTdz::FT=FT(0), w_i::FT=FT(0), apply_massflux_boost::Bool=false, apply_sedimentation_boost::Bool=false) where {FT}
     thermo_params::TDPS = TCP.thermodynamics_params(param_set)
     q::TD.PhasePartition{FT} = TD.PhasePartition(thermo_params, ts)
     T::FT = TD.air_temperature(thermo_params, ts)
@@ -485,7 +490,7 @@ function get_N_i_and_N_i_no_boost(param_set::APS, relaxation_timescale::RTT, ts:
 end
 
 
-function get_N_i_raw_and_adjusted(param_set::APS, relaxation_timescale::RTT, ts::TD.ThermodynamicState, w::FT; N_INP_top::FT=FT(NaN), f_ice_mult::FT=FT(1), q_sno::FT=FT(0), massflux::FT=FT(0), dTdz::FT=FT(0), w_i::FT=FT(0), apply_massflux_boost::Bool=false, apply_sedimentation_boost::Bool=false) where {FT,RTT<:Union{RelaxToEquilibrium,AbstractRelaxationTimescaleType}}
+function get_N_i_raw_and_adjusted(param_set::APS, relaxation_timescale::AbstractNonEquillibriumSourcesType, ts::TD.ThermodynamicState, w::FT; N_INP_top::FT=FT(NaN), f_ice_mult::FT=FT(1), q_sno::FT=FT(0), massflux::FT=FT(0), dTdz::FT=FT(0), w_i::FT=FT(0), apply_massflux_boost::Bool=false, apply_sedimentation_boost::Bool=false) where {FT}
     thermo_params::TDPS = TCP.thermodynamics_params(param_set)
     q::TD.PhasePartition{FT} = TD.PhasePartition(thermo_params, ts)
     T::FT = TD.air_temperature(thermo_params, ts)
@@ -494,7 +499,7 @@ function get_N_i_raw_and_adjusted(param_set::APS, relaxation_timescale::RTT, ts:
     return get_N_i_raw_and_adjusted(param_set, relaxation_timescale, q, T, ρ, w; N_INP_top=N_INP_top, f_ice_mult=f_ice_mult, q_sno=q_sno, massflux=massflux, dTdz=dTdz, w_i=w_i, apply_massflux_boost=apply_massflux_boost, apply_sedimentation_boost=apply_sedimentation_boost)
 end
 
-function get_N_i_raw_and_adjusted_and_N_i_no_boost(param_set::APS, relaxation_timescale::RTT, ts::TD.ThermodynamicState, w::FT; N_INP_top::FT=FT(NaN), f_ice_mult::FT=FT(1), q_sno::FT=FT(0), massflux::FT=FT(0), dTdz::FT=FT(0), w_i::FT=FT(0), apply_massflux_boost::Bool=false, apply_sedimentation_boost::Bool=false) where {FT,RTT<:Union{RelaxToEquilibrium,AbstractRelaxationTimescaleType}}
+function get_N_i_raw_and_adjusted_and_N_i_no_boost(param_set::APS, relaxation_timescale::AbstractNonEquillibriumSourcesType, ts::TD.ThermodynamicState, w::FT; N_INP_top::FT=FT(NaN), f_ice_mult::FT=FT(1), q_sno::FT=FT(0), massflux::FT=FT(0), dTdz::FT=FT(0), w_i::FT=FT(0), apply_massflux_boost::Bool=false, apply_sedimentation_boost::Bool=false) where {FT}
     thermo_params::TDPS = TCP.thermodynamics_params(param_set)
     q::TD.PhasePartition{FT} = TD.PhasePartition(thermo_params, ts)
     T::FT = TD.air_temperature(thermo_params, ts)
@@ -503,7 +508,7 @@ function get_N_i_raw_and_adjusted_and_N_i_no_boost(param_set::APS, relaxation_ti
     return get_N_i_raw_and_adjusted_and_N_i_no_boost(param_set, relaxation_timescale, q, T, ρ, w; N_INP_top=N_INP_top, f_ice_mult=f_ice_mult, q_sno=q_sno, massflux=massflux, dTdz=dTdz, w_i=w_i, apply_massflux_boost=apply_massflux_boost, apply_sedimentation_boost=apply_sedimentation_boost)
 end
 
-function get_N_i_raw(param_set::APS, relaxation_timescale::RTT, ts::TD.ThermodynamicState, w::FT) where {FT,RTT<:Union{RelaxToEquilibrium,AbstractRelaxationTimescaleType}}
+function get_N_i_raw(param_set::APS, relaxation_timescale::AbstractNonEquillibriumSourcesType, ts::TD.ThermodynamicState, w::FT) where {FT}
     thermo_params::TDPS = TCP.thermodynamics_params(param_set)
     q::TD.PhasePartition{FT} = TD.PhasePartition(thermo_params, ts)
     T::FT = TD.air_temperature(thermo_params, ts)
@@ -602,7 +607,7 @@ end
 
 # ======================================================================================================================================== #
 
-function get_INP_concentration(param_set::APS, relaxation_timescale::RTT, q::TD.PhasePartition, T::FT, ρ::FT, w::FT, S_i::FT; apply_supersaturation_scaling::Bool=true) where {FT,RTT<:Union{RelaxToEquilibrium,AbstractRelaxationTimescaleType}}
+function get_INP_concentration(param_set::APS, relaxation_timescale::AbstractNonEquillibriumSourcesType, q::TD.PhasePartition, T::FT, ρ::FT, w::FT, S_i::FT; apply_supersaturation_scaling::Bool=true) where {FT}
     # return FT(NaN) # for ansatz where we don't actually predict INP... needed for say ice nucleation.
     N_INP = get_N_i_Cooper_curve(T; clamp_N=true)
     if apply_supersaturation_scaling
@@ -719,7 +724,7 @@ end
 # Gradients
 # ---------------- #
 
-function get_dNINP_dz(param_set::APS, relaxation_timescale::RTT, T::FT, dTdz::FT) where {FT,RTT<:Union{RelaxToEquilibrium,AbstractRelaxationTimescaleType}}
+function get_dNINP_dz(param_set::APS, relaxation_timescale::AbstractNonEquillibriumSourcesType, T::FT, dTdz::FT) where {FT}
     dNdT = get_dNINP_dT(param_set, relaxation_timescale, T)
     dNdz = dNdT * dTdz
     return dNdz
@@ -730,7 +735,7 @@ get_dNINP_dz(T::FT, dTdz::FT) where {FT} = get_dNINP_dT(T) * dTdz
 function get_dNINP_dT(T::FT) where {FT}
     return get_d_N_i_Cooper_curve_dT(T)
 end
-get_dNINP_dT(param_set::APS, relaxation_timescale::RTT, T::FT) where {FT,RTT<:Union{RelaxToEquilibrium,AbstractRelaxationTimescaleType}} = get_dNINP_dT(T) # Fallback, definitely should be true for NN, but LC and Base are weakpoints, and for arbitrary NNs is less defined.
+get_dNINP_dT(param_set::APS, relaxation_timescale::AbstractNonEquillibriumSourcesType, T::FT) where {FT} = get_dNINP_dT(T) # Fallback, definitely should be true for NN, but LC and Base are weakpoints, and for arbitrary NNs is less defined.
 
 
 # exponential
@@ -1042,13 +1047,13 @@ end
 # ======================================================================================================================================== #
 
 
-function get_Ns(param_set::APS, relaxation_timescale::RTT, q::TD.PhasePartition, T::FT, ρ::FT, w::FT; N_INP_top::FT=FT(NaN), f_ice_mult::FT=FT(1), q_sno::FT=FT(0), massflux::FT=FT(0), dTdz::FT=FT(0), w_i::FT=FT(0), apply_massflux_boost::Bool=false, apply_sedimentation_boost::Bool=false) where {FT,RTT<:Union{RelaxToEquilibrium,AbstractRelaxationTimescaleType}}
+function get_Ns(param_set::APS, relaxation_timescale::AbstractNonEquillibriumSourcesType, q::TD.PhasePartition, T::FT, ρ::FT, w::FT; N_INP_top::FT=FT(NaN), f_ice_mult::FT=FT(1), q_sno::FT=FT(0), massflux::FT=FT(0), dTdz::FT=FT(0), w_i::FT=FT(0), apply_massflux_boost::Bool=false, apply_sedimentation_boost::Bool=false) where {FT}
     N_l::FT = get_N_l(param_set, relaxation_timescale, q, T, ρ, w)
     N_i::FT = get_N_i(param_set, relaxation_timescale, q, T, ρ, w; N_INP_top=N_INP_top, f_ice_mult=f_ice_mult, q_sno=q_sno, massflux=massflux, dTdz=dTdz, w_i=w_i, apply_massflux_boost=apply_massflux_boost, apply_sedimentation_boost=apply_sedimentation_boost)
     return (; N_liq=N_l, N_ice=N_i)
 end
 
-function get_Ns_and_N_i_no_boost(param_set::APS, relaxation_timescale::RTT, q::TD.PhasePartition, T::FT, ρ::FT, w::FT; N_INP_top::FT=FT(NaN), f_ice_mult::FT=FT(1), q_sno::FT=FT(0), massflux::FT=FT(0), dTdz::FT=FT(0), w_i::FT=FT(0), apply_massflux_boost::Bool=false, apply_sedimentation_boost::Bool=false) where {FT,RTT<:Union{RelaxToEquilibrium,AbstractRelaxationTimescaleType}}
+function get_Ns_and_N_i_no_boost(param_set::APS, relaxation_timescale::AbstractNonEquillibriumSourcesType, q::TD.PhasePartition, T::FT, ρ::FT, w::FT; N_INP_top::FT=FT(NaN), f_ice_mult::FT=FT(1), q_sno::FT=FT(0), massflux::FT=FT(0), dTdz::FT=FT(0), w_i::FT=FT(0), apply_massflux_boost::Bool=false, apply_sedimentation_boost::Bool=false) where {FT}
     N_l::FT = get_N_l(param_set, relaxation_timescale, q, T, ρ, w)
     N_i::FT = get_N_i(param_set, relaxation_timescale, q, T, ρ, w; N_INP_top=N_INP_top, f_ice_mult=f_ice_mult, q_sno=q_sno, massflux=massflux, dTdz=dTdz, w_i=w_i, apply_massflux_boost=apply_massflux_boost, apply_sedimentation_boost=apply_sedimentation_boost)
     if apply_massflux_boost
@@ -1059,19 +1064,19 @@ function get_Ns_and_N_i_no_boost(param_set::APS, relaxation_timescale::RTT, q::T
     return (; N_liq=N_l, N_ice=N_i, N_ice_no_boost=N_i_no_boost)
 end
 
-function get_Ns_raw_and_adjusted(param_set::APS, relaxation_timescale::RTT, q::TD.PhasePartition, T::FT, ρ::FT, w::FT; N_INP_top::FT=FT(NaN), f_ice_mult::FT=FT(1), q_sno::FT=FT(0), massflux::FT=FT(0), dTdz::FT=FT(0), w_i::FT=FT(0), apply_massflux_boost::Bool=false, apply_sedimentation_boost::Bool=false) where {FT,RTT<:Union{RelaxToEquilibrium,AbstractRelaxationTimescaleType}}
+function get_Ns_raw_and_adjusted(param_set::APS, relaxation_timescale::AbstractNonEquillibriumSourcesType, q::TD.PhasePartition, T::FT, ρ::FT, w::FT; N_INP_top::FT=FT(NaN), f_ice_mult::FT=FT(1), q_sno::FT=FT(0), massflux::FT=FT(0), dTdz::FT=FT(0), w_i::FT=FT(0), apply_massflux_boost::Bool=false, apply_sedimentation_boost::Bool=false) where {FT}
     (; N_i_raw, N_i_adjusted) = get_N_i_raw_and_adjusted(param_set, relaxation_timescale, q, T, ρ, w; N_INP_top=N_INP_top, f_ice_mult=f_ice_mult, q_sno=q_sno, massflux=massflux, dTdz=dTdz, w_i=w_i, apply_massflux_boost=apply_massflux_boost, apply_sedimentation_boost=apply_sedimentation_boost)
     N_l::FT = get_N_l(param_set, relaxation_timescale, q, T, ρ, w)
     return (; N_liq=N_l, N_ice_raw=N_i_raw, N_ice_adjusted=N_i_adjusted)
 end
 
-function get_Ns_raw_and_adjusted_and_N_i_no_boost(param_set::APS, relaxation_timescale::AbstractRelaxationTimescaleType, q::TD.PhasePartition, T::FT, ρ::FT, w::FT; N_INP_top::FT=FT(NaN), f_ice_mult::FT=FT(1), q_sno::FT=FT(0), massflux::FT=FT(0), dTdz::FT=FT(0), w_i::FT=FT(0), apply_massflux_boost::Bool=false, apply_sedimentation_boost::Bool=false) where {FT}
+function get_Ns_raw_and_adjusted_and_N_i_no_boost(param_set::APS, relaxation_timescale::AbstractNonEquillibriumSourcesType, q::TD.PhasePartition, T::FT, ρ::FT, w::FT; N_INP_top::FT=FT(NaN), f_ice_mult::FT=FT(1), q_sno::FT=FT(0), massflux::FT=FT(0), dTdz::FT=FT(0), w_i::FT=FT(0), apply_massflux_boost::Bool=false, apply_sedimentation_boost::Bool=false) where {FT}
     (; N_i_raw, N_i_adjusted, N_i_no_boost) = get_N_i_raw_and_adjusted_and_N_i_no_boost(param_set, relaxation_timescale, q, T, ρ, w; N_INP_top=N_INP_top, f_ice_mult=f_ice_mult, q_sno=q_sno, massflux=massflux, dTdz=dTdz, w_i=w_i, apply_massflux_boost=apply_massflux_boost, apply_sedimentation_boost=apply_sedimentation_boost)
     N_l::FT = get_N_l(param_set, relaxation_timescale, q, T, ρ, w)
     return (; N_liq=N_l, N_ice_raw=N_i_raw, N_ice_adjusted=N_i_adjusted, N_ice_no_boost=N_i_no_boost)
 end
 
-function get_Ns(param_set::APS, relaxation_timescale::RTT, ts::TD.ThermodynamicState, w::FT; N_INP_top::FT=FT(NaN), f_ice_mult::FT=FT(1), q_sno::FT=FT(0), massflux::FT=FT(0), dTdz::FT=FT(0), w_i::FT=FT(0), apply_massflux_boost::Bool=false, apply_sedimentation_boost::Bool=false) where {FT,RTT<:Union{RelaxToEquilibrium,AbstractRelaxationTimescaleType}}
+function get_Ns(param_set::APS, relaxation_timescale::AbstractNonEquillibriumSourcesType, ts::TD.ThermodynamicState, w::FT; N_INP_top::FT=FT(NaN), f_ice_mult::FT=FT(1), q_sno::FT=FT(0), massflux::FT=FT(0), dTdz::FT=FT(0), w_i::FT=FT(0), apply_massflux_boost::Bool=false, apply_sedimentation_boost::Bool=false) where {FT}
     thermo_params::TDPS = TCP.thermodynamics_params(param_set)
     q::TD.PhasePartition{FT} = TD.PhasePartition(thermo_params, ts)
     T::FT = TD.air_temperature(thermo_params, ts)
@@ -1080,7 +1085,7 @@ function get_Ns(param_set::APS, relaxation_timescale::RTT, ts::TD.ThermodynamicS
     return get_Ns(param_set, relaxation_timescale, q, T, ρ, w; N_INP_top=N_INP_top, f_ice_mult=f_ice_mult, q_sno=q_sno, massflux=massflux, dTdz=dTdz, w_i=w_i, apply_massflux_boost=apply_massflux_boost, apply_sedimentation_boost=apply_sedimentation_boost)
 end
 
-function get_Ns_and_N_i_no_boost(param_set::APS, relaxation_timescale::RTT, ts::TD.ThermodynamicState, w::FT; N_INP_top::FT=FT(NaN), f_ice_mult::FT=FT(1), q_sno::FT=FT(0), massflux::FT=FT(0), dTdz::FT=FT(0), w_i::FT=FT(0), apply_massflux_boost::Bool=false, apply_sedimentation_boost::Bool=false) where {FT,RTT<:Union{RelaxToEquilibrium,AbstractRelaxationTimescaleType}}
+function get_Ns_and_N_i_no_boost(param_set::APS, relaxation_timescale::AbstractNonEquillibriumSourcesType, ts::TD.ThermodynamicState, w::FT; N_INP_top::FT=FT(NaN), f_ice_mult::FT=FT(1), q_sno::FT=FT(0), massflux::FT=FT(0), dTdz::FT=FT(0), w_i::FT=FT(0), apply_massflux_boost::Bool=false, apply_sedimentation_boost::Bool=false) where {FT}
     thermo_params::TDPS = TCP.thermodynamics_params(param_set)
     q::TD.PhasePartition{FT} = TD.PhasePartition(thermo_params, ts)
     T::FT = TD.air_temperature(thermo_params, ts)
@@ -1089,7 +1094,7 @@ function get_Ns_and_N_i_no_boost(param_set::APS, relaxation_timescale::RTT, ts::
     return get_Ns_and_N_i_no_boost(param_set, relaxation_timescale, q, T, ρ, w; N_INP_top=N_INP_top, f_ice_mult=f_ice_mult, q_sno=q_sno, massflux=massflux, dTdz=dTdz, w_i=w_i, apply_massflux_boost=apply_massflux_boost, apply_sedimentation_boost=apply_sedimentation_boost)
 end
 
-function get_Ns_raw_and_adjusted(param_set::APS, relaxation_timescale::RTT, ts::TD.ThermodynamicState, w::FT; N_INP_top::FT=FT(NaN), f_ice_mult::FT=FT(1), q_sno::FT=FT(0), massflux::FT=FT(0), dTdz::FT=FT(0), w_i::FT=FT(0), apply_massflux_boost::Bool=false, apply_sedimentation_boost::Bool=false) where {FT,RTT<:Union{RelaxToEquilibrium,AbstractRelaxationTimescaleType}}
+function get_Ns_raw_and_adjusted(param_set::APS, relaxation_timescale::AbstractNonEquillibriumSourcesType, ts::TD.ThermodynamicState, w::FT; N_INP_top::FT=FT(NaN), f_ice_mult::FT=FT(1), q_sno::FT=FT(0), massflux::FT=FT(0), dTdz::FT=FT(0), w_i::FT=FT(0), apply_massflux_boost::Bool=false, apply_sedimentation_boost::Bool=false) where {FT}
     thermo_params::TDPS = TCP.thermodynamics_params(param_set)
     q::TD.PhasePartition{FT} = TD.PhasePartition(thermo_params, ts)
     T::FT = TD.air_temperature(thermo_params, ts)
@@ -1098,7 +1103,7 @@ function get_Ns_raw_and_adjusted(param_set::APS, relaxation_timescale::RTT, ts::
     return get_Ns_raw_and_adjusted(param_set, relaxation_timescale, q, T, ρ, w; N_INP_top=N_INP_top, f_ice_mult=f_ice_mult, q_sno=q_sno, massflux=massflux, dTdz=dTdz, w_i=w_i, apply_massflux_boost=apply_massflux_boost, apply_sedimentation_boost=apply_sedimentation_boost)
 end
 
-function get_Ns_raw_and_adjusted_and_N_i_no_boost(param_set::APS, relaxation_timescale::RTT, ts::TD.ThermodynamicState, w::FT; N_INP_top::FT=FT(NaN), f_ice_mult::FT=FT(1), q_sno::FT=FT(0), massflux::FT=FT(0), dTdz::FT=FT(0), w_i::FT=FT(0), apply_massflux_boost::Bool=false, apply_sedimentation_boost::Bool=false) where {FT,RTT<:Union{RelaxToEquilibrium,AbstractRelaxationTimescaleType}}
+function get_Ns_raw_and_adjusted_and_N_i_no_boost(param_set::APS, relaxation_timescale::AbstractNonEquillibriumSourcesType, ts::TD.ThermodynamicState, w::FT; N_INP_top::FT=FT(NaN), f_ice_mult::FT=FT(1), q_sno::FT=FT(0), massflux::FT=FT(0), dTdz::FT=FT(0), w_i::FT=FT(0), apply_massflux_boost::Bool=false, apply_sedimentation_boost::Bool=false) where {FT}
     thermo_params::TDPS = TCP.thermodynamics_params(param_set)
     q::TD.PhasePartition{FT} = TD.PhasePartition(thermo_params, ts)
     T::FT = TD.air_temperature(thermo_params, ts)
@@ -1109,7 +1114,7 @@ end
 
 # --------------------------------------------------------------------------- #
 
-function get_τs_and_Ns(param_set::APS, microphys_params::ACMP, relaxation_timescale::RTT, q::TD.PhasePartition, T::FT, p::FT, ρ::FT, w::FT; N_INP_top::FT=FT(NaN), f_ice_mult::FT=FT(1), q_sno::FT=FT(0), massflux::FT=FT(0), dTdz::FT=FT(0), w_i::FT=FT(0), apply_massflux_boost::Bool=false, apply_sedimentation_boost::Bool=false) where {FT,RTT<:Union{RelaxToEquilibrium,AbstractRelaxationTimescaleType}}
+function get_τs_and_Ns(param_set::APS, microphys_params::ACMP, relaxation_timescale::AbstractNonEquillibriumSourcesType, q::TD.PhasePartition, T::FT, p::FT, ρ::FT, w::FT; N_INP_top::FT=FT(NaN), f_ice_mult::FT=FT(1), q_sno::FT=FT(0), massflux::FT=FT(0), dTdz::FT=FT(0), w_i::FT=FT(0), apply_massflux_boost::Bool=false, apply_sedimentation_boost::Bool=false) where {FT}
     # Ns = get_Ns(param_set,                   relaxation_timescale, q, T, ρ, w; N_INP_top = N_INP_top, f_ice_mult = f_ice_mult, q_sno = q_sno, massflux = massflux, dTdz = dTdz, w_i = w_i, apply_massflux_boost = apply_massflux_boost, apply_sedimentation_boost = apply_sedimentation_boost)
     Ns = get_Ns_raw_and_adjusted(param_set, relaxation_timescale, q, T, ρ, w; N_INP_top=N_INP_top, f_ice_mult=f_ice_mult, q_sno=q_sno, massflux=massflux, dTdz=dTdz, w_i=w_i, apply_massflux_boost=apply_massflux_boost, apply_sedimentation_boost=apply_sedimentation_boost)
     if apply_massflux_boost || apply_sedimentation_boost
@@ -1127,7 +1132,7 @@ function get_τs_and_Ns(param_set::APS, microphys_params::ACMP, relaxation_times
 end
 
 
-function get_τs_and_Ns_and_N_i_no_boost(param_set::APS, microphys_params::ACMP, relaxation_timescale::RTT, q::TD.PhasePartition, T::FT, p::FT, ρ::FT, w::FT; N_INP_top::FT=FT(NaN), f_ice_mult::FT=FT(1), q_sno::FT=FT(0), massflux::FT=FT(0), dTdz::FT=FT(0), w_i::FT=FT(0), apply_massflux_boost::Bool=false, apply_sedimentation_boost::Bool=false, use_boost_for_τ::Bool=true) where {FT,RTT<:Union{RelaxToEquilibrium,AbstractRelaxationTimescaleType}}
+function get_τs_and_Ns_and_N_i_no_boost(param_set::APS, microphys_params::ACMP, relaxation_timescale::AbstractNonEquillibriumSourcesType, q::TD.PhasePartition, T::FT, p::FT, ρ::FT, w::FT; N_INP_top::FT=FT(NaN), f_ice_mult::FT=FT(1), q_sno::FT=FT(0), massflux::FT=FT(0), dTdz::FT=FT(0), w_i::FT=FT(0), apply_massflux_boost::Bool=false, apply_sedimentation_boost::Bool=false, use_boost_for_τ::Bool=true) where {FT}
     # Ns = get_Ns(param_set,                   relaxation_timescale, q, T, ρ, w; N_INP_top = N_INP_top, f_ice_mult = f_ice_mult, q_sno = q_sno, massflux = massflux, dTdz = dTdz, w_i = w_i, apply_massflux_boost = apply_massflux_boost, apply_sedimentation_boost = apply_sedimentation_boost)
     Ns = get_Ns_raw_and_adjusted_and_N_i_no_boost(param_set, relaxation_timescale, q, T, ρ, w; N_INP_top=N_INP_top, f_ice_mult=f_ice_mult, q_sno=q_sno, massflux=massflux, dTdz=dTdz, w_i=w_i, apply_massflux_boost=apply_massflux_boost, apply_sedimentation_boost=apply_sedimentation_boost)
 

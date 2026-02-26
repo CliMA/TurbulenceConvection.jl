@@ -248,6 +248,52 @@ end
     return ex
 end
 
+abstract type AbstractMM2015Opts{FT} end
+
+Base.@kwdef struct MM2015Opts{FT} <: AbstractMM2015Opts{FT}
+    use_fix::Bool = true
+    return_mixing_ratio::Bool = false
+    max_depth::Int = 10
+    depth::Int = 0
+    δ_0_shum::FT = FT(0)
+    δ_0i_shum::FT = FT(0)
+    dqvdt::FT = FT(0)
+    dTdt::FT = FT(0)
+    fallback_to_standard_supersaturation_limiter::Bool = false
+    emit_warnings::Bool = true
+    time_tolerance::FT = FT(1e-8)
+    frac_supersat_liq::FT = (δ_0_shum >= FT(0)) ? one(FT) : zero(FT) # default all or nothing
+    frac_supersat::FT = ((δ_0i_shum >= FT(0)) || (δ_0_shum >= FT(0))) ? one(FT) : zero(FT) # default all or nothing    
+end
+
+Base.@kwdef struct MM2015EPAOpts{FT} <: AbstractMM2015Opts{FT}
+    use_fix::Bool = true
+    return_mixing_ratio::Bool = false
+    max_depth::Int = 10
+    depth::Int = 0
+    dqvdt::FT = FT(0)
+    dTdt::FT = FT(0)
+    fallback_to_standard_supersaturation_limiter::Bool = false
+    emit_warnings::Bool = true
+    time_tolerance::FT = FT(1e-8)
+    frac_supersat_liq::FT = one(FT) # default all or nothing
+    frac_supersat::FT = one(FT) # default all or nothing    
+end
+
+# # OLD — type-unstable:
+# function update(opts::T; kwargs...) where {T <: AbstractMM2015Opts}
+#     fields = fieldnames(T)
+#     vals = NamedTuple{fields}(get(kwargs, f, getfield(opts, f)) for f in fields)
+#     return T(; vals...)
+# end
+
+"""Update fields of an AbstractMM2015Opts, keeping all other fields unchanged."""
+@generated function update(opts::T; kwargs...) where {T <: AbstractMM2015Opts}
+    fields = fieldnames(T)
+    exprs = (:(get(kwargs, $(QuoteNode(f)), getfield(opts, $(QuoteNode(f))))) for f in fields)
+    return :(T($(exprs...)))
+end
+
 """
     EntrDetr
 
