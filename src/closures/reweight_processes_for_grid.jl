@@ -333,8 +333,8 @@ function reweight_noneq_moisture_sources_for_grid(
             τ_liq_hi, τ_ice_hi =  get_τs(param_set, microphys_params, nonequilibrium_moisture_scheme, q_hi, T_hi, p_hi, ρ_hi, w_hi)
             # end
 
-            mph_neq_lo = noneq_moisture_sources(param_set, nonequilibrium_moisture_scheme, moisture_sources_limiter, area_lo, ρ_lo, p_c_lo, T_lo, Δt + ε, ts_lo, w_lo, q_vap_sat_liq_lo, q_vap_sat_ice_lo, dqvdt_lo, dTdt_lo, τ_liq_lo, τ_ice_lo)
-            mph_neq_hi = noneq_moisture_sources(param_set, nonequilibrium_moisture_scheme, moisture_sources_limiter, area_hi, ρ_hi, p_c_hi, T_hi, Δt + ε, ts_hi, w_hi, q_vap_sat_liq_hi, q_vap_sat_ice_hi, dqvdt_hi, dTdt_hi, τ_liq_hi, τ_ice_hi)
+            mph_neq_lo = noneq_moisture_sources(param_set, nonequilibrium_moisture_scheme, moisture_sources_limiter, area_lo, ρ_lo, p_c_lo, T_lo, Δt + ε, ts_lo, w_lo, q_vap_sat_liq_lo, q_vap_sat_ice_lo, dqvdt_lo, dTdt_lo, τ_liq_lo, τ_ice_lo, aux_domain.cloud_fraction[k], aux_domain.cloud_fraction[k], aux_domain.cloud_fraction[k])
+            mph_neq_hi = noneq_moisture_sources(param_set, nonequilibrium_moisture_scheme, moisture_sources_limiter, area_hi, ρ_hi, p_c_hi, T_hi, Δt + ε, ts_hi, w_hi, q_vap_sat_liq_hi, q_vap_sat_ice_hi, dqvdt_hi, dTdt_hi, τ_liq_hi, τ_ice_hi, aux_domain.cloud_fraction[k], aux_domain.cloud_fraction[k], aux_domain.cloud_fraction[k])
 
             #=
                 There's an argument that we should weigh [mph_neq_lo, mph, mph_neq_hi] by the some fraction of [area_lo, area, area_hi]...  so that in the end multiplying by area gives a weighted answer

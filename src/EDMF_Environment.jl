@@ -266,13 +266,55 @@ function microphysics!(
                         end
                     end
 
-                    mph_neq_here = noneq_moisture_sources(param_set, nonequilibrium_moisture_scheme, moisture_sources_limiter, region_area, ρ_c[k], aux_en.p[k], T, Δt + ε, ts, w_noneq, q_vap_sat_liq, q_vap_sat_ice, dqvdt, dTdt, τ_liq_here, τ_ice_here, aux_en.frac_supersat_liq[k], aux_en.frac_supersat[k])
+                    (supersat_liq_fraction, q_liq_supersat, q_liq_subsat) = partition_condensate_into_sgs_fractions(thermo_params, liq_type, ts, aux_en.QTvar[k], aux_en.Hvar[k], aux_en.HQTcov[k]; supersaturated_fraction_liq = aux_en.frac_supersat_liq[k])
+                    (supersat_ice_fraction, q_ice_supersat, q_ice_subsat) = partition_condensate_into_sgs_fractions(thermo_params, ice_type, ts, aux_en.QTvar[k], aux_en.Hvar[k], aux_en.HQTcov[k]; supersaturated_fraction_ice = aux_en.frac_supersat[k])
+                    liq_frac = supersat_liq_fraction * (q_liq_supersat > zero(FT)) + (1 - supersat_liq_fraction) * (q_liq_subsat > zero(FT))
+                    ice_frac = supersat_ice_fraction * (q_ice_supersat > zero(FT)) + (1 - supersat_ice_fraction) * (q_ice_subsat > zero(FT))
+                    cloud_frac = max(liq_frac, ice_frac)
+
+                    # :: This loop is prolly more accurate but also more expensive... is it worth it?
+                    # if (supersat_liq_fraction > zero(FT)) && (q_here.liq > zero(FT)) && true # Use the subsplit into liquid rich and liquid poor regions to aid in WBF calculations and overlap
+                    #     q_liq_supliq = q_liq_supersat
+                    #     # q_ice is a weighted sum, in the supersat area we take ice supersat as much as possible until we run out of area, etc.
+                    #     q_ice_supliq = q_ice_supersat * min(supersat_liq_fraction, supersat_ice_fraction) + q_ice_subsat * max(zero(FT), min(supersat_liq_fraction, supersat_ice_fraction) - supersat_liq_fraction)
+                    #     _ts = thermo_state_pθq(param_set, p_c[k], θ, qt, q_liq_supliq, q_ice_supliq)
+                    #     liq_frac_here = (q_liq_supersat > zero(FT)) ? supersat_liq_fraction/supersat_liq_fraction : zero(FT)
+                    #     ice_frac_here = (q_ice_supersat > zero(FT)) ? supersat_ice_fraction/supersat_liq_fraction : zero(FT)
+                    #     cloud_frac_here = max(liq_frac_here, ice_frac_here)
+                        
+                    #     mph_neq_here = supersat_liq_fraction * noneq_moisture_sources(param_set, nonequilibrium_moisture_scheme, moisture_sources_limiter, region_area, ρ_c[k], aux_en.p[k], T, Δt + ε, _ts, w_noneq, q_vap_sat_liq, q_vap_sat_ice, dqvdt, dTdt, τ_liq_here, τ_ice_here, liq_frac_here, ice_frac_here, cloud_frac_here)
+                    #     if supersat_liq_fraction < one(FT)
+                    #         q_liq_here = q_liq_subsat
+                    #         # we take the remainder...
+                    #         q_ice_here = max(q_here.ice - supersat_liq_fraction * q_ice_supliq, zero(FT)) / (one(FT) - supersat_liq_fraction) # we take the remainder of the ice, scaled up to account for the smaller area
+                    #         qt_here = (q_here.tot - (qt*supersat_liq_fraction)) / (1 - supersat_liq_fraction) # we take the remainder of the total, scaled up to account for the smaller area
+                    #         _ts = thermo_state_pθq(param_set, p_c[k], θ, qt_here, q_liq_here, q_ice_here)
+                    #         liq_frac_here = (q_liq_subsat > zero(FT)) ? (1 - supersat_liq_fraction)/(1 - supersat_liq_fraction) : zero(FT)
+                    #         ice_frac_here = (q_ice_subsat > zero(FT)) ? (1 - supersat_ice_fraction)/(1 - supersat_liq_fraction) : zero(FT)
+                    #         cloud_frac_here = max(liq_frac_here, ice_frac_here)
+                    #         mph_neq_here += (1 - supersat_liq_fraction) * noneq_moisture_sources(param_set, nonequilibrium_moisture_scheme, moisture_sources_limiter, region_area, ρ_c[k], aux_en.p[k], T, Δt + ε, _ts, w_noneq, q_vap_sat_liq, q_vap_sat_ice, dqvdt, dTdt, τ_liq_here, τ_ice_here, liq_frac_here, ice_frac_here, cloud_frac_here)
+                    #     end
+                    # else
+                    #     mph_neq_here = noneq_moisture_sources(param_set, nonequilibrium_moisture_scheme, moisture_sources_limiter, region_area, ρ_c[k], aux_en.p[k], T, Δt + ε, ts, w_noneq, q_vap_sat_liq, q_vap_sat_ice, dqvdt, dTdt, τ_liq_here, τ_ice_here, liq_frac, ice_frac, cloud_frac)
+                    # end
                     
+                    mph_neq_here = noneq_moisture_sources(param_set, nonequilibrium_moisture_scheme, moisture_sources_limiter, region_area, ρ_c[k], aux_en.p[k], T, Δt + ε, ts, w_noneq, q_vap_sat_liq, q_vap_sat_ice, dqvdt, dTdt, τ_liq_here, τ_ice_here, liq_frac, ice_frac, cloud_frac)
+
+
+                    # if (aux_en.frac_supersat_liq[k] < eps(FT)) && ((iszero(aux_en.q_liq[k]) ? q_liq_supersat/aux_en.q_liq[k] : zero(FT)) > eps(FT))
+                    #     @error "k = $(k.i) | frac_supersat_liq = $(aux_en.frac_supersat_liq[k]) ; q_liq_supersat = $(q_liq_supersat) ; q_liq = $(aux_en.q_liq[k]) ; q_liq_supersat/q_liq = $(q_liq_supersat/aux_en.q_liq[k])"
+                    # end
+
                     # prevent excess losses when not using quadrature
-                    mph_neq_here = NoneqMoistureSources(
-                        max(mph_neq_here.ql_tendency, -(aux_en.q_liq[k] * (1-aux_en.frac_supersat_liq[k])) / (Δt + ε)), # cannot remove more liq than exists subsaturated
-                        max(mph_neq_here.qi_tendency, -(aux_en.q_ice[k] * min(1-aux_en.frac_supersat[k], 1-aux_en.frac_supersat_liq[k])) / (Δt + ε)), # cannot remove more ice than exists subsaturated
-                    )
+                    # we don't want to lose ice that is supersaturated and not vulnerable to WBF. 
+                    if !iszero(aux_en.q_liq[k])
+                        mph_neq_here = NoneqMoistureSources(
+                            # max(mph_neq_here.ql_tendency, -(aux_en.q_liq[k] * (1-aux_en.frac_supersat_liq[k])) / (Δt + ε)), # cannot remove more liq than exists subsaturated
+                            # max(mph_neq_here.qi_tendency, -(aux_en.q_ice[k] * min(1-aux_en.frac_supersat[k], 1-aux_en.frac_supersat_liq[k])) / (Δt + ε)), # cannot remove more ice than exists subsaturated
+                            max(mph_neq_here.ql_tendency, -(aux_en.q_liq[k] * (one(FT) - min((q_liq_supersat * supersat_liq_fraction)/aux_en.q_liq[k], one(FT) - aux_en.frac_supersat[k]))) / (Δt + ε)), # cannot remove more liq than exists subsaturated and not vulnerable to WBF
+                            max(mph_neq_here.qi_tendency, -(aux_en.q_ice[k] * (one(FT) - aux_en.frac_supersat[k])) / (Δt + ε)), # cannot remove more ice than exists subsaturated
+                        )
+                    end
 
                     if region isa EnvRemainingDomain
                         aux_en.qi_tendency_sub_dep_en_remaining[k] = mph_neq_here.qi_tendency
@@ -464,7 +506,13 @@ function microphysics!(
 
                         q_vap_sat_liq = TD.q_vap_saturation_generic(thermo_params, T, ρ, TD.Liquid())
                         q_vap_sat_ice = TD.q_vap_saturation_generic(thermo_params, T, ρ, TD.Ice())
-                        mph_neq_quad = noneq_moisture_sources(param_set, nonequilibrium_moisture_scheme, moisture_sources_limiter, aux_en.area[k], ρ_c[k], aux_en.p[k], T, Δt + ε, ts_hat, w_noneq, q_vap_sat_liq, q_vap_sat_ice, dqvdt, dTdt, aux_en.τ_liq[k], aux_en.τ_ice[k], aux_en.frac_supersat_liq[k], aux_en.frac_supersat[k])
+                        (supersat_liq_fraction_q, q_liq_supersat_q, q_liq_subsat_q) = partition_condensate_into_sgs_fractions(thermo_params, liq_type, ts_env[k], aux_en.QTvar[k], aux_en.Hvar[k], aux_en.HQTcov[k]; supersaturated_fraction_liq = aux_en.frac_supersat_liq[k])
+                        (supersat_ice_fraction_q, q_ice_supersat_q, q_ice_subsat_q) = partition_condensate_into_sgs_fractions(thermo_params, ice_type, ts_env[k], aux_en.QTvar[k], aux_en.Hvar[k], aux_en.HQTcov[k]; supersaturated_fraction_ice = aux_en.frac_supersat[k])
+                        liq_frac_q = supersat_liq_fraction_q * (q_liq_supersat_q > zero(FT)) + (1 - supersat_liq_fraction_q) * (q_liq_subsat_q > zero(FT))
+                        ice_frac_q = supersat_ice_fraction_q * (q_ice_supersat_q > zero(FT)) + (1 - supersat_ice_fraction_q) * (q_ice_subsat_q > zero(FT))
+                        cloud_frac_q = max(liq_frac_q, ice_frac_q)
+
+                        mph_neq_quad = noneq_moisture_sources(param_set, nonequilibrium_moisture_scheme, moisture_sources_limiter, aux_en.area[k], ρ_c[k], aux_en.p[k], T, Δt + ε, ts_hat, w_noneq, q_vap_sat_liq, q_vap_sat_ice, dqvdt, dTdt, aux_en.τ_liq[k], aux_en.τ_ice[k], liq_frac_q, ice_frac_q, cloud_frac_q)
 
                         # if at an extrema, we don't know where the peak is so we'll reweight based on probability of where it could be in between.
                         if reweight_processes_for_grid
@@ -602,6 +650,8 @@ function microphysics!(
             end
             
         else # EquilibriumMoisture
+
+            # Now way to use partition_condensate_into_sgs_fractions right now since sat-adjust forces the overlap, could go into other microphysics but not implemented yet.
 
 
             do_cloak = (edmf.area_partition_model isa CoreCloakAreaPartitionModel) && (edmf.area_partition_model.apply_cloak_to_condensate_formation) && (aux_bulk.area[k] > edmf.minimum_area)
@@ -1847,7 +1897,7 @@ function microphysics_helper(grid::Grid, edmf::EDMFModel, Δt::FT, param_set::AP
 
 
     if moisture_model isa NonEquilibriumMoisture
-        mph_neq = noneq_moisture_sources(param_set, nonequilibrium_moisture_scheme, moisture_sources_limiter, area, ρ_c, p, T, Δt + ε, ts, w, q_vap_sat_liq, q_vap_sat_ice, dqvdt, dTdt, τ_liq, τ_ice, frac_supersat_liq, frac_supersat)
+        mph_neq = noneq_moisture_sources(param_set, nonequilibrium_moisture_scheme, moisture_sources_limiter, area, ρ_c, p, T, Δt + ε, ts, w, q_vap_sat_liq, q_vap_sat_ice, dqvdt, dTdt, τ_liq, τ_ice, aux_en.cloud_fraction[k], aux_en.cloud_fraction[k], aux_en.cloud_fraction[k])
 
         # if at an extrema, we don't know where the peak is so we'll reweight based on probability of where it could be in between.
         if reweight_processes_for_grid

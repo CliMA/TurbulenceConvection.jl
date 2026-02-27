@@ -35,8 +35,9 @@ function noneq_moisture_sources(param_set::APS,
     dTdt::FT = FT(0),
     τ_liq::FT = FT(NaN),
     τ_ice::FT = FT(NaN),
-    frac_supersat_liq::FT = FT(1),
-    frac_supersat::FT = FT(1)
+    liq_fraction::FT = FT(1),
+    ice_fraction::FT = FT(1),
+    cld_fraction::FT = FT(1)
     ;
     # ts_LCL::Union{Nothing, TD.ThermodynamicState} = nothing,
 )  where {FT}
@@ -49,7 +50,7 @@ function noneq_moisture_sources(param_set::APS,
     q_vap_sat_liq = TD.q_vap_saturation_generic(thermo_params, T, ρ, TD.Liquid())
     q_vap_sat_ice = TD.q_vap_saturation_generic(thermo_params, T, ρ, TD.Ice())
 
-    return noneq_moisture_sources(param_set, noneq_sources_type, moisture_sources_limiter, area, ρ, p, T, Δt, ts, w, q_vap_sat_liq, q_vap_sat_ice, dqvdt, dTdt, τ_liq, τ_ice, frac_supersat_liq, frac_supersat)
+    return noneq_moisture_sources(param_set, noneq_sources_type, moisture_sources_limiter, area, ρ, p, T, Δt, ts, w, q_vap_sat_liq, q_vap_sat_ice, dqvdt, dTdt, τ_liq, τ_ice, liq_fraction, ice_fraction, cld_fraction)
 end
 
 # -------------------------------------------------------------------------------------------------------------------------- #
@@ -72,8 +73,9 @@ function noneq_moisture_sources(
     dTdt::FT,
     τ_liq::FT = FT(NaN),
     τ_ice::FT = FT(NaN),
-    frac_supersat_liq::FT = FT(1),
-    frac_supersat::FT = FT(1)
+    liq_fraction::FT = FT(1),
+    ice_fraction::FT = FT(1),
+    cld_fraction::FT = FT(1)
     ;
     # ts_LCL::Union{Nothing, TD.ThermodynamicState} = nothing,
 )  where {FT}
@@ -94,7 +96,7 @@ function noneq_moisture_sources(
 
         S_ql = CMNe.conv_q_vap_to_q_liq_ice(microphys_params, liq_type, q_eq, q)
         S_qi = CMNe.conv_q_vap_to_q_liq_ice(microphys_params, ice_type, q_eq, q)
-        S_ql, S_qi = calculate_timestep_limited_sources(moisture_sources_limiter, param_set, area, ρ, FT(0), FT(0), FT(0), FT(0), FT(0), q_vap, dqvdt, dTdt, q, q_eq, Δt, ts, S_ql, S_qi; frac_supersat_liq=frac_supersat_liq, frac_supersat=frac_supersat)
+        S_ql, S_qi = calculate_timestep_limited_sources(moisture_sources_limiter, param_set, area, ρ, FT(0), FT(0), FT(0), FT(0), FT(0), q_vap, dqvdt, dTdt, q, q_eq, Δt, ts, S_ql, S_qi; liq_fraction=liq_fraction, ice_fraction=ice_fraction, cld_fraction=cld_fraction)
         ql_tendency += S_ql
         qi_tendency += S_qi
     end
@@ -119,8 +121,9 @@ function noneq_moisture_sources(
     dTdt::FT,
     τ_liq::FT,
     τ_ice::FT,
-    frac_supersat_liq::FT = FT(1),
-    frac_supersat::FT = FT(1)
+    liq_fraction::FT = FT(1),
+    ice_fraction::FT = FT(1),
+    cld_fraction::FT = FT(1)
     ;
     # ts_LCL::Union{Nothing, TD.ThermodynamicState} = nothing,
 ) where {FT}
@@ -143,7 +146,7 @@ function noneq_moisture_sources(
             q_vap_sat_liq,
             q_vap_sat_ice,
         ) # all 3 are vapor amounts
-        S_ql, S_qi = calculate_timestep_limited_sources(moisture_sources_limiter, param_set, area, ρ, p, T, w, τ_liq, τ_ice, q_vap, dqvdt, dTdt, q, q_eq, Δt, ts; frac_supersat_liq=frac_supersat_liq, frac_supersat=frac_supersat)
+        S_ql, S_qi = calculate_timestep_limited_sources(moisture_sources_limiter, param_set, area, ρ, p, T, w, τ_liq, τ_ice, q_vap, dqvdt, dTdt, q, q_eq, Δt, ts; liq_fraction=liq_fraction, ice_fraction=ice_fraction, cld_fraction=cld_fraction)
         ql_tendency += S_ql
         qi_tendency += S_qi
     end

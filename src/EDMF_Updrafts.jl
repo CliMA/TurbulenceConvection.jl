@@ -71,7 +71,10 @@ function updraft_microphysics!(
                 # ========================================== #
                 #  compute nonequilibrium moisture tendencies
                 # ========================================== #
-                mph_neq = noneq_moisture_sources(param_set, nonequilibrium_moisture_scheme, moisture_sources_limiter, aux_up[i].area[k], ρ_c[k], aux_up[i].p[k], aux_up[i].T[k], Δt + ε, aux_up[i].ts[k], w[k],  aux_up[i].q_vap_sat_liq[k], aux_up[i].q_vap_sat_ice[k], aux_tc.dqvdt[k], aux_tc.dTdt[k], aux_up[i].τ_liq[k], aux_up[i].τ_ice[k]) # ts_LCL = nothing) # we currently don't store dqvdt for the updraft...
+                cld_frac_up = (aux_up[i].q_liq[k] > zero(FT) || aux_up[i].q_ice[k] > zero(FT)) ?  one(FT) : zero(FT) # updrafts are assumed 100% cloudy if they have condensate
+                liq_frac_up = aux_up[i].q_liq[k] > zero(FT) ? one(FT) : zero(FT)
+                ice_frac_up = aux_up[i].q_ice[k] > zero(FT) ? one(FT) : zero(FT)
+                mph_neq = noneq_moisture_sources(param_set, nonequilibrium_moisture_scheme, moisture_sources_limiter, aux_up[i].area[k], ρ_c[k], aux_up[i].p[k], aux_up[i].T[k], Δt + ε, aux_up[i].ts[k], w[k],  aux_up[i].q_vap_sat_liq[k], aux_up[i].q_vap_sat_ice[k], aux_tc.dqvdt[k], aux_tc.dTdt[k], aux_up[i].τ_liq[k], aux_up[i].τ_ice[k], liq_frac_up, ice_frac_up, cld_frac_up) # ts_LCL = nothing) # we currently don't store dqvdt for the updraft...
 
                 if reweight_processes_for_grid
                     mph_neq = reweight_noneq_moisture_sources_for_grid(k, grid, param_set, thermo_params, aux_up[i], aux_up_f[i], mph_neq, nonequilibrium_moisture_scheme, moisture_sources_limiter, Δt, ρ_c, p_c, w, aux_tc.dqvdt, aux_tc.dTdt; reweight_extrema_only = reweight_extrema_only)

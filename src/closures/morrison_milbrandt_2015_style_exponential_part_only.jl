@@ -115,7 +115,30 @@ end
 
 # ==================================================================================================================================================================================================================================================================================== #
 
+"""
+    We implement SGS partitioning of liq and ice to impact WBF.
+    
+    If in WBF region:
+        τ_liq if allowed to span the whole area feels the entire WBF
+        Otherwise, the interaction surface is much smaller:
+            The WBF process is reduced by being confined to a small area (assuming well-mixed ice)
+            This is because there's less ice to take up the vapor given off by the liquid, so the liquid evaporates slower in the long run.
 
+            This changes the trajectory for the semianalytic steady-state form, but we can't really account for that easily...
+                For one, the starting timescale is the same in bulk, the divergence only happens later via slowed ice growth...
+
+        We assume for simplicity that we are liq is fast and we are limited by ice uptake (this is implicit in MM2015 by the WBF term being (q_sl-q_si)/(Γ_i*τ_i))
+            Thus, our true answer should be reduced by losing some of that WBF term... but we dont have a way to do that separately from q_i...
+
+        We approximate this by reducing τ_liq to slow its evaporation?
+
+        Idk we basically have two subdomains, one with liq and one without...
+
+"""
+function adapt_τ_and_area_to_SGS(τ_liq::FT, f_liq_sat::FT, q_liq_sat::FT, q_liq_unsat::FT) where {FT}
+    τ = f_liq_sat * τ_liq * q_liq_sat + (1 - f_liq_sat) * τ_liq * q_liq_unsat # this is a weighted average of the τ_liq for the saturated and unsaturated parts of the grid cell, weighted by the fraction of the grid cell that is saturated
+    return τ, τ_liq # return both the adapted τ and the original τ_liq
+end
 
 
 
@@ -386,8 +409,8 @@ const SΔt_qi_func_no_WBF_EPA = SΔt_qi_func_no_WBF_exponential_part_only
 
 
 """ Both species - default is WBF on ice, but can call the other way with appropriate replacements"""
-function S_func_exponential_part_only(A_c::FT, τ::FT, τ_ice::FT, δ_0::FT, Δt::FT, Γ::FT, q_sl::FT, q_si::FT) where {FT}
-    S = S_func_no_WBF_exponential_part_only( A_c, τ, τ_ice, δ_0, Δt, Γ) + (q_sl - q_si) / (τ_ice * Γ) #  # QICON Eqn C7 # if τ_ice is Inf this works fine,  no issues...
+function S_func_exponential_part_only(A_c::FT, τ::FT, τ_ice::FT, δ_0::FT, Δt::FT, Γ::FT, q_sl::FT, q_si::FT, CF_mp::FT = one(FT)) where {FT}
+    S = S_func_no_WBF_exponential_part_only( A_c, τ, τ_ice, δ_0, Δt, Γ) + ((q_sl - q_si) / (τ_ice * Γ)) * CF_mp #  # QICON Eqn C7 # if τ_ice is Inf this works fine,  no issues...
     # @error("I think this line is bad bc if you're passing in δ_0 and operating on WBF sign can flip")
     # return (sign(S) == sign(δ_0)) ? S : FT(0) # probably is a small floating point problem -- just return 0. Honestly we should probably have done this for all large τ, τ_c from the beginning... Now that we have exact/prognostic δ tracking instead of backing out, maybe we should do it for small δ too... edge cases are killing us
     return S
@@ -398,8 +421,8 @@ const S_qi_func_exponential_part_only = S_func_exponential_part_only
 const S_qi_func_EPA = S_qi_func_exponential_part_only
 
 """ Both species - default is WBF on ice, but can call the other way with appropriate replacements"""
-function SΔt_func_exponential_part_only(A_c::FT, τ::FT, τ_ice::FT, δ_0::FT, Δt::FT, Γ::FT, q_sl::FT, q_si::FT) where {FT}
-    SΔt = SΔt_func_no_WBF_exponential_part_only( A_c, τ, τ_ice, δ_0, Δt, Γ) + (q_sl - q_si) * Δt / (τ_ice * Γ) #  # QICON Eqn C7 # if τ_ice is Inf this works fine,  no issues...
+function SΔt_func_exponential_part_only(A_c::FT, τ::FT, τ_ice::FT, δ_0::FT, Δt::FT, Γ::FT, q_sl::FT, q_si::FT, CF_mp::FT = one(FT)) where {FT}
+    SΔt = SΔt_func_no_WBF_exponential_part_only( A_c, τ, τ_ice, δ_0, Δt, Γ) + ((q_sl - q_si) * Δt / (τ_ice * Γ)) * CF_mp #  # QICON Eqn C7 # if τ_ice is Inf this works fine,  no issues...
     # @error("I think this line is bad bc if you're passing in δ_0 and operating on WBF sign can flip")
     # return (sign(SΔt) == sign(δ_0)) ? SΔt : FT(0) # probably is a small floating point problem -- just return 0. Honestly we should probably have done this for all large τ, τ_c from the beginning... Now that we have exact/prognostic δ tracking instead of backing out, maybe we should do it for small δ too... edge cases are killing us
     return SΔt
@@ -414,7 +437,7 @@ get_t_out_of_q_no_WBF_EPA(δ_0::FT, A_c::FT, τ::FT, τ_c::FT, q_c::FT, Γ::FT, 
 const get_t_out_of_q_liq_EPA = get_t_out_of_q_no_WBF_EPA
 const get_t_out_of_q_ice_no_WBF_EPA = get_t_out_of_q_no_WBF_EPA
 
-get_t_out_of_q_WBF_EPA(δ_0::FT, A_c::FT, τ::FT, τ_c::FT, q_ice::FT, Γ::FT, q_sl::FT, q_si::FT, exit_if_fail::Bool = true) where {FT} = get_t_out_of_q_WBF(δ_0, A_c, τ, τ_c, q_ice, Γ, q_sl, q_si, exit_if_fail) # easier to use this than rewrite, just fill in Γ = 1
+get_t_out_of_q_WBF_EPA(δ_0::FT, A_c::FT, τ::FT, τ_c::FT, q_ice::FT, Γ::FT, q_sl::FT, q_si::FT, exit_if_fail::Bool = true, CF_mp::FT = one(FT)) where {FT} = get_t_out_of_q_WBF(δ_0, A_c, τ, τ_c, q_ice, Γ, q_sl, q_si, exit_if_fail, CF_mp) # easier to use this than rewrite, just fill in Γ = 1
 const get_t_out_of_q_ice_EPA = get_t_out_of_q_WBF_EPA
 
 # Deprecated for now, I don't think you can actually reach the exact equilibrium point in q_new_exponential_part_only bc we're ignoring external forcings...
@@ -720,7 +743,8 @@ function morrison_milbrandt_2015_style_exponential_part_only(
     param_set::APS, area::FT, ρ::FT, p::FT, T::FT, w::FT, τ_liq::FT, τ_ice::FT, δ_0::FT, δ_0i::FT, q::TD.PhasePartition, q_eq::TD.PhasePartition, Δt::FT, ts::TD.ThermodynamicState;
     opts::MM2015EPAOpts{FT} = MM2015EPAOpts{FT}(),
     )::Tuple{FT,FT} where {FT}
-    (; return_mixing_ratio, depth, dqvdt, dTdt, fallback_to_standard_supersaturation_limiter, time_tolerance) = opts
+    (; return_mixing_ratio, depth, dqvdt, dTdt, fallback_to_standard_supersaturation_limiter, time_tolerance, liq_fraction, ice_fraction, cld_fraction) = opts
+    CF_mp = min(liq_fraction, ice_fraction)
     
     if depth ≥ 10
         @error "Failed on inputs area = $area; ρ = $ρ; p = $p; T = $T; w = $w; τ_liq = $τ_liq; τ_ice = $τ_ice; δ_0 = $δ_0; δ_0i = $δ_0i; q = $q; q_eq = $q_eq; Δt = $Δt; ts = $ts; dTdt = $dTdt; dqvdt = $dqvdt;"
@@ -739,7 +763,7 @@ function morrison_milbrandt_2015_style_exponential_part_only(
     # Both are growing..., no explicit need for WBF right
     # A_c = A_c_func_EPA(τ_ice, Γ_l, q_sl, q_si, g, w, c_p, e_sl, L_i, dqsl_dT, dqvdt, dTdt, p, ρ) # Eq C4
     # A_c_no_WBF = A_c_func_no_WBF_EPA(q_sl, g, w, c_p, e_sl, dqsl_dT, dqvdt, dTdt, p, ρ)  # for clamping and fallback
-    (; A_c, A_c_no_WBF) = A_c_func_with_and_without_WBF(τ_ice, Γ_l, q_sl, q_si, g, w, c_p, e_sl, L_i, dqsl_dT, dqvdt, dTdt, p, ρ) # Eq C4
+    (; A_c, A_c_no_WBF) = A_c_func_with_and_without_WBF(τ_ice, Γ_l, q_sl, q_si, g, w, c_p, e_sl, L_i, dqsl_dT, dqvdt, dTdt, p, ρ, CF_mp) # Eq C4
     
     τ = τ_func_EPA(τ_liq, τ_ice, L_i, c_p, dqsl_dT, Γ_i)
 
@@ -764,7 +788,7 @@ function morrison_milbrandt_2015_style_exponential_part_only(
     if min_t < Δt
         # @debug "will hit liq sat before timestep is over... will transition to wbf at t = $(t_hit_liq_sat)..."
         S_ql = S_ql_func_EPA( A_c, τ, τ_liq, δ_0, min_t, Γ_l) # This includes the wbf part though...
-        S_qi = S_qi_func_EPA( A_c, τ, τ_ice, δ_0, min_t, Γ_i, q_sl, q_si) #
+        S_qi = S_qi_func_EPA( A_c, τ, τ_ice, δ_0, min_t, Γ_i, q_sl, q_si, CF_mp) #
 
         if isinf((S_ql+S_qi)*min_t) # scale down just to hit WBF. This can happen when the timescale is too short to calculate. This will crash the model when you go to calculate new_q for example
             liq_frac = τ/τ_liq
@@ -790,7 +814,7 @@ function morrison_milbrandt_2015_style_exponential_part_only(
     else
         # @debug "nothing of note through end of timestep..."
         S_ql = S_ql_func_EPA( A_c, τ, τ_liq, δ_0, Δt, Γ_l)
-        S_qi = S_qi_func_EPA( A_c, τ, τ_ice, δ_0, Δt, Γ_i, q_sl, q_si)
+        S_qi = S_qi_func_EPA( A_c, τ, τ_ice, δ_0, Δt, Γ_i, q_sl, q_si, CF_mp)
         # @debug "Before clamp: S_ql = $S_ql; S_qi = $S_qi; A_c = $A_c; τ = $τ; τ_liq = $τ_liq; τ_ice = $τ_ice; δ_0 = $δ_0; δ_0i = $δ_0i; q_sl = $q_sl; q_si = $q_si; q_liq = $q_liq; q_ice = $q_ice; Δt = $Δt; dqvdt = $dqvdt; dTdt = $dTdt; Γ_l = $Γ_l; Γ_i = $Γ_i; dqsl_dT = $dqsl_dT; dqsi_dT = $dqsi_dT;"
         S_ql, S_qi = clamp_S(S_ql, S_qi, regime, δ_0, δ_0i, q_liq, q_ice, Δt, A_c_no_WBF)
         # @debug "After clamp: S_ql = $S_ql; S_qi = $S_qi;"
@@ -812,7 +836,8 @@ function morrison_milbrandt_2015_style_exponential_part_only(
     param_set::APS, area::FT, ρ::FT, p::FT, T::FT, w::FT, τ_liq::FT, τ_ice::FT, δ_0::FT, δ_0i::FT, q::TD.PhasePartition, q_eq::TD.PhasePartition, Δt::FT, ts::TD.ThermodynamicState;
     opts::MM2015EPAOpts{FT} = MM2015EPAOpts{FT}(),
     )::Tuple{FT,FT} where {FT}
-    (; return_mixing_ratio, depth, dqvdt, dTdt, fallback_to_standard_supersaturation_limiter, time_tolerance) = opts
+    (; return_mixing_ratio, depth, dqvdt, dTdt, fallback_to_standard_supersaturation_limiter, time_tolerance, liq_fraction, ice_fraction, cld_fraction) = opts
+    CF_mp = min(liq_fraction, ice_fraction)
 
     if depth ≥ 10
         @error "Failed on inputs area = $area; ρ = $ρ; p = $p; T = $T; w = $w; τ_liq = $τ_liq; τ_ice = $τ_ice; δ_0 = $δ_0; δ_0i = $δ_0i; q = $q; q_eq = $q_eq; Δt = $Δt; ts = $ts; dTdt = $dTdt; dqvdt = $dqvdt;"
@@ -889,7 +914,8 @@ function morrison_milbrandt_2015_style_exponential_part_only(
     param_set::APS, area::FT, ρ::FT, p::FT, T::FT, w::FT, τ_liq::FT, τ_ice::FT, δ_0::FT, δ_0i::FT, q::TD.PhasePartition, q_eq::TD.PhasePartition, Δt::FT, ts::TD.ThermodynamicState;
     opts::MM2015EPAOpts{FT} = MM2015EPAOpts{FT}(),
     )::Tuple{FT,FT} where {FT}
-    (; return_mixing_ratio, depth, dqvdt, dTdt, fallback_to_standard_supersaturation_limiter, time_tolerance) = opts
+    (; return_mixing_ratio, depth, dqvdt, dTdt, fallback_to_standard_supersaturation_limiter, time_tolerance, liq_fraction, ice_fraction, cld_fraction) = opts
+    CF_mp = min(liq_fraction, ice_fraction)
 
     if depth ≥ 10
         @error "Failed on inputs area = $area; ρ = $ρ; p = $p; T = $T; w = $w; τ_liq = $τ_liq; τ_ice = $τ_ice; δ_0 = $δ_0; δ_0i = $δ_0i; q = $q; q_eq = $q_eq; Δt = $Δt; ts = $ts; dTdt = $dTdt; dqvdt = $dqvdt;"
@@ -905,7 +931,7 @@ function morrison_milbrandt_2015_style_exponential_part_only(
     # One is growing, one is shrinking...
     # A_c = A_c_func_EPA(τ_ice, Γ_l, q_sl, q_si, g, w, c_p, e_sl, L_i, dqsl_dT, dqvdt, dTdt, p, ρ) # Eq C4
     # A_c_no_WBF = A_c_func_no_WBF_EPA(q_sl, g, w, c_p, e_sl, dqsl_dT, dqvdt, dTdt, p, ρ)  # for clamping and fallback
-    (; A_c, A_c_no_WBF) = A_c_func_with_and_without_WBF(τ_ice, Γ_l, q_sl, q_si, g, w, c_p, e_sl, L_i, dqsl_dT, dqvdt, dTdt, p, ρ) # Eq C4
+    (; A_c, A_c_no_WBF) = A_c_func_with_and_without_WBF(τ_ice, Γ_l, q_sl, q_si, g, w, c_p, e_sl, L_i, dqsl_dT, dqvdt, dTdt, p, ρ, CF_mp) # Eq C4
 
     τ = τ_func_EPA(τ_liq, τ_ice, L_i, c_p, dqsl_dT, Γ_i)
 
@@ -957,7 +983,7 @@ function morrison_milbrandt_2015_style_exponential_part_only(
         if i_min_t == 1
             # @debug "liq will run out first before timestep is over... will transition at t = $(min_t) to just ice growth"
             S_ql = -q_liq / min_t
-            S_qi = S_qi_func_EPA( A_c, τ, τ_ice, δ_0, min_t, Γ_i, q_sl, q_si)  # however much happens in that time, rescaled to the timestep [ if this underflows, then what? ]
+            S_qi = S_qi_func_EPA( A_c, τ, τ_ice, δ_0, min_t, Γ_i, q_sl, q_si, CF_mp)  # however much happens in that time, rescaled to the timestep [ if this underflows, then what? ]
             Δt_left = Δt - min_t
 
 
@@ -983,7 +1009,7 @@ function morrison_milbrandt_2015_style_exponential_part_only(
         elseif i_min_t == 2 # if you hit liq sat
             # @debug "liq will hit sat first before timestep is over... will transition at t = $(min_t) to Supersaturated"
             S_ql = S_ql_func_EPA( A_c, τ, τ_liq, δ_0, min_t, Γ_l) # however much happens in that time, rescaled to the timestep [ if this underflows, then what? ]
-            S_qi = S_qi_func_EPA( A_c, τ, τ_ice, δ_0, min_t, Γ_i, q_sl, q_si)  # however much happens in that time, rescaled to the timestep [ if this underflows, then what? ]
+            S_qi = S_qi_func_EPA( A_c, τ, τ_ice, δ_0, min_t, Γ_i, q_sl, q_si, CF_mp)  # however much happens in that time, rescaled to the timestep [ if this underflows, then what? ]
             Δt_left = Δt - min_t
 
             # @debug "S_ql = $S_ql; S_qi = $S_qi; min_t = $min_t; dqvdt = $dqvdt; dTdt = $dTdt; dqsl_dT = $dqsl_dT; dqsi_dT = $dqsi_dT; δ_0 = $δ_0; δ_0i = $δ_0i; q_liq = $q_liq; q_ice = $q_ice;"
@@ -1008,7 +1034,7 @@ function morrison_milbrandt_2015_style_exponential_part_only(
         else # i_min_t == 3 # if you hit ice sat
             # @debug "ice will hit sat first before timestep is over... will transition at t = $(min_t) to Subsaturated"
             S_ql = S_ql_func_EPA( A_c, τ, τ_liq, δ_0, min_t, Γ_l) # however much happens in that time, rescaled to the timestep [ if this underflows, then what? ]
-            S_qi = S_qi_func_EPA( A_c, τ, τ_ice, δ_0, min_t, Γ_i, q_sl, q_si)  # however much happens in that time, rescaled to the timestep [ if this underflows, then what? ]
+            S_qi = S_qi_func_EPA( A_c, τ, τ_ice, δ_0, min_t, Γ_i, q_sl, q_si, CF_mp)  # however much happens in that time, rescaled to the timestep [ if this underflows, then what? ]
             Δt_left = Δt - min_t
 
             S_ql = clamp_S_ql(S_ql, regime, δ_0, q_liq, q_ice, min_t, A_c_no_WBF) # clamp S_ql to the timestep, so that it doesn't exceed the amount of liq that can shrink in that time
@@ -1027,7 +1053,7 @@ function morrison_milbrandt_2015_style_exponential_part_only(
     else
         # @debug "nothing of note through end of timestep..."
         S_ql = S_ql_func_EPA( A_c, τ, τ_liq, δ_0, Δt, Γ_l)
-        S_qi = S_qi_func_EPA( A_c, τ, τ_ice, δ_0, Δt, Γ_i, q_sl, q_si)
+        S_qi = S_qi_func_EPA( A_c, τ, τ_ice, δ_0, Δt, Γ_i, q_sl, q_si, CF_mp)
         # @debug "S_ql = $S_ql; S_qi = $S_qi; Δt = $Δt; (q_liq +  S_ql * Δt) = $(q_liq + S_ql * Δt); (q_ice +  S_qi * Δt) = $(q_ice + S_qi * Δt); δ_0 = $δ_0; δ_0i = $δ_0i; q_liq = $q_liq; q_ice = $q_ice; dqvdt = $dqvdt"
         S_ql, S_qi = clamp_S(S_ql, S_qi, regime, δ_0, δ_0i, q_liq, q_ice, Δt, A_c_no_WBF) # clamp S_ql and S_qi to the timestep, so that it doesn't exceed the amount of liq/ice that can shrink/grow in that time
         # @debug "q_ice = $q_ice; S_qi = $S_qi; Δt = $Δt; (q_ice +  S_qi * Δt) = $(q_ice + S_qi * Δt);"
@@ -1049,7 +1075,8 @@ function morrison_milbrandt_2015_style_exponential_part_only(
     param_set::APS, area::FT, ρ::FT, p::FT, T::FT, w::FT, τ_liq::FT, τ_ice::FT, δ_0::FT, δ_0i::FT, q::TD.PhasePartition, q_eq::TD.PhasePartition, Δt::FT, ts::TD.ThermodynamicState;
     opts::MM2015EPAOpts{FT} = MM2015EPAOpts{FT}(),
     )::Tuple{FT,FT} where {FT}
-    (; return_mixing_ratio, depth, dqvdt, dTdt, fallback_to_standard_supersaturation_limiter, time_tolerance) = opts
+    (; return_mixing_ratio, depth, dqvdt, dTdt, fallback_to_standard_supersaturation_limiter, time_tolerance, liq_fraction, ice_fraction, cld_fraction) = opts
+    CF_mp = min(liq_fraction, ice_fraction)
 
     if depth ≥ 10
         @error "Failed on inputs area = $area; ρ = $ρ; p = $p; T = $T; w = $w; τ_liq = $τ_liq; τ_ice = $τ_ice; δ_0 = $δ_0; δ_0i = $δ_0i; q = $q; q_eq = $q_eq; Δt = $Δt; ts = $ts; dTdt = $dTdt; dqvdt = $dqvdt;"
@@ -1156,7 +1183,8 @@ function morrison_milbrandt_2015_style_exponential_part_only(
     param_set::APS, area::FT, ρ::FT, p::FT, T::FT, w::FT, τ_liq::FT, τ_ice::FT, δ_0::FT, δ_0i::FT, q::TD.PhasePartition, q_eq::TD.PhasePartition, Δt::FT, ts::TD.ThermodynamicState;
     opts::MM2015EPAOpts{FT} = MM2015EPAOpts{FT}(), # if time is shorter than the tolerance, we do a StandardSupersaturation step first, since we can't guarantee success w/ the lambert W methods...
     )::Tuple{FT,FT} where {FT} 
-    (; return_mixing_ratio, depth, dqvdt, dTdt, fallback_to_standard_supersaturation_limiter, time_tolerance) = opts
+    (; return_mixing_ratio, depth, dqvdt, dTdt, fallback_to_standard_supersaturation_limiter, time_tolerance, liq_fraction, ice_fraction, cld_fraction) = opts
+    CF_mp = min(liq_fraction, ice_fraction)
 
     if depth ≥ 10
         @error "Failed on inputs area = $area; ρ = $ρ; p = $p; T = $T; w = $w; τ_liq = $τ_liq; τ_ice = $τ_ice; δ_0 = $δ_0; δ_0i = $δ_0i; q = $q; q_eq = $q_eq; Δt = $Δt; ts = $ts; dTdt = $dTdt; dqvdt = $dqvdt;"
@@ -1168,7 +1196,7 @@ function morrison_milbrandt_2015_style_exponential_part_only(
    
     # A_c = A_c_func_EPA(τ_ice, Γ_l, q_sl, q_si, g, w, c_p, e_sl, L_i, dqsl_dT, dqvdt, dTdt, p, ρ) # Eq C4
     # A_c_no_WBF = A_c_func_no_WBF_EPA(q_sl, g, w, c_p, e_sl, dqsl_dT, dqvdt, dTdt, p, ρ)  # for clamping and fallback
-    (; A_c, A_c_no_WBF) = A_c_func_with_and_without_WBF(τ_ice, Γ_l, q_sl, q_si, g, w, c_p, e_sl, L_i, dqsl_dT, dqvdt, dTdt, p, ρ) # Eq C4
+    (; A_c, A_c_no_WBF) = A_c_func_with_and_without_WBF(τ_ice, Γ_l, q_sl, q_si, g, w, c_p, e_sl, L_i, dqsl_dT, dqvdt, dTdt, p, ρ, CF_mp) # Eq C4
 
     τ = τ_func_EPA(τ_liq, τ_ice, L_i, c_p, dqsl_dT, Γ_i)
     
@@ -1234,7 +1262,7 @@ function morrison_milbrandt_2015_style_exponential_part_only(
         elseif i_min_t == 2 # hit liq sat, cross into subsaturated
             # @debug "Hit liq sat, crossing into subsaturated regime..."
             S_ql = S_ql_func_EPA( A_c, τ, τ_liq, δ_0, min_t, Γ_l)
-            S_qi = S_qi_func_EPA( A_c, τ, τ_ice, δ_0, min_t, Γ_i, q_sl, q_si)
+            S_qi = S_qi_func_EPA( A_c, τ, τ_ice, δ_0, min_t, Γ_i, q_sl, q_si, CF_mp)
             # S_ql = clamp_S_ql(S_ql, regime, δ_0, q_liq, q_ice, Δt, A_c_no_WBF) 
             # S_qi = clamp_S_qi(S_qi, regime, δ_0i, q_liq, q_ice, Δt, A_c_no_WBF) 
             S_ql, S_qi = clamp_S(S_ql, S_qi, regime, δ_0, δ_0i, q_liq, q_ice, Δt, A_c_no_WBF) # clamp S_ql and S_qi to the timestep, so that it doesn't exceed the amount of liq/ice that can shrink/grow in that time
@@ -1255,7 +1283,7 @@ function morrison_milbrandt_2015_style_exponential_part_only(
         else # i_min_t == 3, hit ice sat, go to Supersaturated but above freezing.
             # @debug "Hit ice saturation, transitioning to Supersaturated but above freezing regime"
             S_ql = S_ql_func_EPA( A_c, τ, τ_liq, δ_0, min_t, Γ_l)
-            S_qi = S_qi_func_EPA( A_c, τ, τ_ice, δ_0, min_t, Γ_i, q_sl, q_si) # However much happens in this amount of time
+            S_qi = S_qi_func_EPA( A_c, τ, τ_ice, δ_0, min_t, Γ_i, q_sl, q_si, CF_mp) # However much happens in this amount of time
             S_ql, S_qi = clamp_S(S_ql, S_qi, regime, δ_0, δ_0i, q_liq, q_ice, Δt, A_c_no_WBF)
 
             # if iszero(dqvdt + dTdt + w)
@@ -1275,7 +1303,7 @@ function morrison_milbrandt_2015_style_exponential_part_only(
     else
         # @debug "nothing of note through end of timestep..."
         S_ql = S_ql_func_EPA( A_c, τ, τ_liq, δ_0, Δt, Γ_l)
-        S_qi = S_qi_func_EPA( A_c, τ, τ_ice, δ_0, Δt, Γ_i, q_sl, q_si) # Eq C2
+        S_qi = S_qi_func_EPA( A_c, τ, τ_ice, δ_0, Δt, Γ_i, q_sl, q_si, CF_mp) # Eq C2
         # @debug "Before clamping: S_ql = $S_ql; S_qi = $S_qi; δ_0 = $δ_0; δ_0i = $δ_0i; q_liq = $q_liq; q_ice = $q_ice; Δt = $Δt; dqvdt = $dqvdt; dTdt = $dTdt"
         S_ql, S_qi = clamp_S(S_ql, S_qi, regime, δ_0, δ_0i, q_liq, q_ice, Δt, A_c_no_WBF)
         # @debug "After clamping: S_ql = $S_ql; S_qi = $S_qi;"
@@ -1298,7 +1326,8 @@ function morrison_milbrandt_2015_style_exponential_part_only(
     param_set::APS, area::FT, ρ::FT, p::FT, T::FT, w::FT, τ_liq::FT, τ_ice::FT, δ_0::FT, δ_0i::FT, q::TD.PhasePartition, q_eq::TD.PhasePartition, Δt::FT, ts::TD.ThermodynamicState;
     opts::MM2015EPAOpts{FT} = MM2015EPAOpts{FT}(), # if time is shorter than the tolerance, we do a StandardSupersaturation step first, since we can't guarantee success w/ the lambert W methods...
     )::Tuple{FT,FT} where {FT} 
-    (; return_mixing_ratio, depth, dqvdt, dTdt, fallback_to_standard_supersaturation_limiter, time_tolerance) = opts
+    (; return_mixing_ratio, depth, dqvdt, dTdt, fallback_to_standard_supersaturation_limiter, time_tolerance, liq_fraction, ice_fraction, cld_fraction) = opts
+    CF_mp = min(liq_fraction, ice_fraction)
 
     if depth ≥ 10
         @error "Failed on inputs area = $area; ρ = $ρ; p = $p; T = $T; w = $w; τ_liq = $τ_liq; τ_ice = $τ_ice; δ_0 = $δ_0; δ_0i = $δ_0i; q = $q; q_eq = $q_eq; Δt = $Δt; ts = $ts; dTdt = $dTdt; dqvdt = $dqvdt;"
@@ -1402,7 +1431,8 @@ function morrison_milbrandt_2015_style_exponential_part_only(
     param_set::APS, area::FT, ρ::FT, p::FT, T::FT, w::FT, τ_liq::FT, τ_ice::FT, δ_0::FT, δ_0i::FT, q::TD.PhasePartition, q_eq::TD.PhasePartition, Δt::FT, ts::TD.ThermodynamicState;
     opts::MM2015EPAOpts{FT} = MM2015EPAOpts{FT}(),
     )::Tuple{FT,FT} where {FT}
-    (; return_mixing_ratio, depth, dqvdt, dTdt, fallback_to_standard_supersaturation_limiter, time_tolerance) = opts
+    (; return_mixing_ratio, depth, dqvdt, dTdt, fallback_to_standard_supersaturation_limiter, time_tolerance, liq_fraction, ice_fraction, cld_fraction) = opts
+    CF_mp = min(liq_fraction, ice_fraction)
 
 
     if depth ≥ 10
@@ -1418,7 +1448,7 @@ function morrison_milbrandt_2015_style_exponential_part_only(
 
     # A_c = A_c_func_EPA(τ_ice, Γ_l, q_sl, q_si, g, w, c_p, e_sl, L_i, dqsl_dT, dqvdt, dTdt, p, ρ) # Eq C4
     # A_c_no_WBF = A_c_func_no_WBF_EPA(q_sl, g, w, c_p, e_sl, dqsl_dT, dqvdt, dTdt, p, ρ)  # for clamping and fallback
-    (; A_c, A_c_no_WBF) = A_c_func_with_and_without_WBF(τ_ice, Γ_l, q_sl, q_si, g, w, c_p, e_sl, L_i, dqsl_dT, dqvdt, dTdt, p, ρ) # Eq C4
+    (; A_c, A_c_no_WBF) = A_c_func_with_and_without_WBF(τ_ice, Γ_l, q_sl, q_si, g, w, c_p, e_sl, L_i, dqsl_dT, dqvdt, dTdt, p, ρ, CF_mp) # Eq C4
 
     τ = τ_func_EPA(τ_liq, τ_ice, L_i, c_p, dqsl_dT, Γ_i)
 
@@ -1478,7 +1508,7 @@ function morrison_milbrandt_2015_style_exponential_part_only(
         if i_min_t == 1
             # @debug "liq will run out first before timestep is over... will transition at t = $(min_t) to just ice decay if ice is present"
             S_ql = -q_liq / min_t
-            S_qi = S_qi_func_EPA( A_c, τ, τ_ice, δ_0, min_t, Γ_i, q_sl, q_si)
+            S_qi = S_qi_func_EPA( A_c, τ, τ_ice, δ_0, min_t, Γ_i, q_sl, q_si, CF_mp)
             Δt_left = Δt - min_t
 
             S_ql, S_qi = clamp_S(S_ql, S_qi, regime, δ_0, δ_0i, q_liq, q_ice, min_t, A_c_no_WBF)
@@ -1520,7 +1550,7 @@ function morrison_milbrandt_2015_style_exponential_part_only(
         else # i_min_t == 3
             # @debug "will hit sat before timestep is over... will transition to wbf at t = $(min_t) if liq is present otherwise we're stuck..."
             S_ql = S_ql_func_EPA( A_c, τ, τ_liq, δ_0, min_t, Γ_l)
-            S_qi = S_qi_func_EPA( A_c, τ, τ_ice, δ_0, min_t, Γ_i, q_sl, q_si)
+            S_qi = S_qi_func_EPA( A_c, τ, τ_ice, δ_0, min_t, Γ_i, q_sl, q_si, CF_mp)
             Δt_left = Δt - min_t
 
             S_ql, S_qi = clamp_S(S_ql, S_qi, regime, δ_0, δ_0i, q_liq, q_ice, min_t, A_c_no_WBF)
@@ -1544,7 +1574,7 @@ function morrison_milbrandt_2015_style_exponential_part_only(
     else
         # @debug "nothing of note through end of timestep..."
         S_ql = S_ql_func_EPA( A_c, τ, τ_liq, δ_0, Δt, Γ_l)
-        S_qi = S_qi_func_EPA( A_c, τ, τ_ice, δ_0, Δt, Γ_i, q_sl, q_si)
+        S_qi = S_qi_func_EPA( A_c, τ, τ_ice, δ_0, Δt, Γ_i, q_sl, q_si, CF_mp)
         S_ql, S_qi = clamp_S(S_ql, S_qi, regime, δ_0, δ_0i, q_liq, q_ice, Δt, A_c_no_WBF)
         return return_mixing_ratio ? (S_ql, S_qi) : (S_mixing_ratio_to_shum(S_ql, q.tot), S_mixing_ratio_to_shum(S_qi, q.tot))
     end
@@ -1566,7 +1596,8 @@ function morrison_milbrandt_2015_style_exponential_part_only(
     param_set::APS, area::FT, ρ::FT, p::FT, T::FT, w::FT, τ_liq::FT, τ_ice::FT, δ_0::FT, δ_0i::FT, q::TD.PhasePartition, q_eq::TD.PhasePartition, Δt::FT, ts::TD.ThermodynamicState;
     opts::MM2015EPAOpts{FT} = MM2015EPAOpts{FT}(),
     )::Tuple{FT,FT} where {FT}
-    (; return_mixing_ratio, depth, dqvdt, dTdt, fallback_to_standard_supersaturation_limiter, time_tolerance) = opts
+    (; return_mixing_ratio, depth, dqvdt, dTdt, fallback_to_standard_supersaturation_limiter, time_tolerance, liq_fraction, ice_fraction, cld_fraction) = opts
+    CF_mp = min(liq_fraction, ice_fraction)
 
     if depth ≥ 10
         @error "Failed on inputs area = $area; ρ = $ρ; p = $p; T = $T; w = $w; τ_liq = $τ_liq; τ_ice = $τ_ice; δ_0 = $δ_0; δ_0i = $δ_0i; q = $q; q_eq = $q_eq; Δt = $Δt; ts = $ts; dTdt = $dTdt; dqvdt = $dqvdt;"
@@ -1688,7 +1719,8 @@ function morrison_milbrandt_2015_style_exponential_part_only(
     param_set::APS, area::FT, ρ::FT, p::FT, T::FT, w::FT, τ_liq::FT, τ_ice::FT, δ_0::FT, δ_0i::FT, q::TD.PhasePartition, q_eq::TD.PhasePartition, Δt::FT, ts::TD.ThermodynamicState;
     opts::MM2015EPAOpts{FT} = MM2015EPAOpts{FT}(),
     )::Tuple{FT,FT} where {FT}
-    (; return_mixing_ratio, depth, dqvdt, dTdt, fallback_to_standard_supersaturation_limiter, time_tolerance) = opts
+    (; return_mixing_ratio, depth, dqvdt, dTdt, fallback_to_standard_supersaturation_limiter, time_tolerance, liq_fraction, ice_fraction, cld_fraction) = opts
+    CF_mp = min(liq_fraction, ice_fraction)
 
     if depth ≥ 10
         @error "Failed on inputs area = $area; ρ = $ρ; p = $p; T = $T; w = $w; τ_liq = $τ_liq; τ_ice = $τ_ice; δ_0 = $δ_0; δ_0i = $δ_0i; q = $q; q_eq = $q_eq; Δt = $Δt; ts = $ts; dTdt = $dTdt; dqvdt = $dqvdt;"
@@ -1812,7 +1844,8 @@ function morrison_milbrandt_2015_style_exponential_part_only(
     param_set::APS, area::FT, ρ::FT, p::FT, T::FT, w::FT, τ_liq::FT, τ_ice::FT, δ_0::FT, δ_0i::FT, q::TD.PhasePartition, q_eq::TD.PhasePartition, Δt::FT, ts::TD.ThermodynamicState;
     opts::MM2015EPAOpts{FT} = MM2015EPAOpts{FT}(),
     )::Tuple{FT,FT} where {FT}
-    (; return_mixing_ratio, depth, dqvdt, dTdt, fallback_to_standard_supersaturation_limiter, time_tolerance) = opts
+    (; return_mixing_ratio, depth, dqvdt, dTdt, fallback_to_standard_supersaturation_limiter, time_tolerance, liq_fraction, ice_fraction, cld_fraction) = opts
+    CF_mp = min(liq_fraction, ice_fraction)
 
 
 

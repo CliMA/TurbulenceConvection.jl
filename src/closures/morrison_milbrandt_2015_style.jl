@@ -150,9 +150,9 @@ A_c_func(τ_ice::FT, Γ_l::FT, q_sl::FT, q_si::FT, g::FT, w::FT, c_p::FT, e_sl::
     A_c_func_no_WBF(q_sl, g, w, c_p, e_sl, dqsl_dT, dqvdt, dTdt, p, ρ) - (q_sl - q_si) / (τ_ice * Γ_l) * (1 + (L_i / c_p) * dqsl_dT) # Eq C4
 
 # save some cpu cycles
-function A_c_func_with_and_without_WBF(τ_ice::FT, Γ_l::FT, q_sl::FT, q_si::FT, g::FT, w::FT, c_p::FT, e_sl::FT, L_i::FT, dqsl_dT::FT, dqvdt::FT, dTdt::FT, p::FT, ρ::FT) where {FT}
+function A_c_func_with_and_without_WBF(τ_ice::FT, Γ_l::FT, q_sl::FT, q_si::FT, g::FT, w::FT, c_p::FT, e_sl::FT, L_i::FT, dqsl_dT::FT, dqvdt::FT, dTdt::FT, p::FT, ρ::FT, CF_mp::FT = one(FT)) where {FT}
     A_c_no_WBF = A_c_func_no_WBF(q_sl, g, w, c_p, e_sl, dqsl_dT, dqvdt, dTdt, p, ρ)
-    A_c = A_c_no_WBF - (q_sl - q_si) / (τ_ice * Γ_l) * (1 + (L_i / c_p) * dqsl_dT) # save some computation
+    A_c = A_c_no_WBF - (q_sl - q_si) / (τ_ice * Γ_l) * (1 + (L_i / c_p) * dqsl_dT) * CF_mp # save some computation
     return (; A_c, A_c_no_WBF) # return both so we can use the no WBF version if we want to, e.g. for large timesteps where it doesn't matter as much
 end
 
@@ -337,9 +337,9 @@ end
 const S_ql_func = S_func_no_WBF
 const S_ql_func_indiv = S_func_indiv_no_WBF
 
-S_func_WBF(A_c::FT, τ::FT, τ_ice::FT, δ_0::FT, Δt::FT, Γ_i::FT, q_sl::FT, q_si::FT) where {FT} =
+S_func_WBF(A_c::FT, τ::FT, τ_ice::FT, δ_0::FT, Δt::FT, Γ_i::FT, q_sl::FT, q_si::FT, CF_mp::FT = one(FT)) where {FT} =
     S_func_no_WBF( A_c, τ, τ_ice, δ_0, Δt, Γ_i)  + 
-    (q_sl - q_si) / (τ_ice * Γ_i) #  # QICON Eqn C7 # if τ_ice is infinite, this works just fine
+    ((q_sl - q_si) / (τ_ice * Γ_i)) * CF_mp #  # QICON Eqn C7 # if τ_ice is infinite, this works just fine
 
 const S_qi_func = S_func_WBF
 const S_qi_func_indiv = S_func_indiv_no_WBF
@@ -452,8 +452,8 @@ e.g.
     where B = (q_sl - q_si) / (τ_ice * Γ_i) * (τ_ice * Γ_i / τ) 
 """
 # function get_t_out_of_q_WBF(δ_0::FT, A_c::Union{FT, FT2}, τ::FT, τ_c::FT, q_ice::FT, Γ::FT, q_sl::FT, q_si::FT, exit_if_fail::Bool=true) where {FT, FT2}
-function get_t_out_of_q_WBF(δ_0::FT, A_c::FT2, τ::FT, τ_c::FT, q_ice::FT, Γ::FT, q_sl::FT, q_si::FT, exit_if_fail::Bool=true) where {FT, FT2}
-    B = (q_sl - q_si) /  τ # (q_sl - q_si) / (τ_c * Γ) * (τ_c * Γ / τ) #
+function get_t_out_of_q_WBF(δ_0::FT, A_c::FT2, τ::FT, τ_c::FT, q_ice::FT, Γ::FT, q_sl::FT, q_si::FT, exit_if_fail::Bool=true, CF_mp::FT = one(FT)) where {FT, FT2}
+    B = ((q_sl - q_si) /  τ) * CF_mp # (q_sl - q_si) / (τ_c * Γ) * (τ_c * Γ / τ) #
     c = -q_ice * (τ_c * Γ / τ) # Rearrange QICON * Δt = -q_ice to get: A_c * Δt + (δ_0 - A_c * τ) * (1 - exp(-Δt / τ)) + B * Δt = c and solve for Δt
 
 
@@ -549,8 +549,8 @@ const get_t_out_of_q_ice = get_t_out_of_q_WBF
     There's second order effects we can't get precisely in dqsl/dT,  dqsi/dT as well as the fact that the equations are writen from liquid perspectiv,e favoring dqsl/dT.
 """
 
-function get_t_T_hit_T_freeze(δ_0::FT, A_c::FT, τ::FT, τ_liq::FT, τ_ice::FT, T::FT, Γ_l::FT, Γ_i::FT, q_sl::FT, q_si::FT, g::FT, w::FT, c_p::FT, L_l::FT, L_i::FT, T_freeze::FT, dTdt::FT, exit_if_fail::Bool=true) where {FT}
-    B = (q_sl - q_si) / τ * L_i/c_p + -g*w/c_p + dTdt
+function get_t_T_hit_T_freeze(δ_0::FT, A_c::FT, τ::FT, τ_liq::FT, τ_ice::FT, T::FT, Γ_l::FT, Γ_i::FT, q_sl::FT, q_si::FT, g::FT, w::FT, c_p::FT, L_l::FT, L_i::FT, T_freeze::FT, dTdt::FT, exit_if_fail::Bool=true, CF_mp::FT = one(FT)) where {FT}
+    B = ((q_sl - q_si) / τ * L_i/c_p) * CF_mp + -g*w/c_p + dTdt
     K = τ / (τ_liq * Γ_l) * L_l/c_p + τ / (τ_ice * Γ_i) * L_i/c_p
     c = T_freeze - T 
 
@@ -886,14 +886,14 @@ end
 # from ice perspective
 function get_t_var_hit_value_helper(::Val{:δip}, param_set::APS, δ_0::FT, A_c::FT, τ::FT, τ_liq::FT, τ_ice::FT, Γ_l::FT, Γ_i::FT, q_sl::FT, q_si::FT, T::FT, p::FT, q::TD.PhasePartition, q_eq::TD.PhasePartition, q_liq::FT, q_ice::FT, Δt::FT, ts::TD.ThermodynamicState, w::FT; dqvdt::FT = FT(0), dTdt::FT = FT(0), error_on_q_neg::Bool = true, use_WBF::Bool = true) where {FT}
     S_qi = S_func_no_WBF( A_c, τ, τ_ice, δ_0, Δt, Γ_i)
-    S_ql = use_WBF ? S_func_WBF( A_c, τ, τ_liq, δ_0, Δt, Γ_l, q_si, q_sl) : S_func_no_WBF( A_c, τ, τ_liq, δ_0 - (q_si - q_sl), Δt, Γ_l)
+    S_ql = use_WBF ? S_func_WBF( A_c, τ, τ_liq, δ_0, Δt, Γ_l, q_si, q_sl, CF_mp) : S_func_no_WBF( A_c, τ, τ_liq, δ_0 - (q_si - q_sl), Δt, Γ_l)
     (; new_q_vap, new_q_si) = morrison_milbrandt_2015_get_new_status_helper(param_set, p, q, q_eq, q_liq, q_ice, S_ql, S_qi, Δt, dqvdt, ts, w; error_on_q_neg = error_on_q_neg)
     return new_q_vap - new_q_si
 end
 
 function get_t_var_hit_value_helper_return_outputs(::Val{:δip}, param_set::APS, δ_0::FT, A_c::FT, τ::FT, τ_liq::FT, τ_ice::FT, Γ_l::FT, Γ_i::FT, q_sl::FT, q_si::FT, T::FT, p::FT, q::TD.PhasePartition, q_eq::TD.PhasePartition, q_liq::FT, q_ice::FT, Δt::FT, ts::TD.ThermodynamicState, w::FT; dqvdt::FT = FT(0), dTdt::FT = FT(0), error_on_q_neg::Bool = true, use_WBF::Bool = true) where {FT}
     S_qi = S_func_no_WBF( A_c, τ, τ_ice, δ_0, Δt, Γ_i)
-    S_ql = use_WBF ? S_func_WBF( A_c, τ, τ_liq, δ_0, Δt, Γ_l, q_si, q_sl) : S_func_no_WBF( A_c, τ, τ_liq, δ_0 - (q_si - q_sl), Δt, Γ_l)
+    S_ql = use_WBF ? S_func_WBF( A_c, τ, τ_liq, δ_0, Δt, Γ_l, q_si, q_sl, CF_mp) : S_func_no_WBF( A_c, τ, τ_liq, δ_0 - (q_si - q_sl), Δt, Γ_l)
     (; new_q_vap, new_q_si, new_T) = morrison_milbrandt_2015_get_new_status_helper(param_set, p, q, q_eq, q_liq, q_ice, S_ql, S_qi, Δt, dqvdt, ts, w; error_on_q_neg = error_on_q_neg)
     return new_q_vap - new_q_si, S_ql, S_qi, new_T
 end
@@ -918,7 +918,7 @@ end
 
 # from ice perspective, so (δ_0l, δ_0) are equivalent to liquid perspective (δ_0, δ_0i)
 function get_t_var_hit_value_helper(::Val{:δipl}, param_set::APS, δ_0::FT, A_c::FT, τ::FT, τ_liq::FT, τ_ice::FT, Γ_l::FT, Γ_i::FT, q_sl::FT, q_si::FT, T::FT, p::FT, q::TD.PhasePartition, q_eq::TD.PhasePartition, q_liq::FT, q_ice::FT, Δt::FT, ts::TD.ThermodynamicState, w::FT; dqvdt::FT = FT(0), dTdt::FT = FT(0), error_on_q_neg::Bool = true, use_WBF::Bool = true) where {FT}
-    S_ql = use_WBF ? S_func_WBF( A_c, τ, τ_liq, δ_0, Δt, Γ_l, q_si, q_sl) : S_func_no_WBF( A_c, τ, τ_liq, δ_0 - (q_si - q_sl), Δt, Γ_l) # swap l for i
+    S_ql = use_WBF ? S_func_WBF( A_c, τ, τ_liq, δ_0, Δt, Γ_l, q_si, q_sl, CF_mp) : S_func_no_WBF( A_c, τ, τ_liq, δ_0 - (q_si - q_sl), Δt, Γ_l) # swap l for i
     S_qi = S_func_no_WBF( A_c, τ, τ_ice, δ_0, Δt, Γ_i)
     (; new_q_vap, new_q_sl) = morrison_milbrandt_2015_get_new_status_helper(param_set, p, q, q_eq, q_liq, q_ice, S_ql, S_qi, Δt, dqvdt, ts, w; error_on_q_neg = error_on_q_neg)
     return new_q_vap - new_q_sl
@@ -926,7 +926,7 @@ end
 
 # from ice perspective, so (δ_0l, δ_0) are equivalent to liquid perspective (δ_0, δ_0i)
 function get_t_var_hit_value_helper_return_outputs(::Val{:δipl}, param_set::APS, δ_0::FT, A_c::FT, τ::FT, τ_liq::FT, τ_ice::FT, Γ_l::FT, Γ_i::FT, q_sl::FT, q_si::FT, T::FT, p::FT, q::TD.PhasePartition, q_eq::TD.PhasePartition, q_liq::FT, q_ice::FT, Δt::FT, ts::TD.ThermodynamicState, w::FT; dqvdt::FT = FT(0), dTdt::FT = FT(0), error_on_q_neg::Bool = true, use_WBF::Bool = true) where {FT}
-    S_ql = use_WBF ? S_func_WBF( A_c, τ, τ_liq, δ_0, Δt, Γ_l, q_si, q_sl) : S_func_no_WBF( A_c, τ, τ_liq, δ_0 - (q_si - q_sl), Δt, Γ_l) # swap l for i
+    S_ql = use_WBF ? S_func_WBF( A_c, τ, τ_liq, δ_0, Δt, Γ_l, q_si, q_sl, CF_mp) : S_func_no_WBF( A_c, τ, τ_liq, δ_0 - (q_si - q_sl), Δt, Γ_l) # swap l for i
     S_qi = S_func_no_WBF( A_c, τ, τ_ice, δ_0, Δt, Γ_i)
     (; new_q_vap, new_q_sl, new_T) = morrison_milbrandt_2015_get_new_status_helper(param_set, p, q, q_eq, q_liq, q_ice, S_ql, S_qi, Δt, dqvdt, ts, w; error_on_q_neg = error_on_q_neg)
     return new_q_vap - new_q_sl, S_ql, S_qi, new_T
@@ -1093,7 +1093,8 @@ function morrison_milbrandt_2015_style(
     ts::TD.ThermodynamicState;
     opts::MM2015Opts{FT} = MM2015Opts{FT}(),
 )::Tuple{FT, FT} where {FT}
-    (; use_fix, return_mixing_ratio, max_depth, depth, δ_0_shum, δ_0i_shum, fallback_to_standard_supersaturation_limiter, emit_warnings, time_tolerance) = opts
+    (; use_fix, return_mixing_ratio, max_depth, depth, δ_0_shum, δ_0i_shum, fallback_to_standard_supersaturation_limiter, emit_warnings, time_tolerance, liq_fraction, ice_fraction, cld_fraction) = opts
+    CF_mp = min(liq_fraction, ice_fraction)
 
     if area > 0
 
@@ -1258,7 +1259,8 @@ function morrison_milbrandt_2015_style(
     param_set::APS, area::FT, ρ::FT, p::FT, T::FT, w::FT, τ_liq::FT, τ_ice::FT, q_vap::FT, q::TD.PhasePartition, q_eq::TD.PhasePartition, Δt::FT, ts::TD.ThermodynamicState;
     opts::MM2015Opts{FT} = MM2015Opts{FT}(),
     )::Tuple{FT, FT} where {FT}
-    (; use_fix, return_mixing_ratio, max_depth, depth, δ_0_shum, δ_0i_shum, dqvdt, dTdt, fallback_to_standard_supersaturation_limiter) = opts
+    (; use_fix, return_mixing_ratio, max_depth, depth, δ_0_shum, δ_0i_shum, dqvdt, dTdt, fallback_to_standard_supersaturation_limiter, liq_fraction, ice_fraction, cld_fraction) = opts
+    CF_mp = min(liq_fraction, ice_fraction)
 
     if depth == max_depth
         # @debug "Max depth reached, returning exponential part only fallback (no thermo adjustments)"
@@ -1410,7 +1412,8 @@ function morrison_milbrandt_2015_style(
     param_set::APS, area::FT, ρ::FT, p::FT, T::FT, w::FT, τ_liq::FT, τ_ice::FT, q_vap::FT, q::TD.PhasePartition, q_eq::TD.PhasePartition, Δt::FT, ts::TD.ThermodynamicState;
     opts::MM2015Opts{FT} = MM2015Opts{FT}(),
     )::Tuple{FT, FT} where {FT}
-    (; use_fix, return_mixing_ratio, max_depth, depth, δ_0_shum, δ_0i_shum, dqvdt, dTdt, fallback_to_standard_supersaturation_limiter) = opts
+    (; use_fix, return_mixing_ratio, max_depth, depth, δ_0_shum, δ_0i_shum, dqvdt, dTdt, fallback_to_standard_supersaturation_limiter, liq_fraction, ice_fraction, cld_fraction) = opts
+    CF_mp = min(liq_fraction, ice_fraction)
 
     # @debug "Calling Supersaturated{$(q.liq > FT(0)), $(q.ice > FT(0)), false}"
 
@@ -1525,7 +1528,8 @@ function morrison_milbrandt_2015_style(
     param_set::APS, area::FT, ρ::FT, p::FT, T::FT, w::FT, τ_liq::FT, τ_ice::FT, q_vap::FT, q::TD.PhasePartition, q_eq::TD.PhasePartition, Δt::FT, ts::TD.ThermodynamicState;
     opts::MM2015Opts{FT} = MM2015Opts{FT}(),
     )::Tuple{FT, FT} where {FT}
-    (; use_fix, return_mixing_ratio, max_depth, depth, δ_0_shum, δ_0i_shum, dqvdt, dTdt, fallback_to_standard_supersaturation_limiter) = opts
+    (; use_fix, return_mixing_ratio, max_depth, depth, δ_0_shum, δ_0i_shum, dqvdt, dTdt, fallback_to_standard_supersaturation_limiter, liq_fraction, ice_fraction, cld_fraction) = opts
+    CF_mp = min(liq_fraction, ice_fraction)
 
     # @debug "Calling WBF{true, $(q.ice > FT(0)), true}"
 
@@ -1590,7 +1594,7 @@ function morrison_milbrandt_2015_style(
     end
 
     max_t = Δt
-    (t_out_of_liq, t_out_of_liq_valid) = use_ice_perspective ? get_t_out_of_q_WBF(δ_0, A_c, τ, τ_liq, q_liq, Γ_l, q_si, q_sl) : get_t_out_of_q_liq(δ_0, A_c, τ, τ_liq, q_liq, Γ_l) # don't calculate if we're starting with no liquid, calculation would fail
+    (t_out_of_liq, t_out_of_liq_valid) = use_ice_perspective ? get_t_out_of_q_WBF(δ_0, A_c, τ, τ_liq, q_liq, Γ_l, q_si, q_sl, true, CF_mp) : get_t_out_of_q_liq(δ_0, A_c, τ, τ_liq, q_liq, Γ_l) # don't calculate if we're starting with no liquid, calculation would fail
     (t_out_of_ice, t_out_of_ice_valid) = use_ice_perspective ? get_t_out_of_q_ice_no_WBF(δ_0, A_c, τ, τ_ice, q_ice, Γ_i) : get_t_out_of_q_ice(δ_0, A_c, τ, τ_ice, q_ice, Γ_i, q_sl, q_si) # don't calculate if we're starting with no ice, calculation would fail
     
     if !t_out_of_liq_valid
@@ -1678,7 +1682,7 @@ function morrison_milbrandt_2015_style(
             return return_mixing_ratio ? (S_ql + S_ql_addit, S_qi + S_qi_addit) : (S_mixing_ratio_to_shum(S_ql + S_ql_addit, q.tot), S_mixing_ratio_to_shum(S_qi + S_qi_addit, q.tot))
         elseif i_min_t == 2  # out of ice
             # S_ql = S_ql_func( A_c, τ, τ_liq, δ_0, min_t, Γ_l)
-            S_ql = use_ice_perspective ? S_func_WBF(A_c, τ, τ_liq, δ_0, min_t, Γ_l, q_si, q_sl) : S_ql_func( A_c, τ, τ_liq, δ_0, min_t, Γ_l) # however much happens in that time, rescaled to the timestep
+            S_ql = use_ice_perspective ? S_func_WBF(A_c, τ, τ_liq, δ_0, min_t, Γ_l, q_si, q_sl, CF_mp) : S_ql_func( A_c, τ, τ_liq, δ_0, min_t, Γ_l) # however much happens in that time, rescaled to the timestep
             S_qi = -q_ice / min_t
 
             S_ql, S_qi = S_above_floor(S_ql, S_qi, q_liq, q_ice, min_t) # if t was too small for t_out_of_q for example, this makes sure we put a floor on S_ql and S_qi
@@ -1698,7 +1702,7 @@ function morrison_milbrandt_2015_style(
             return return_mixing_ratio ? (S_ql + S_ql_addit, S_qi + S_qi_addit) : (S_mixing_ratio_to_shum(S_ql + S_ql_addit, q.tot), S_mixing_ratio_to_shum(S_qi + S_qi_addit, q.tot))
 
         else # i_min_t == 3,4,5 
-            S_ql = use_ice_perspective ? S_func_WBF(A_c, τ, τ_liq, δ_0, min_t, Γ_l, q_si, q_sl) : S_ql_func( A_c, τ, τ_liq, δ_0, min_t, Γ_l) # however much happens in that time, rescaled to the timestep
+            S_ql = use_ice_perspective ? S_func_WBF(A_c, τ, τ_liq, δ_0, min_t, Γ_l, q_si, q_sl, CF_mp) : S_ql_func( A_c, τ, τ_liq, δ_0, min_t, Γ_l) # however much happens in that time, rescaled to the timestep
             S_qi = use_ice_perspective ? S_func_no_WBF(A_c, τ, τ_ice, δ_0, min_t, Γ_i) : S_qi_func( A_c, τ, τ_ice, δ_0, min_t, Γ_i, q_sl, q_si)
 
             S_ql, S_qi = S_above_floor(S_ql, S_qi, q_liq, q_ice, min_t) # if t was too small for t_out_of_q for example, this makes sure we put a floor on S_ql and S_qi
@@ -1759,7 +1763,8 @@ function morrison_milbrandt_2015_style(
     param_set::APS, area::FT, ρ::FT, p::FT, T::FT, w::FT, τ_liq::FT, τ_ice::FT, q_vap::FT, q::TD.PhasePartition, q_eq::TD.PhasePartition, Δt::FT, ts::TD.ThermodynamicState;
     opts::MM2015Opts{FT} = MM2015Opts{FT}(),
     )::Tuple{FT, FT} where {FT}
-    (; use_fix, return_mixing_ratio, max_depth, depth, δ_0_shum, δ_0i_shum, dqvdt, dTdt, fallback_to_standard_supersaturation_limiter) = opts
+    (; use_fix, return_mixing_ratio, max_depth, depth, δ_0_shum, δ_0i_shum, dqvdt, dTdt, fallback_to_standard_supersaturation_limiter, liq_fraction, ice_fraction, cld_fraction) = opts
+    CF_mp = min(liq_fraction, ice_fraction)
 
     # @debug "Calling WBF{true, false, false}"
     # although we'd be moving towards liquid sat, with outside forcing could still be either, so still need to choose perspectives
@@ -1831,7 +1836,7 @@ function morrison_milbrandt_2015_style(
 
 
     max_t = Δt
-    (t_out_of_liq, t_out_of_liq_valid) = use_ice_perspective ? get_t_out_of_q_WBF(δ_0, A_c, τ, τ_liq, q_liq, Γ_l, q_si, q_sl) : get_t_out_of_q_liq(δ_0, A_c, τ, τ_liq, q_liq, Γ_l) # don't calculate if we're starting with no liquid, calculation would fail
+    (t_out_of_liq, t_out_of_liq_valid) = use_ice_perspective ? get_t_out_of_q_WBF(δ_0, A_c, τ, τ_liq, q_liq, Γ_l, q_si, q_sl, true, CF_mp) : get_t_out_of_q_liq(δ_0, A_c, τ, τ_liq, q_liq, Γ_l) # don't calculate if we're starting with no liquid, calculation would fail
 
     if !t_out_of_liq_valid
         if fallback_to_standard_supersaturation_limiter
@@ -1857,7 +1862,7 @@ function morrison_milbrandt_2015_style(
             δ_0o_big = big(δ_0i)
         end
 
-        t_out_of_liq = use_ice_perspective ? FT(get_t_out_of_q_WBF(δ_0_big, A_c_big, τ_big, big(τ_liq), big(q_liq), big(Γ_l), big(q_si), big(q_sl), false).sol) : FT(get_t_out_of_q_liq(δ_0_big, A_c_big, τ_big, big(τ_liq), big(q_liq), big(Γ_l), false).sol) # don't calculate if we're starting with no liquid, calculation would fail
+        t_out_of_liq = use_ice_perspective ? FT(get_t_out_of_q_WBF(δ_0_big, A_c_big, τ_big, big(τ_liq), big(q_liq), big(Γ_l), big(q_si), big(q_sl), false, big(CF_mp)).sol) : FT(get_t_out_of_q_liq(δ_0_big, A_c_big, τ_big, big(τ_liq), big(q_liq), big(Γ_l), false).sol) # don't calculate if we're starting with no liquid, calculation would fail
         # @debug "After upgrading to BigFloat, t_out_of_liq = $t_out_of_liq"
     end
 
@@ -1903,7 +1908,7 @@ function morrison_milbrandt_2015_style(
             return return_mixing_ratio ? (S_ql, S_qi) : (S_mixing_ratio_to_shum(S_ql, q.tot), S_mixing_ratio_to_shum(S_qi, q.tot))
         else # i_min_t == 2,3,4
 
-            S_ql = use_ice_perspective ? S_func_WBF(A_c, τ, τ_liq, δ_0, min_t, Γ_l, q_si, q_sl) : S_ql_func( A_c, τ, τ_liq, δ_0, min_t, Γ_l) # however much happens in that time, rescaled to the timestep
+            S_ql = use_ice_perspective ? S_func_WBF(A_c, τ, τ_liq, δ_0, min_t, Γ_l, q_si, q_sl, CF_mp) : S_ql_func( A_c, τ, τ_liq, δ_0, min_t, Γ_l) # however much happens in that time, rescaled to the timestep
             S_qi = FT(0)
 
             if (S_qi > FT(0))
@@ -1981,7 +1986,8 @@ function morrison_milbrandt_2015_style(
     param_set::APS, area::FT, ρ::FT, p::FT, T::FT, w::FT, τ_liq::FT, τ_ice::FT, q_vap::FT, q::TD.PhasePartition, q_eq::TD.PhasePartition, Δt::FT, ts::TD.ThermodynamicState;
     opts::MM2015Opts{FT} = MM2015Opts{FT}(),
     )::Tuple{FT, FT} where {FT}
-    (; use_fix, return_mixing_ratio, max_depth, depth, δ_0_shum, δ_0i_shum, dqvdt, dTdt, fallback_to_standard_supersaturation_limiter) = opts
+    (; use_fix, return_mixing_ratio, max_depth, depth, δ_0_shum, δ_0i_shum, dqvdt, dTdt, fallback_to_standard_supersaturation_limiter, liq_fraction, ice_fraction, cld_fraction) = opts
+    CF_mp = min(liq_fraction, ice_fraction)
 
     # @debug "Calling WBF{true, true, false}"
 
@@ -2053,7 +2059,7 @@ function morrison_milbrandt_2015_style(
 
 
     max_t = Δt
-    (t_out_of_liq, t_out_of_liq_valid) = use_ice_perspective ? get_t_out_of_q_WBF(δ_0, A_c, τ, τ_liq, q_liq, Γ_l, q_si, q_sl) : get_t_out_of_q_liq(δ_0, A_c, τ, τ_liq, q_liq, Γ_l) # don't calculate if we're starting with no liquid, calculation would fail
+    (t_out_of_liq, t_out_of_liq_valid) = use_ice_perspective ? get_t_out_of_q_WBF(δ_0, A_c, τ, τ_liq, q_liq, Γ_l, q_si, q_sl, true, CF_mp) : get_t_out_of_q_liq(δ_0, A_c, τ, τ_liq, q_liq, Γ_l) # don't calculate if we're starting with no liquid, calculation would fail
     (t_out_of_ice, t_out_of_ice_valid) = use_ice_perspective ? get_t_out_of_q_ice_no_WBF(δ_0, A_c, τ, τ_ice, q_ice, Γ_i) : get_t_out_of_q_ice(δ_0, A_c, τ, τ_ice, q_ice, Γ_i, q_sl, q_si) # don't calculate if we're starting with no ice, calculation would fail
 
     if !t_out_of_liq_valid
@@ -2078,7 +2084,7 @@ function morrison_milbrandt_2015_style(
             δ_0o_big = big(δ_0i)
         end
 
-        t_out_of_liq = use_ice_perspective ? FT(get_t_out_of_q_WBF(δ_0_big , A_c_big, τ_big, big(τ_liq), big(q_liq), big(Γ_l), big(q_si), big(q_sl), false).sol) : FT(get_t_out_of_q_liq(δ_0_big , A_c_big, τ_big, big(τ_liq), big(q_liq), big(Γ_l), false).sol)
+        t_out_of_liq = use_ice_perspective ? FT(get_t_out_of_q_WBF(δ_0_big , A_c_big, τ_big, big(τ_liq), big(q_liq), big(Γ_l), big(q_si), big(q_sl), false, big(CF_mp)).sol) : FT(get_t_out_of_q_liq(δ_0_big , A_c_big, τ_big, big(τ_liq), big(q_liq), big(Γ_l), false).sol)
         # @debug "After upgrading to BigFloat, t_out_of_liq = $t_out_of_liq"
     end
     if !t_out_of_ice_valid
@@ -2156,7 +2162,7 @@ function morrison_milbrandt_2015_style(
             S_ql_addit *= Δt_left / Δt # rescale to the remaining time
             return return_mixing_ratio ? (S_ql, S_qi) : (S_mixing_ratio_to_shum(S_ql, q.tot), S_mixing_ratio_to_shum(S_qi, q.tot))
         elseif i_min_t == 2 # out of ice
-            S_ql = use_ice_perspective ? S_func_WBF(A_c, τ, τ_liq, δ_0, min_t, Γ_l, q_si, q_sl) : S_ql_func( A_c, τ, τ_liq, δ_0, min_t, Γ_l) # however much happens in that time, rescaled to the timestep
+            S_ql = use_ice_perspective ? S_func_WBF(A_c, τ, τ_liq, δ_0, min_t, Γ_l, q_si, q_sl, CF_mp) : S_ql_func( A_c, τ, τ_liq, δ_0, min_t, Γ_l) # however much happens in that time, rescaled to the timestep
             S_qi = -q_ice / min_t
 
             S_ql, S_qi = S_above_floor(S_ql, S_qi, q_liq, q_ice, min_t) # if t was too small for t_out_of_q for example, this makes sure we put a floor on S_ql and S_qi
@@ -2179,7 +2185,7 @@ function morrison_milbrandt_2015_style(
             # S_ql = S_ql_func( A_c, τ, τ_liq, δ_0, min_t, Γ_l)
             # S_qi = FT(0)
 
-            S_ql = use_ice_perspective ? S_func_WBF(A_c, τ, τ_liq, δ_0, min_t, Γ_l, q_si, q_sl) : S_ql_func( A_c, τ, τ_liq, δ_0, min_t, Γ_l) # however much happens in that time, rescaled to the timestep
+            S_ql = use_ice_perspective ? S_func_WBF(A_c, τ, τ_liq, δ_0, min_t, Γ_l, q_si, q_sl, CF_mp) : S_ql_func( A_c, τ, τ_liq, δ_0, min_t, Γ_l) # however much happens in that time, rescaled to the timestep
             S_qi = use_ice_perspective ? S_func_no_WBF(A_c, τ, τ_ice, δ_0, min_t, Γ_i) : S_qi_func( A_c, τ, τ_ice, δ_0, min_t, Γ_i, q_sl, q_si)
 
             if (S_qi > FT(0))
@@ -2255,7 +2261,8 @@ function morrison_milbrandt_2015_style(
     param_set::APS, area::FT, ρ::FT, p::FT, T::FT, w::FT, τ_liq::FT, τ_ice::FT, q_vap::FT, q::TD.PhasePartition, q_eq::TD.PhasePartition, Δt::FT, ts::TD.ThermodynamicState;
     opts::MM2015Opts{FT} = MM2015Opts{FT}(),
     )::Tuple{FT, FT} where {FT}
-    (; use_fix, return_mixing_ratio, max_depth, depth, δ_0_shum, δ_0i_shum, dqvdt, dTdt, fallback_to_standard_supersaturation_limiter) = opts
+    (; use_fix, return_mixing_ratio, max_depth, depth, δ_0_shum, δ_0i_shum, dqvdt, dTdt, fallback_to_standard_supersaturation_limiter, liq_fraction, ice_fraction, cld_fraction) = opts
+    CF_mp = min(liq_fraction, ice_fraction)
 
     # @debug "Calling WBF{false, $(q.ice > FT(0)), true}"
 
@@ -2444,7 +2451,8 @@ function morrison_milbrandt_2015_style(
     param_set::APS, area::FT, ρ::FT, p::FT, T::FT, w::FT, τ_liq::FT, τ_ice::FT, q_vap::FT, q::TD.PhasePartition, q_eq::TD.PhasePartition, Δt::FT, ts::TD.ThermodynamicState;
     opts::MM2015Opts{FT} = MM2015Opts{FT}(),
     )::Tuple{FT, FT} where {FT}
-    (; use_fix, return_mixing_ratio, max_depth, depth, δ_0_shum, δ_0i_shum, dqvdt, dTdt, fallback_to_standard_supersaturation_limiter) = opts
+    (; use_fix, return_mixing_ratio, max_depth, depth, δ_0_shum, δ_0i_shum, dqvdt, dTdt, fallback_to_standard_supersaturation_limiter, liq_fraction, ice_fraction, cld_fraction) = opts
+    CF_mp = min(liq_fraction, ice_fraction)
 
     if depth == max_depth
         # @debug "Max depth reached, returning exponential part only fallback (no thermo adjustments)"
@@ -2539,7 +2547,8 @@ function morrison_milbrandt_2015_style(
     param_set::APS, area::FT, ρ::FT, p::FT, T::FT, w::FT, τ_liq::FT, τ_ice::FT, q_vap::FT, q::TD.PhasePartition, q_eq::TD.PhasePartition, Δt::FT, ts::TD.ThermodynamicState;
     opts::MM2015Opts{FT} = MM2015Opts{FT}(),
     )::Tuple{FT, FT} where {FT}
-    (; use_fix, return_mixing_ratio, max_depth, depth, δ_0_shum, δ_0i_shum, dqvdt, dTdt, fallback_to_standard_supersaturation_limiter) = opts
+    (; use_fix, return_mixing_ratio, max_depth, depth, δ_0_shum, δ_0i_shum, dqvdt, dTdt, fallback_to_standard_supersaturation_limiter, liq_fraction, ice_fraction, cld_fraction) = opts
+    CF_mp = min(liq_fraction, ice_fraction)
 
 
     if depth == max_depth
@@ -2582,7 +2591,7 @@ function morrison_milbrandt_2015_style(
     end
 
     max_t = Δt
-    (t_out_of_liq, t_out_of_liq_valid) = use_ice_perspective ? get_t_out_of_q_WBF(δ_0, A_c, τ, τ_liq, q_liq, Γ_l, q_si, q_sl) : get_t_out_of_q_liq(δ_0, A_c, τ, τ_liq, q_liq, Γ_l) # don't calculate if we're starting with no liquid, calculation would fail
+    (t_out_of_liq, t_out_of_liq_valid) = use_ice_perspective ? get_t_out_of_q_WBF(δ_0, A_c, τ, τ_liq, q_liq, Γ_l, q_si, q_sl, true, CF_mp) : get_t_out_of_q_liq(δ_0, A_c, τ, τ_liq, q_liq, Γ_l) # don't calculate if we're starting with no liquid, calculation would fail
     (t_out_of_ice, t_out_of_ice_valid) = use_ice_perspective ? get_t_out_of_q_ice_no_WBF(δ_0, A_c, τ, τ_ice, q_ice, Γ_i) : get_t_out_of_q_ice(δ_0, A_c, τ, τ_ice, q_ice, Γ_i, q_sl, q_si) # don't calculate if we're starting with no ice, calculation would fail   
     
 
@@ -2605,7 +2614,7 @@ function morrison_milbrandt_2015_style(
             δ_0_big = big(δ_0) #
         end
 
-        t_out_of_liq = use_ice_perspective ? FT(get_t_out_of_q_WBF(δ_0_big, A_c_big, τ_big, big(τ_liq), big(q_liq), big(Γ_l), big(q_si), big(q_sl), false).sol) : FT(get_t_out_of_q_liq(δ_0_big, A_c_big, τ_big, big(τ_liq), big(q_liq), big(Γ_l), false).sol) # don't calculate if we're starting with no liquid, calculation would fail
+        t_out_of_liq = use_ice_perspective ? FT(get_t_out_of_q_WBF(δ_0_big, A_c_big, τ_big, big(τ_liq), big(q_liq), big(Γ_l), big(q_si), big(q_sl), false, big(CF_mp)).sol) : FT(get_t_out_of_q_liq(δ_0_big, A_c_big, τ_big, big(τ_liq), big(q_liq), big(Γ_l), false).sol) # don't calculate if we're starting with no liquid, calculation would fail
         # @debug "After upgrading to big, t_out_of_liq = $t_out_of_liq"
     end
     if !t_out_of_ice_valid
@@ -2672,7 +2681,7 @@ function morrison_milbrandt_2015_style(
             S_ql_addit *= Δt_left / Δt # rescale to the remaining time
             return return_mixing_ratio ? (S_ql + S_ql_addit, S_qi + S_qi_addit) : (S_mixing_ratio_to_shum(S_ql + S_ql_addit, q.tot), S_mixing_ratio_to_shum(S_qi + S_qi_addit, q.tot))
         elseif i_min_t == 2 # out of ice
-            S_ql = use_ice_perspective ? S_func_WBF(A_c, τ, τ_liq, δ_0, min_t, Γ_l, q_si, q_sl) : S_ql_func( A_c, τ, τ_liq, δ_0, min_t, Γ_l)
+            S_ql = use_ice_perspective ? S_func_WBF(A_c, τ, τ_liq, δ_0, min_t, Γ_l, q_si, q_sl, CF_mp) : S_ql_func( A_c, τ, τ_liq, δ_0, min_t, Γ_l)
             S_qi = -q_ice / min_t
 
             S_ql, S_qi = S_above_floor(S_ql, S_qi, q_liq, q_ice, min_t) # if t was too small for t_out_of_q for example, this makes sure we put a floor on S_ql and S_qi
@@ -2690,7 +2699,7 @@ function morrison_milbrandt_2015_style(
             S_qi_addit *= Δt_left / Δt # rescale to the remaining time
             return return_mixing_ratio ? (S_ql + S_ql_addit, S_qi + S_qi_addit) : (S_mixing_ratio_to_shum(S_ql + S_ql_addit, q.tot), S_mixing_ratio_to_shum(S_qi + S_qi_addit, q.tot))
         else # i_min_t == 3,4 
-            S_ql = use_ice_perspective ? S_func_WBF(A_c, τ, τ_liq, δ_0, min_t, Γ_l, q_si, q_sl) : S_ql_func( A_c, τ, τ_liq, δ_0, min_t, Γ_l)
+            S_ql = use_ice_perspective ? S_func_WBF(A_c, τ, τ_liq, δ_0, min_t, Γ_l, q_si, q_sl, CF_mp) : S_ql_func( A_c, τ, τ_liq, δ_0, min_t, Γ_l)
             S_qi = use_ice_perspective ? S_func_no_WBF(A_c, τ, τ_ice, δ_0, min_t, Γ_i) : S_qi_func(A_c, τ, τ_ice, δ_0, min_t, Γ_i, q_sl, q_si)
 
             if !BF && (S_qi > FT(0))

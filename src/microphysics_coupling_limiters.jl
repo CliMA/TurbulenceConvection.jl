@@ -100,12 +100,12 @@ This complicates balancing and limiters.
 
 NOTE: We could try to make a version of this that does not cutoff but it would have WBF going off both directions forever... This may not be desirable. Also it's time evolution is dependent on the evolution of q_liq, q_ice, q_vap, so composing with other sources isn't as simple as adding the tendencies together. Just use with caution.
 """
-function calculate_timestep_limited_sources(moisture_sources_limiter::MorrisonMilbrandt2015MoistureSourcesLimiter, param_set::APS, area::FT, ρ::FT, p::FT, T::FT, w::FT, τ_liq::FT, τ_ice::FT, q_vap::FT, dqvdt::FT, dTdt::FT, q::TD.PhasePartition, q_eq::TD.PhasePartition, Δt::FT, ts::TD.ThermodynamicState; frac_supersat_liq::FT = FT(1), frac_supersat::FT = FT(1)) where {FT}
+function calculate_timestep_limited_sources(moisture_sources_limiter::MorrisonMilbrandt2015MoistureSourcesLimiter, param_set::APS, area::FT, ρ::FT, p::FT, T::FT, w::FT, τ_liq::FT, τ_ice::FT, q_vap::FT, dqvdt::FT, dTdt::FT, q::TD.PhasePartition, q_eq::TD.PhasePartition, Δt::FT, ts::TD.ThermodynamicState; liq_fraction::FT = FT(1), ice_fraction::FT = FT(1), cld_fraction::FT = FT(1)) where {FT}
     # this *shouldn't* need limiters the way it's defined but... lol we'll see...
     if iszero(Δt)
         return FT(0), FT(0)
     end
-    S_ql, S_qi = morrison_milbrandt_2015_style(param_set, area, ρ, p, T, w, τ_liq, τ_ice, q_vap, dqvdt, dTdt, q, q_eq, Δt, ts; opts = MM2015Opts{FT}(emit_warnings = false, frac_supersat_liq=frac_supersat_liq, frac_supersat=frac_supersat))
+    S_ql, S_qi = morrison_milbrandt_2015_style(param_set, area, ρ, p, T, w, τ_liq, τ_ice, q_vap, dqvdt, dTdt, q, q_eq, Δt, ts; opts = MM2015Opts{FT}(emit_warnings = false, liq_fraction=liq_fraction, ice_fraction=ice_fraction, cld_fraction=cld_fraction))
 
     # if isnothing(S_ql)  # An underflow fallback, go to :standard
     #     return calculate_timestep_limited_sources(StandardSupersaturationMoistureSourcesLimiter(), param_set, area, ρ, p, T, w, τ_liq, τ_ice, q_vap, q, q_eq, Δt, ts)
@@ -122,7 +122,7 @@ end
 # ========================================================================================================================================================================================================================================================= #
 
 
-function calculate_timestep_limited_sources(moisture_sources_limiter::MorrisonMilbrandt2015ExponentialPartOnlyMoistureSourcesLimiter, param_set::APS, area::FT, ρ::FT, p::FT, T::FT, w::FT, τ_liq::FT, τ_ice::FT, q_vap::FT, dqvdt::FT, dTdt::FT, q::TD.PhasePartition, q_eq::TD.PhasePartition, Δt::FT, ts::TD.ThermodynamicState; frac_supersat_liq::FT = FT(1), frac_supersat::FT = FT(1)) where {FT}
+function calculate_timestep_limited_sources(moisture_sources_limiter::MorrisonMilbrandt2015ExponentialPartOnlyMoistureSourcesLimiter, param_set::APS, area::FT, ρ::FT, p::FT, T::FT, w::FT, τ_liq::FT, τ_ice::FT, q_vap::FT, dqvdt::FT, dTdt::FT, q::TD.PhasePartition, q_eq::TD.PhasePartition, Δt::FT, ts::TD.ThermodynamicState; liq_fraction::FT = FT(1), ice_fraction::FT = FT(1), cld_fraction::FT = FT(1)) where {FT}
     if iszero(Δt)
         return FT(0), FT(0)
     end
@@ -131,7 +131,7 @@ function calculate_timestep_limited_sources(moisture_sources_limiter::MorrisonMi
         return calculate_timestep_limited_sources(StandardSupersaturationMoistureSourcesLimiter(), param_set, area, ρ, p, T, w, τ_liq, τ_ice, dqvdt, dTdt, q_vap, q, q_eq, Δt, ts)
     end
 
-    S_ql, S_qi = morrison_milbrandt_2015_style_exponential_part_only(param_set, area, ρ, p, T, w, τ_liq, τ_ice, q_vap, dqvdt, dTdt, q, q_eq, Δt, ts; opts = MM2015EPAOpts{FT}(emit_warnings = false, fallback_to_standard_supersaturation_limiter = moisture_sources_limiter.fallback_to_standard_supersaturation_limiter, frac_supersat_liq=frac_supersat_liq, frac_supersat=frac_supersat))
+    S_ql, S_qi = morrison_milbrandt_2015_style_exponential_part_only(param_set, area, ρ, p, T, w, τ_liq, τ_ice, q_vap, dqvdt, dTdt, q, q_eq, Δt, ts; opts = MM2015EPAOpts{FT}(emit_warnings = false, fallback_to_standard_supersaturation_limiter = moisture_sources_limiter.fallback_to_standard_supersaturation_limiter, liq_fraction=liq_fraction, ice_fraction=ice_fraction, cld_fraction=cld_fraction))
 
     if isnothing(S_ql)  # An underflow fallback, go to :standard [not implemented yet]
         return calculate_timestep_limited_sources(StandardSupersaturationMoistureSourcesLimiter(), param_set, area, ρ, p, T, w, τ_liq, τ_ice, q_vap, dqvdt, dTdt, q, q_eq, Δt, ts)

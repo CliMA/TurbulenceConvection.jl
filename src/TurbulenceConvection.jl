@@ -86,6 +86,13 @@ end
 # resolve_inf(x::FT; val::FT=FT(NaN)) where {FT} = isinf(x) ? val : x # replace inf with NaN
 
 full_print(x) = show(IOContext(stdout, :limit => false), "text/plain", x) # prints directly to io
+# full_print_str(x) = sprint(io -> show(IOContext(io, :limit => false), "text/plain", x));
+function full_print_str(x)
+    io = IOBuffer();
+    ctx = IOContext(stdout, :limit => false);
+    show(IOContext(io, ctx), "text/plain", x);
+    return String(take!(io));
+end;
 # full_print_inline(x) = sprint(io -> show(IOContext(io, :limit => false), "text/plain", x)) # returns string
 # gpt_full_print_inline(x) = Ref(sprint(io -> show(IOContext(io, :limit => false), "text/plain", x)))
 

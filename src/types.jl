@@ -262,8 +262,9 @@ Base.@kwdef struct MM2015Opts{FT} <: AbstractMM2015Opts{FT}
     fallback_to_standard_supersaturation_limiter::Bool = false
     emit_warnings::Bool = true
     time_tolerance::FT = FT(1e-8)
-    frac_supersat_liq::FT = (δ_0_shum >= FT(0)) ? one(FT) : zero(FT) # default all or nothing
-    frac_supersat::FT = ((δ_0i_shum >= FT(0)) || (δ_0_shum >= FT(0))) ? one(FT) : zero(FT) # default all or nothing    
+    liq_fraction::FT = (δ_0_shum >= FT(0)) ? one(FT) : zero(FT) # default all or nothing assuming sat adjustment
+    ice_fraction::FT = (δ_0i_shum >= FT(0)) ? one(FT) : zero(FT) # default all or nothing assuming sat adjustment   
+    cld_fraction::FT = ((δ_0i_shum >= FT(0)) || (δ_0_shum >= FT(0))) ? one(FT) : zero(FT) # default all or nothing assuming sat adjustment
 end
 
 Base.@kwdef struct MM2015EPAOpts{FT} <: AbstractMM2015Opts{FT}
@@ -276,8 +277,9 @@ Base.@kwdef struct MM2015EPAOpts{FT} <: AbstractMM2015Opts{FT}
     fallback_to_standard_supersaturation_limiter::Bool = false
     emit_warnings::Bool = true
     time_tolerance::FT = FT(1e-8)
-    frac_supersat_liq::FT = one(FT) # default all or nothing
-    frac_supersat::FT = one(FT) # default all or nothing    
+    liq_fraction::FT = one(FT) # default all or nothing assuming sat adjustment
+    ice_fraction::FT = one(FT) # default all or nothing assuming sat adjustment   
+    cld_fraction::FT = one(FT) # default all or nothing assuming sat adjustment    
 end
 
 # # OLD — type-unstable:
