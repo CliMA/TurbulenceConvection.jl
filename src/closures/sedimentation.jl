@@ -299,7 +299,7 @@ function calculate_sedimentation_velocity(
     if velo_scheme == Chen2022Vel
         w = my_terminal_velocity(param_set, rain_type, velo_scheme, ρ, q; Dmax = Dmax, Nt = Nt) # testing [ this version makes you pass in raintype to avoid creating another object] [ rain_type is avilable from a global]
     elseif velo_scheme == Blk1MVel
-        error("velo_scheme $velo_scheme not implemented for liquid_type in current CM1 version. If you want liquid sedimentation, use Chen2022Vel (TODO: turn this into an error at namelist construction)")
+        error("velo_scheme $velo_scheme not implemented for CMT.LiquidType in current CM1 version. If you want liquid sedimentation, use Chen2022Vel (TODO: turn this into an error at namelist construction)")
         # return FT(0.0) # not implemented in CloudMicrophysics.jl 0.14
     end
 

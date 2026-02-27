@@ -3,6 +3,7 @@ function mixing_length(mix_len_params, param_set, ml_model::MinDisspLen{FT}, con
     c_d = mix_len_params.c_d
     smin_ub = mix_len_params.smin_ub
     l_max = mix_len_params.l_max
+    unstable_ref_factor = mix_len_params.unstable_ref_factor
     c_b = mix_len_params.c_b
     g::FT = TCP.grav(param_set)
     molmass_ratio::FT = TCP.molmass_ratio(param_set)
@@ -68,19 +69,19 @@ function mixing_length(mix_len_params, param_set, ml_model::MinDisspLen{FT}, con
 
     # 1. Configuration (Tunable)
     #    ∂b∂z_ref: The stable gradient where we trust the standard mixing length.
-    #    factor:   How much larger mixing is at Neutral (0) vs Stable (∂b∂z_ref).
+    #    unstable_ref_factor:   How much larger mixing is at Neutral (0) vs Stable (∂b∂z_ref).
     ∂b∂z_ref = FT(1e-5)
-    factor   = FT(1.1)
+    # unstable_ref_factor = FT(1.1)
 
     N_eff = if ∂b∂z > ∂b∂z_ref
         sqrt(∂b∂z)
-    elseif FT(0) <= ∂b∂z <= ∂b∂z_ref # At ∂b∂z = 0, N_eff = sqrt(∂b∂z_ref) / factor
+    elseif FT(0) <= ∂b∂z <= ∂b∂z_ref # At ∂b∂z = 0, N_eff = sqrt(∂b∂z_ref) / unstable_ref_factor
         # interpolate
-        sqrt(∂b∂z_ref) * (1 / factor + ∂b∂z / ∂b∂z_ref * (1 - 1 / factor)) # Linearly scales from (1/factor) at 0 up to (1.0) at ∂b∂z_ref
+        sqrt(∂b∂z_ref) * (1 / unstable_ref_factor + ∂b∂z / ∂b∂z_ref * (1 - 1 / unstable_ref_factor)) # Linearly scales from (1/factor) at 0 up to (1.0) at ∂b∂z_ref
     else # ∂b∂z < 0
         # extrapolate
-            # sqrt(∂b∂z_ref) * (1 / factor + ∂b∂z / ∂b∂z_ref * (1 - 1 / factor)) # Linearly scales from (1/factor) at 0 up to (1.0) at ∂b∂z_ref
-        max(sqrt(∂b∂z_ref) * (1 / factor + ∂b∂z / ∂b∂z_ref * (1 - 1 / factor)), eps(FT))
+            # sqrt(∂b∂z_ref) * (1 / factor + ∂b∂z / ∂b∂z_ref * (1 - 1 / unstable_ref_factor)) # Linearly scales from (1/factor) at 0 up to (1.0) at ∂b∂z_ref
+        max(sqrt(∂b∂z_ref) * (1 / unstable_ref_factor + ∂b∂z / ∂b∂z_ref * (1 - 1 / unstable_ref_factor)), eps(FT))
     end
 
 

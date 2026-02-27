@@ -696,6 +696,7 @@ Base.@kwdef struct MixingLengthParams{FT}
     Le::FT # Lewis number
     smin_ub::FT # lower limit for smin function
     l_max::FT
+    unstable_ref_factor::FT # factor by which mixing length is increased in unstable conditions
     #
     # My additions
     c_KQl::FT # coefficient for liquid water effect on mixing length
@@ -1915,6 +1916,7 @@ function EDMFModel(::Type{FT}, namelist, precip_model, rain_formation_model, par
         Le = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "Lewis_number"; default = 1.0),
         smin_ub = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "smin_ub"),
         l_max = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "l_max"; default = 1.0e6),
+        unstable_ref_factor = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "unstable_ref_factor"; default = 1.1), # How much larger mixing is at Neutral (0) vs small stable reference point of (∂b∂z_ref = 1e-5). Prevents sudden jumps to l_max and smooth transition to instability.
         #
         # My additions
         c_KQl = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "c_KQl"; default = 1.0),
