@@ -57,8 +57,13 @@ function partition_condensate_into_sgs_fractions(
     max_boost_factor::FT = FT(1.0),
 ) where {FT}
     # partition assuming all liq into supersaturated fraction, not to exceed max_boost_factor
-    q_supersat = iszero(supersaturated_fraction) ? (max_boost_factor * q) : min(q / supersaturated_fraction, max_boost_factor * q)
-    q_subsat = isone(supersaturated_fraction) ? zero(FT) : (q - (q_supersat * supersaturated_fraction)) / (1 - supersaturated_fraction)
+    if !iszero(q)
+        q_supersat = iszero(supersaturated_fraction) ? zero(FT) : min(q / supersaturated_fraction, max_boost_factor * q)
+        q_subsat = isone(supersaturated_fraction) ? zero(FT) : (q - (q_supersat * supersaturated_fraction)) / (1 - supersaturated_fraction)
+    else
+        q_supersat = zero(FT)
+        q_subsat = zero(FT)
+    end
 
     return (; supersaturated_fraction, q_supersat, q_subsat)
 end
@@ -79,7 +84,7 @@ function partition_condensate_into_sgs_fractions(
     supersaturated_fraction_liq::FT = FT(NaN),
     max_boost_factor::FT = FT(2.0),
 ) where {FT}
-    q = TD.PhasePartition(ts)
+    q = TD.PhasePartition(thermo_params, ts)
     if isnan(supersaturated_fraction_liq)
         T = TD.air_temperature(thermo_params, ts)
         ρ = TD.air_density(thermo_params, ts)
@@ -89,7 +94,7 @@ function partition_condensate_into_sgs_fractions(
         dq_sat_dT_l = TD.∂q_vap_sat_∂T(thermo_params, one(FT), T, q_sat_l)  # Calculate derivative
         supersaturated_fraction_liq = sgs_saturated_fraction(thermo_params, q_vap, q_sat_l, qt_var, h_var, h_qt_cov, dq_sat_dT_l, p)
     end
-    return partition_condensate_into_sgs_fractions(TD.Liquid(), q.liq, supersaturated_fraction_liq; max_boost_factor)
+    return partition_condensate_into_sgs_fractions(q.liq, supersaturated_fraction_liq; max_boost_factor)
 end
 partition_condensate_into_sgs_fractions(::CMT.LiquidType, ql::FT, supersaturated_fraction_liq::FT; max_boost_factor::FT = FT(2.0)) where {FT} = partition_condensate_into_sgs_fractions(ql, supersaturated_fraction_liq; max_boost_factor)
 
@@ -110,7 +115,7 @@ function partition_condensate_into_sgs_fractions(
     supersaturated_fraction_ice::FT = FT(NaN),
     max_boost_factor::FT = FT(1.1),
 ) where {FT}
-    q = TD.PhasePartition(ts)
+    q = TD.PhasePartition(thermo_params, ts)
     if isnan(supersaturated_fraction_ice)
         T = TD.air_temperature(thermo_params, ts)
         ρ = TD.air_density(thermo_params, ts)
@@ -120,7 +125,7 @@ function partition_condensate_into_sgs_fractions(
         dq_sat_dT = TD.∂q_vap_sat_∂T(thermo_params, zero(FT), T, q_sat)  # Calculate derivative
         supersaturated_fraction_ice = sgs_saturated_fraction(thermo_params, q_vap, q_sat, qt_var, h_var, h_qt_cov, dq_sat_dT, p) # pass q_vap here to get supersat fraction (pass q_tot to get cloud fraction (under saturation adjustment to form ql))
     end
-    return partition_condensate_into_sgs_fractions(TD.Ice(), q.ice, supersaturated_fraction_ice; max_boost_factor)
+    return partition_condensate_into_sgs_fractions(q.ice, supersaturated_fraction_ice; max_boost_factor)
 end
 partition_condensate_into_sgs_fractions(::CMT.IceType, qi::FT, supersaturated_fraction_ice::FT; max_boost_factor::FT = FT(1.1)) where {FT} = partition_condensate_into_sgs_fractions(qi, supersaturated_fraction_ice; max_boost_factor)
 
