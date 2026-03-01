@@ -25,7 +25,14 @@ const extended_x_0_characteristic_tuple = Tuple(extended_x_0_characteristic)
 
 # ===================================================================================================================================================================================== #
 
-function prepare_for_NN(ρ::FTT, T::FTT, q_liq::FTT, q_ice::FTT, w::FTT, norm::NTuple{5,FTT}=x_0_characteristic_tuple) where {FTT<:Real}
+function prepare_for_NN(
+    ρ::FTT,
+    T::FTT,
+    q_liq::FTT,
+    q_ice::FTT,
+    w::FTT,
+    norm::NTuple{5, FTT} = x_0_characteristic_tuple,
+) where {FTT <: Real}
     # normalize
     ρ /= norm[1]
     T = (T - FTT(273.15)) / norm[2] # not sure if is better than two atomic poerations
@@ -53,11 +60,19 @@ function prepare_for_NN(ρ::FTT, T::FTT, q_liq::FTT, q_ice::FTT, w::FTT, norm::N
 
 
     # return FTNN.([ρ, T, q_liq, q_ice, w])
-    return SA.SVector{5,FTNN}(ρ, T, q_liq, q_ice, w) # use SVector for better performance. also if using static_strided_aray from svector, matching input to be svector has best performance. doesn't really impact Flux at all.
+    return SA.SVector{5, FTNN}(ρ, T, q_liq, q_ice, w) # use SVector for better performance. also if using static_strided_aray from svector, matching input to be svector has best performance. doesn't really impact Flux at all.
 end
-prepare_for_NN(ρ::FTT, T::FTT, q_liq::FTT, q_ice::FTT, w::FTT, norm::AbstractVector{FTT}) where {FTT<:Real} = prepare_for_NN(ρ, T, q_liq, q_ice, w, Tuple(norm)) # default in method is already tuple for norm
+prepare_for_NN(ρ::FTT, T::FTT, q_liq::FTT, q_ice::FTT, w::FTT, norm::AbstractVector{FTT}) where {FTT <: Real} =
+    prepare_for_NN(ρ, T, q_liq, q_ice, w, Tuple(norm)) # default in method is already tuple for norm
 
-function prepare_for_NN!(ρ::AbstractVector{FTT}, T::AbstractVector{FTT}, q_liq::AbstractVector{FTT}, q_ice::AbstractVector{FTT}, w::AbstractVector{FTT}, norm::NTuple{5,FTT}=x_0_characteristic_tuple) where {FTT<:Real}
+function prepare_for_NN!(
+    ρ::AbstractVector{FTT},
+    T::AbstractVector{FTT},
+    q_liq::AbstractVector{FTT},
+    q_ice::AbstractVector{FTT},
+    w::AbstractVector{FTT},
+    norm::NTuple{5, FTT} = x_0_characteristic_tuple,
+) where {FTT <: Real}
     # normalize
     # in place versions -- it's a little dangerous..
     ρ ./= norm[1]
@@ -81,7 +96,14 @@ function prepare_for_NN!(ρ::AbstractVector{FTT}, T::AbstractVector{FTT}, q_liq:
 
     return ρ, T, q_liq, q_ice, w # return the modified vectors
 end
-function prepare_for_NN(ρ::AbstractVector{FTT}, T::AbstractVector{FTT}, q_liq::AbstractVector{FTT}, q_ice::AbstractVector{FTT}, w::AbstractVector{FTT}, norm::NTuple{5,FTT}=x_0_characteristic_tuple) where {FTT<:Real}
+function prepare_for_NN(
+    ρ::AbstractVector{FTT},
+    T::AbstractVector{FTT},
+    q_liq::AbstractVector{FTT},
+    q_ice::AbstractVector{FTT},
+    w::AbstractVector{FTT},
+    norm::NTuple{5, FTT} = x_0_characteristic_tuple,
+) where {FTT <: Real}
     ρ = ρ ./ norm[1]
     T = (T .- FTT(273.15)) ./ norm[2]
     q_liq = q_liq ./ norm[3]
@@ -93,8 +115,22 @@ function prepare_for_NN(ρ::AbstractVector{FTT}, T::AbstractVector{FTT}, q_liq::
     @. q_ice = log10(FTT(1e-10) + q_ice)
     return FTNN.(ρ), FTNN.(T), FTNN.(q_liq), FTNN.(q_ice), FTNN.(w)
 end
-prepare_for_NN!(ρ::AbstractVector{FTT}, T::AbstractVector{FTT}, q_liq::AbstractVector{FTT}, q_ice::AbstractVector{FTT}, w::AbstractVector{FTT}, norm::AbstractVector{FTT}) where {FTT<:Real} = prepare_for_NN!(ρ, T, q_liq, q_ice, w, Tuple(norm)) # default in method is already tuple for norm
-prepare_for_NN(ρ::AbstractVector{FTT}, T::AbstractVector{FTT}, q_liq::AbstractVector{FTT}, q_ice::AbstractVector{FTT}, w::AbstractVector{FTT}, norm::AbstractVector{FTT}) where {FTT<:Real} = prepare_for_NN(ρ, T, q_liq, q_ice, w, Tuple(norm)) # default in method is already tuple for norm
+prepare_for_NN!(
+    ρ::AbstractVector{FTT},
+    T::AbstractVector{FTT},
+    q_liq::AbstractVector{FTT},
+    q_ice::AbstractVector{FTT},
+    w::AbstractVector{FTT},
+    norm::AbstractVector{FTT},
+) where {FTT <: Real} = prepare_for_NN!(ρ, T, q_liq, q_ice, w, Tuple(norm)) # default in method is already tuple for norm
+prepare_for_NN(
+    ρ::AbstractVector{FTT},
+    T::AbstractVector{FTT},
+    q_liq::AbstractVector{FTT},
+    q_ice::AbstractVector{FTT},
+    w::AbstractVector{FTT},
+    norm::AbstractVector{FTT},
+) where {FTT <: Real} = prepare_for_NN(ρ, T, q_liq, q_ice, w, Tuple(norm)) # default in method is already tuple for norm
 
 # -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=- #
 
@@ -108,8 +144,8 @@ function prepare_for_NN(
     tke::FTT,
     qt_var::FTT,
     h_var::FTT,
-    norm::NTuple{9,FTT}=extended_x_0_characteristic_tuple,
-) where {FTT<:Real}
+    norm::NTuple{9, FTT} = extended_x_0_characteristic_tuple,
+) where {FTT <: Real}
     ρ /= norm[1]
     T = (T - FTT(273.15)) / norm[2]
     q_liq /= norm[3]
@@ -127,7 +163,7 @@ function prepare_for_NN(
     qt_var = log10(FTT(1e-10) + max(qt_var, FTT(0)))
     h_var = log10(FTT(1e-10) + max(h_var, FTT(0)))
 
-    return SA.SVector{9,FTNN}(ρ, T, q_liq, q_ice, w, qt, tke, qt_var, h_var)
+    return SA.SVector{9, FTNN}(ρ, T, q_liq, q_ice, w, qt, tke, qt_var, h_var)
 end
 prepare_for_NN(
     ρ::FTT,
@@ -140,9 +176,31 @@ prepare_for_NN(
     qt_var::FTT,
     h_var::FTT,
     norm::AbstractVector{FTT},
-) where {FTT<:Real} = prepare_for_NN(ρ, T, q_liq, q_ice, w, qt, tke, qt_var, h_var, Tuple(norm))
-prepare_for_extended_NN(ρ::FTT, T::FTT, q_liq::FTT, q_ice::FTT, w::FTT, qt::FTT, tke::FTT, qt_var::FTT, h_var::FTT, norm::NTuple{9,FTT}) where {FTT<:Real} = prepare_for_NN(ρ, T, q_liq, q_ice, w, qt, tke, qt_var, h_var, norm)
-prepare_for_extended_NN(ρ::FTT, T::FTT, q_liq::FTT, q_ice::FTT, w::FTT, qt::FTT, tke::FTT, qt_var::FTT, h_var::FTT, norm::AbstractVector{FTT}) where {FTT<:Real} = prepare_for_NN(ρ, T, q_liq, q_ice, w, qt, tke, qt_var, h_var, Tuple(norm))
+) where {FTT <: Real} = prepare_for_NN(ρ, T, q_liq, q_ice, w, qt, tke, qt_var, h_var, Tuple(norm))
+prepare_for_extended_NN(
+    ρ::FTT,
+    T::FTT,
+    q_liq::FTT,
+    q_ice::FTT,
+    w::FTT,
+    qt::FTT,
+    tke::FTT,
+    qt_var::FTT,
+    h_var::FTT,
+    norm::NTuple{9, FTT},
+) where {FTT <: Real} = prepare_for_NN(ρ, T, q_liq, q_ice, w, qt, tke, qt_var, h_var, norm)
+prepare_for_extended_NN(
+    ρ::FTT,
+    T::FTT,
+    q_liq::FTT,
+    q_ice::FTT,
+    w::FTT,
+    qt::FTT,
+    tke::FTT,
+    qt_var::FTT,
+    h_var::FTT,
+    norm::AbstractVector{FTT},
+) where {FTT <: Real} = prepare_for_NN(ρ, T, q_liq, q_ice, w, qt, tke, qt_var, h_var, Tuple(norm))
 
 
 function prepare_for_NN(
@@ -155,8 +213,8 @@ function prepare_for_NN(
     tke::AbstractVector{FTT},
     qt_var::AbstractVector{FTT},
     h_var::AbstractVector{FTT},
-    norm::NTuple{9,FTT}=extended_x_0_characteristic_tuple,
-) where {FTT<:Real}
+    norm::NTuple{9, FTT} = extended_x_0_characteristic_tuple,
+) where {FTT <: Real}
     ρ = ρ ./ norm[1]
     T = (T .- FTT(273.15)) ./ norm[2]
     q_liq = q_liq ./ norm[3]
@@ -187,9 +245,31 @@ prepare_for_NN(
     qt_var::AbstractVector{FTT},
     h_var::AbstractVector{FTT},
     norm::AbstractVector{FTT},
-) where {FTT<:Real} = prepare_for_NN(ρ, T, q_liq, q_ice, w, qt, tke, qt_var, h_var, Tuple(norm))
-prepare_for_extended_NN(ρ::AbstractVector{FTT}, T::AbstractVector{FTT}, q_liq::AbstractVector{FTT}, q_ice::AbstractVector{FTT}, w::AbstractVector{FTT}, qt::AbstractVector{FTT}, tke::AbstractVector{FTT}, qt_var::AbstractVector{FTT}, h_var::AbstractVector{FTT}, norm::NTuple{9,FTT}) where {FTT<:Real} = prepare_for_NN(ρ, T, q_liq, q_ice, w, qt, tke, qt_var, h_var, norm)
-prepare_for_extended_NN(ρ::AbstractVector{FTT}, T::AbstractVector{FTT}, q_liq::AbstractVector{FTT}, q_ice::AbstractVector{FTT}, w::AbstractVector{FTT}, qt::AbstractVector{FTT}, tke::AbstractVector{FTT}, qt_var::AbstractVector{FTT}, h_var::AbstractVector{FTT}, norm::AbstractVector{FTT}) where {FTT<:Real} = prepare_for_NN(ρ, T, q_liq, q_ice, w, qt, tke, qt_var, h_var, Tuple(norm))
+) where {FTT <: Real} = prepare_for_NN(ρ, T, q_liq, q_ice, w, qt, tke, qt_var, h_var, Tuple(norm))
+prepare_for_extended_NN(
+    ρ::AbstractVector{FTT},
+    T::AbstractVector{FTT},
+    q_liq::AbstractVector{FTT},
+    q_ice::AbstractVector{FTT},
+    w::AbstractVector{FTT},
+    qt::AbstractVector{FTT},
+    tke::AbstractVector{FTT},
+    qt_var::AbstractVector{FTT},
+    h_var::AbstractVector{FTT},
+    norm::NTuple{9, FTT},
+) where {FTT <: Real} = prepare_for_NN(ρ, T, q_liq, q_ice, w, qt, tke, qt_var, h_var, norm)
+prepare_for_extended_NN(
+    ρ::AbstractVector{FTT},
+    T::AbstractVector{FTT},
+    q_liq::AbstractVector{FTT},
+    q_ice::AbstractVector{FTT},
+    w::AbstractVector{FTT},
+    qt::AbstractVector{FTT},
+    tke::AbstractVector{FTT},
+    qt_var::AbstractVector{FTT},
+    h_var::AbstractVector{FTT},
+    norm::AbstractVector{FTT},
+) where {FTT <: Real} = prepare_for_NN(ρ, T, q_liq, q_ice, w, qt, tke, qt_var, h_var, Tuple(norm))
 
 
 
@@ -205,7 +285,15 @@ prepare_for_extended_NN(ρ::AbstractVector{FTT}, T::AbstractVector{FTT}, q_liq::
 
 # function predict_τ(ρ::FTT, T::FTT, q::TD.PhasePartition{FTT}, w::FTT, NN::Flux.Chain, norm::NTuple{5,FTT} = x_0_characteristic_tuple) where {FTT}
 # note, we could use a Vector instead of a SimpleChains.StrideArraysCore.StaticStrideArray  and it would be similarly fast, we can't directly pass an SVector though... rn our conversion is via to_static_strided_array().
-function predict_τ(ρ::FTT, T::FTT, q_liq::FTT, q_ice::FTT, w::FTT, NN::Union{Flux.Chain,Tuple{SimpleChains.SimpleChain,SimpleChains.StrideArraysCore.StaticStrideArray}}, norm::NTuple{5,FTT}=x_0_characteristic_tuple) where {FTT<:Real}
+function predict_τ(
+    ρ::FTT,
+    T::FTT,
+    q_liq::FTT,
+    q_ice::FTT,
+    w::FTT,
+    NN::Union{Flux.Chain, Tuple{SimpleChains.SimpleChain, SimpleChains.StrideArraysCore.StaticStrideArray}},
+    norm::NTuple{5, FTT} = x_0_characteristic_tuple,
+) where {FTT <: Real}
     x_0 = prepare_for_NN(ρ, T, q_liq, q_ice, w, norm)
 
     if (NN isa Flux.Chain)
@@ -216,16 +304,32 @@ function predict_τ(ρ::FTT, T::FTT, q_liq::FTT, q_ice::FTT, w::FTT, NN::Union{F
 
     return FTT(exp10(log_τ_liq)), FTT(exp10(log_τ_ice)), FTT(exp10(log_N_liq)), FTT(exp10(log_N_ice))
 end
-predict_τ(ρ::FTT, T::FTT, q_liq::FTT, q_ice::FTT, w::FTT, NN::Union{Flux.Chain,Tuple{SimpleChains.SimpleChain,SimpleChains.StrideArraysCore.StaticStrideArray}}, norm::AbstractVector{FTT}) where {FTT<:Real} = predict_τ(ρ, T, q_liq, q_ice, w, NN, Tuple(norm))
+predict_τ(
+    ρ::FTT,
+    T::FTT,
+    q_liq::FTT,
+    q_ice::FTT,
+    w::FTT,
+    NN::Union{Flux.Chain, Tuple{SimpleChains.SimpleChain, SimpleChains.StrideArraysCore.StaticStrideArray}},
+    norm::AbstractVector{FTT},
+) where {FTT <: Real} = predict_τ(ρ, T, q_liq, q_ice, w, NN, Tuple(norm))
 
 
 # vector
-function predict_τ(ρ::AbstractVector{FTT}, T::AbstractVector{FTT}, q_liq::AbstractVector{FTT}, q_ice::AbstractVector{FTT}, w::AbstractVector{FTT}, NN::Union{Flux.Chain,Tuple{SimpleChains.SimpleChain,SimpleChains.StrideArraysCore.StaticStrideArray}}, norm::NTuple{5,FTT}) where {FTT<:Real}
+function predict_τ(
+    ρ::AbstractVector{FTT},
+    T::AbstractVector{FTT},
+    q_liq::AbstractVector{FTT},
+    q_ice::AbstractVector{FTT},
+    w::AbstractVector{FTT},
+    NN::Union{Flux.Chain, Tuple{SimpleChains.SimpleChain, SimpleChains.StrideArraysCore.StaticStrideArray}},
+    norm::NTuple{5, FTT},
+) where {FTT <: Real}
     x_0 = prepare_for_NN(ρ, T, q_liq, q_ice, w, norm)
     if NN isa Flux.Chain
-        log_τ_liq, log_τ_ice, log_N_liq, log_N_ice = eachrow(NN(stack(x_0, dims=1)))
+        log_τ_liq, log_τ_ice, log_N_liq, log_N_ice = eachrow(NN(stack(x_0, dims = 1)))
     else
-        log_τ_liq, log_τ_ice, log_N_liq, log_N_ice = eachrow(NN[1](stack(x_0, dims=1), NN[2]))
+        log_τ_liq, log_τ_ice, log_N_liq, log_N_ice = eachrow(NN[1](stack(x_0, dims = 1), NN[2]))
     end
     τ_liq = log_τ_liq
     τ_ice = log_τ_ice
@@ -251,9 +355,9 @@ function predict_τ(
     tke::FTT,
     qt_var::FTT,
     h_var::FTT,
-    NN::Union{Flux.Chain,Tuple{SimpleChains.SimpleChain,SimpleChains.StrideArraysCore.StaticStrideArray}},
-    norm::NTuple{9,FTT}=extended_x_0_characteristic_tuple,
-) where {FTT<:Real}
+    NN::Union{Flux.Chain, Tuple{SimpleChains.SimpleChain, SimpleChains.StrideArraysCore.StaticStrideArray}},
+    norm::NTuple{9, FTT} = extended_x_0_characteristic_tuple,
+) where {FTT <: Real}
     x_0 = prepare_for_extended_NN(ρ, T, q_liq, q_ice, w, qt, tke, qt_var, h_var, norm)
     if NN isa Flux.Chain
         log_τ_liq, log_τ_ice, log_N_liq, log_N_ice = NN(x_0)
@@ -262,8 +366,32 @@ function predict_τ(
     end
     return FTT(exp10(log_τ_liq)), FTT(exp10(log_τ_ice)), FTT(exp10(log_N_liq)), FTT(exp10(log_N_ice))
 end
-predict_τ_extended(ρ::FTT, T::FTT, q_liq::FTT, q_ice::FTT, w::FTT, qt::FTT, tke::FTT, qt_var::FTT, h_var::FTT, NN::Union{Flux.Chain,Tuple{SimpleChains.SimpleChain,SimpleChains.StrideArraysCore.StaticStrideArray}}, norm::NTuple{9,FTT}) where {FTT<:Real} = predict_τ(ρ, T, q_liq, q_ice, w, qt, tke, qt_var, h_var, NN, norm)
-predict_τ_extended(ρ::FTT, T::FTT, q_liq::FTT, q_ice::FTT, w::FTT, qt::FTT, tke::FTT, qt_var::FTT, h_var::FTT, NN::Union{Flux.Chain,Tuple{SimpleChains.SimpleChain,SimpleChains.StrideArraysCore.StaticStrideArray}}, norm::AbstractVector{FTT}) where {FTT<:Real} = predict_τ(ρ, T, q_liq, q_ice, w, qt, tke, qt_var, h_var, NN, Tuple(norm))
+predict_τ_extended(
+    ρ::FTT,
+    T::FTT,
+    q_liq::FTT,
+    q_ice::FTT,
+    w::FTT,
+    qt::FTT,
+    tke::FTT,
+    qt_var::FTT,
+    h_var::FTT,
+    NN::Union{Flux.Chain, Tuple{SimpleChains.SimpleChain, SimpleChains.StrideArraysCore.StaticStrideArray}},
+    norm::NTuple{9, FTT},
+) where {FTT <: Real} = predict_τ(ρ, T, q_liq, q_ice, w, qt, tke, qt_var, h_var, NN, norm)
+predict_τ_extended(
+    ρ::FTT,
+    T::FTT,
+    q_liq::FTT,
+    q_ice::FTT,
+    w::FTT,
+    qt::FTT,
+    tke::FTT,
+    qt_var::FTT,
+    h_var::FTT,
+    NN::Union{Flux.Chain, Tuple{SimpleChains.SimpleChain, SimpleChains.StrideArraysCore.StaticStrideArray}},
+    norm::AbstractVector{FTT},
+) where {FTT <: Real} = predict_τ(ρ, T, q_liq, q_ice, w, qt, tke, qt_var, h_var, NN, Tuple(norm))
 
 # extended vector
 function predict_τ(
@@ -276,15 +404,15 @@ function predict_τ(
     tke::AbstractVector{FTT},
     qt_var::AbstractVector{FTT},
     h_var::AbstractVector{FTT},
-    NN::Union{Flux.Chain,Tuple{SimpleChains.SimpleChain,SimpleChains.StrideArraysCore.StaticStrideArray}},
-    norm::NTuple{9,FTT}=extended_x_0_characteristic_tuple,
-) where {FTT<:Real}
+    NN::Union{Flux.Chain, Tuple{SimpleChains.SimpleChain, SimpleChains.StrideArraysCore.StaticStrideArray}},
+    norm::NTuple{9, FTT} = extended_x_0_characteristic_tuple,
+) where {FTT <: Real}
     x_0 = prepare_for_extended_NN(ρ, T, q_liq, q_ice, w, qt, tke, qt_var, h_var, norm)
 
     if NN isa Flux.Chain
-        log_τ_liq, log_τ_ice, log_N_liq, log_N_ice = eachrow(NN(stack(x_0, dims=1)))
+        log_τ_liq, log_τ_ice, log_N_liq, log_N_ice = eachrow(NN(stack(x_0, dims = 1)))
     else
-        log_τ_liq, log_τ_ice, log_N_liq, log_N_ice = eachrow(NN[1](stack(x_0, dims=1), NN[2]))
+        log_τ_liq, log_τ_ice, log_N_liq, log_N_ice = eachrow(NN[1](stack(x_0, dims = 1), NN[2]))
     end
 
     τ_liq = log_τ_liq
@@ -299,18 +427,30 @@ function predict_τ(
 
     return τ_liq, τ_ice, N_liq, N_ice
 end
-predict_τ_extended(ρ::AbstractVector{FTT}, T::AbstractVector{FTT}, q_liq::AbstractVector{FTT}, q_ice::AbstractVector{FTT}, w::AbstractVector{FTT}, qt::AbstractVector{FTT}, tke::AbstractVector{FTT}, qt_var::AbstractVector{FTT}, h_var::AbstractVector{FTT}, NN::Union{Flux.Chain,Tuple{SimpleChains.SimpleChain,SimpleChains.StrideArraysCore.StaticStrideArray}}, norm::NTuple{9,FTT}) where {FTT<:Real} = predict_τ(ρ, T, q_liq, q_ice, w, qt, tke, qt_var, h_var, NN, norm)
+predict_τ_extended(
+    ρ::AbstractVector{FTT},
+    T::AbstractVector{FTT},
+    q_liq::AbstractVector{FTT},
+    q_ice::AbstractVector{FTT},
+    w::AbstractVector{FTT},
+    qt::AbstractVector{FTT},
+    tke::AbstractVector{FTT},
+    qt_var::AbstractVector{FTT},
+    h_var::AbstractVector{FTT},
+    NN::Union{Flux.Chain, Tuple{SimpleChains.SimpleChain, SimpleChains.StrideArraysCore.StaticStrideArray}},
+    norm::NTuple{9, FTT},
+) where {FTT <: Real} = predict_τ(ρ, T, q_liq, q_ice, w, qt, tke, qt_var, h_var, NN, norm)
 
 
 # -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=- #
 
 NN_to_vec(NN::Flux.Chain) = Flux.destructure(NN) # see Flux.destructure, returns vector (θ), and representation (re)
 vec_to_NN(param_vector::Vector, re) = re(param_vector) # see Flux.destructure  
-model_destructure_re_from_file(filename::String; var="re") = JLD2.load(filename, var)
+model_destructure_re_from_file(filename::String; var = "re") = JLD2.load(filename, var)
 
 
 function simple_chain_model_from_file(filename::String) #, param_vector::Union{AbstractVector{FTNN}, Nothing} = nothing)
-    NN_simple_chain = JLD2.load(filename, "NN_simple_chain",) # don't need to load nn_simple_chain_params, we can do that when creating the param_set, don't need to load x_0_characteristic, we don't use it from the file it's just defined here.
+    NN_simple_chain = JLD2.load(filename, "NN_simple_chain") # don't need to load nn_simple_chain_params, we can do that when creating the param_set, don't need to load x_0_characteristic, we don't use it from the file it's just defined here.
     # if !isnothing(param_vector)
     #     nn_simple_chain_params = SimpleChains.init_params(NN_simple_chain) # this is not needed, we already have the params
     #     nn_simple_chain_params .= param_vector # should this be static or does it not matter?
@@ -329,7 +469,7 @@ function simple_chain_model_from_file(filename::String) #, param_vector::Union{A
             SimpleChains.TurboDense(Flux.relu, 2L),
             SimpleChains.TurboDense(Flux.relu, 8),
             SimpleChains.TurboDense(Flux.relu, 4),
-            SimpleChains.TurboDense(identity, 4)
+            SimpleChains.TurboDense(identity, 4),
         )
     end
     return NN_simple_chain

@@ -32,10 +32,10 @@ function condensate_qt_SD(
     end
 
     dist = Distributions.Normal(zero(FT), one(FT))
-    
+
     # Use ccdf for better numerical precision in the tail
-    prob_sat = Distributions.ccdf(dist, z_star) 
-    phi_z = Distributions.pdf(dist, z_star)        
+    prob_sat = Distributions.ccdf(dist, z_star)
+    phi_z = Distributions.pdf(dist, z_star)
 
     # Theoretical equilibrium condensate
     qc_sat_adjust = qt_std * max(eps(FT), phi_z - z_star * prob_sat)
@@ -59,7 +59,9 @@ function partition_condensate_into_sgs_fractions(
     # partition assuming all liq into supersaturated fraction, not to exceed max_boost_factor
     if !iszero(q)
         q_supersat = iszero(supersaturated_fraction) ? zero(FT) : min(q / supersaturated_fraction, max_boost_factor * q)
-        q_subsat = isone(supersaturated_fraction) ? zero(FT) : (q - (q_supersat * supersaturated_fraction)) / (1 - supersaturated_fraction)
+        q_subsat =
+            isone(supersaturated_fraction) ? zero(FT) :
+            (q - (q_supersat * supersaturated_fraction)) / (1 - supersaturated_fraction)
     else
         q_supersat = zero(FT)
         q_subsat = zero(FT)
@@ -92,11 +94,17 @@ function partition_condensate_into_sgs_fractions(
         q_vap = TD.vapor_specific_humidity(thermo_params, ts)
         q_sat_l = TD.q_vap_saturation_generic(thermo_params, T, ρ, TD.Liquid())
         dq_sat_dT_l = TD.∂q_vap_sat_∂T(thermo_params, one(FT), T, q_sat_l)  # Calculate derivative
-        supersaturated_fraction_liq = sgs_saturated_fraction(thermo_params, q_vap, q_sat_l, qt_var, h_var, h_qt_cov, dq_sat_dT_l, p)
+        supersaturated_fraction_liq =
+            sgs_saturated_fraction(thermo_params, q_vap, q_sat_l, qt_var, h_var, h_qt_cov, dq_sat_dT_l, p)
     end
     return partition_condensate_into_sgs_fractions(q.liq, supersaturated_fraction_liq; max_boost_factor)
 end
-partition_condensate_into_sgs_fractions(::CMT.LiquidType, ql::FT, supersaturated_fraction_liq::FT; max_boost_factor::FT = FT(2.0)) where {FT} = partition_condensate_into_sgs_fractions(ql, supersaturated_fraction_liq; max_boost_factor)
+partition_condensate_into_sgs_fractions(
+    ::CMT.LiquidType,
+    ql::FT,
+    supersaturated_fraction_liq::FT;
+    max_boost_factor::FT = FT(2.0),
+) where {FT} = partition_condensate_into_sgs_fractions(ql, supersaturated_fraction_liq; max_boost_factor)
 
 
 
@@ -123,11 +131,17 @@ function partition_condensate_into_sgs_fractions(
         q_vap = TD.vapor_specific_humidity(thermo_params, ts)
         q_sat = TD.q_vap_saturation_generic(thermo_params, T, ρ, TD.Ice())
         dq_sat_dT = TD.∂q_vap_sat_∂T(thermo_params, zero(FT), T, q_sat)  # Calculate derivative
-        supersaturated_fraction_ice = sgs_saturated_fraction(thermo_params, q_vap, q_sat, qt_var, h_var, h_qt_cov, dq_sat_dT, p) # pass q_vap here to get supersat fraction (pass q_tot to get cloud fraction (under saturation adjustment to form ql))
+        supersaturated_fraction_ice =
+            sgs_saturated_fraction(thermo_params, q_vap, q_sat, qt_var, h_var, h_qt_cov, dq_sat_dT, p) # pass q_vap here to get supersat fraction (pass q_tot to get cloud fraction (under saturation adjustment to form ql))
     end
     return partition_condensate_into_sgs_fractions(q.ice, supersaturated_fraction_ice; max_boost_factor)
 end
-partition_condensate_into_sgs_fractions(::CMT.IceType, qi::FT, supersaturated_fraction_ice::FT; max_boost_factor::FT = FT(1.1)) where {FT} = partition_condensate_into_sgs_fractions(qi, supersaturated_fraction_ice; max_boost_factor)
+partition_condensate_into_sgs_fractions(
+    ::CMT.IceType,
+    qi::FT,
+    supersaturated_fraction_ice::FT;
+    max_boost_factor::FT = FT(1.1),
+) where {FT} = partition_condensate_into_sgs_fractions(qi, supersaturated_fraction_ice; max_boost_factor)
 
 # ======================================================================================================================================================== #
 # ======================================================================================================================================================== #
@@ -157,16 +171,16 @@ function get_qc_stats_from_moments(
     qt_var::FT,
     h_var::FT,
     h_qt_cov::FT,
-    w_qt_cov::FT, 
-    w_h_cov::FT, 
+    w_qt_cov::FT,
+    w_h_cov::FT,
     ql_true::FT = FT(NaN),
-    qi_true::FT = FT(NaN)
+    qi_true::FT = FT(NaN),
 ) where {FT}
 
     # --- 1. SETUP ---
     thermo_params = TCP.thermodynamics_params(param_set)
     has_prognostic = !isnan(ql_true) && !isnan(qi_true)
-    
+
     p = TD.air_pressure(thermo_params, ts)
     θli = TD.liquid_ice_pottemp(thermo_params, ts)
     qt = TD.total_specific_humidity(thermo_params, ts)
@@ -180,28 +194,28 @@ function get_qc_stats_from_moments(
     dqsat_dT = TD.∂q_vap_sat_∂T(thermo_params, FT(1.0), T_pdf, q_sat)
 
     # --- 2. PDF MOMENTS ---
-    s_mean = qt - q_sat 
+    s_mean = qt - q_sat
     dsdqt = one(FT)
     dsdθli = -dqsat_dT * Π_pdf
-    
+
     # Variance of saturation deficit (s)
     # Floor to prevent division by zero in standard deviation
     s_var = max(dsdqt^2 * qt_var + dsdθli^2 * h_var + FT(2) * dsdqt * dsdθli * h_qt_cov, FT(1e-12))
     s_std = sqrt(s_var)
-    
+
     α = s_mean / s_std
     inv_sqrt2 = one(FT) / sqrt(FT(2))
     Φ = FT(0.5) * (one(FT) + SpecialFunctions.erf(α * inv_sqrt2))
-    
+
     # PDF Potentials (Mean and Flux)
     # qc_pdf_pot: The mean condensate predicted by the Liquid PDF
     qc_pdf_pot = s_mean * Φ + s_std * (exp(-FT(0.5) * α^2) / sqrt(FT(2) * FT(π)))
-    w_qc_pot = (dsdqt * w_qt_cov + dsdθli * w_h_cov) * Φ 
-    
+    w_qc_pot = (dsdqt * w_qt_cov + dsdθli * w_h_cov) * Φ
+
     # Scalar Potentials
     cov_qc_qt_pot = (dsdqt * qt_var + dsdθli * h_qt_cov) * Φ
-    cov_qc_h_pot  = (dsdqt * h_qt_cov + dsdθli * h_var) * Φ
-    
+    cov_qc_h_pot = (dsdqt * h_qt_cov + dsdθli * h_var) * Φ
+
     # Proxy for the Standard Deviation of the "Cloudy" part of the PDF
     # Used to normalize the Transport Velocity.
     sigma_pot = s_std * sqrt(Φ)
@@ -222,10 +236,10 @@ function get_qc_stats_from_moments(
         if qc_pdf_pot > FT(1e-10)
             eff_w = w_qc_pot / qc_pdf_pot
             w_ql_cov = min(eff_w * ql_true, w_qc_pot)
-            
+
             eff_qt = cov_qc_qt_pot / qc_pdf_pot
             cov_ql_qt = min(eff_qt * ql_true, cov_qc_qt_pot)
-            
+
             eff_h = cov_qc_h_pot / qc_pdf_pot
             cov_ql_h = min(eff_h * ql_true, cov_qc_h_pot)
         end
@@ -233,7 +247,7 @@ function get_qc_stats_from_moments(
         # =====================================================================
         # PATH B: ICE (Physical Blending)
         # =====================================================================
-        
+
         # 1. Transport Velocity (V_trans)
         # "How fast is the turbulent cloudy air moving?"
         # V_trans = Flux_Potential / Sigma_Potential
@@ -241,13 +255,13 @@ function get_qc_stats_from_moments(
         if sigma_pot > FT(1e-10)
             transport_vel = w_qc_pot / sigma_pot
         end
-        
+
         # 2. Determine Regimes (Liquid Fraction)
         qc_true_total = ql_true + qi_true
         f_liq_prog = (qc_true_total > FT(1e-10)) ? ql_true / qc_true_total : zero(FT)
-        
+
         # 3. Estimate Ice Variance (Sigma_qi)
-        
+
         #   Regime 1: Passive (Total Water Scaling)
         #   Sigma_Passive = qi * (sigma_qt / qt)
         sigma_ice_passive = zero(FT)
@@ -255,7 +269,7 @@ function get_qc_stats_from_moments(
             sigma_qt = sqrt(qt_var)
             sigma_ice_passive = qi_true * (sigma_qt / qt)
         end
-        
+
         #   Regime 2: Active (Liquid Potential Scaling)
         #   Sigma_Active = qi * (sigma_pot / qc_pot)
         #   We use the Coefficient of Variation from the PDF.
@@ -268,7 +282,7 @@ function get_qc_stats_from_moments(
 
         #   Blend the Standard Deviations
         sigma_ice_final = ((one(FT) - f_liq_prog) * sigma_ice_passive) + (f_liq_prog * sigma_ice_active) # the first term is tiny, almost everything is in the second term...
-        
+
         sigma_ice_final *= (qc_pdf_pot / qt)
 
 
@@ -282,27 +296,46 @@ function get_qc_stats_from_moments(
         w_ql_cov = w_qc_pot
         w_qi_cov = zero(FT)
         cov_ql_qt = cov_qc_qt_pot
-        cov_ql_h  = cov_qc_h_pot
+        cov_ql_h = cov_qc_h_pot
     end
 
     # --- 4. OUTPUT PREP ---
     qt_std = sqrt(qt_var)
     qc_total = ql_out + qi_out
-    final_z = (qt_std > eps(FT) && qc_total > FT(1e-8)) ? 
-        clamp(cov_ql_qt / (qc_total * qt_std), zero(FT), FT(2.5)) : zero(FT)
+    final_z =
+        (qt_std > eps(FT) && qc_total > FT(1e-8)) ? clamp(cov_ql_qt / (qc_total * qt_std), zero(FT), FT(2.5)) : zero(FT)
 
     f_liq = (qc_total > eps(FT)) ? ql_out / qc_total : one(FT)
     f_ice = (qc_total > eps(FT)) ? qi_out / qc_total : zero(FT)
-    
+
     ql_pdf = qc_pdf_pot * f_liq
     qi_pdf = qc_pdf_pot * f_ice
     w_ql_pot = w_qc_pot * f_liq
     w_qi_pot = w_qc_pot * f_ice
-    
+
     scale_l = (w_ql_pot > eps(FT)) ? min(w_ql_cov / w_ql_pot, FT(1.0)) : one(FT)
     scale_i = (w_qi_pot > eps(FT)) ? min(w_qi_cov / w_qi_pot, FT(1.0)) : one(FT)
 
-    return ql_out, qi_out, cov_ql_qt, cov_ql_h, w_ql_cov, w_qi_cov, final_z, final_z, qc_pdf_pot, w_qc_pot, ql_pdf, qi_pdf, Φ, α, f_liq, f_ice, scale_l, scale_i, w_ql_pot, w_qi_pot
+    return ql_out,
+    qi_out,
+    cov_ql_qt,
+    cov_ql_h,
+    w_ql_cov,
+    w_qi_cov,
+    final_z,
+    final_z,
+    qc_pdf_pot,
+    w_qc_pot,
+    ql_pdf,
+    qi_pdf,
+    Φ,
+    α,
+    f_liq,
+    f_ice,
+    scale_l,
+    scale_i,
+    w_ql_pot,
+    w_qi_pot
 end
 
 # """

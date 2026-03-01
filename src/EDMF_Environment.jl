@@ -623,9 +623,10 @@ function microphysics!(
                 q_liq = aux_en.q_liq[k]
                 q_ice = aux_en.q_ice[k]
 
-                # Get all quadrature points in SMatrix format to avoid memory allocation inside the loop
-                (qt_quad_M, h_quad_M, ts_quad_M, T_quad_M, S_liq_M, S_ice_M, q_vap_sat_liq_M, q_vap_sat_ice_M) =
-                    get_quadrature_thermo_states_and_saturation_excess_matrix(
+                # Get required quadrature matrices in SMatrix format to avoid memory allocation inside the loop
+                (S_liq_M, S_ice_M) =
+                    get_quadrature_saturation_excess_matrices(
+                        param_set,
                         thermo_params,
                         quadrature_type,
                         χ,
@@ -653,13 +654,54 @@ function microphysics!(
 
                 mph_neq = null_NoneqMoistureSources(FT; fill_value = FT(0)) # initialize...
                 mph_neq_other = null_OtherMicrophysicsSources(FT; fill_value = FT(0)) # initialize...
-                @inbounds for m_q in 1:quad_order
-                    @inbounds for m_h in 1:quad_order
-                        ts_hat = ts_quad_M[m_q, m_h]
-                        T = T_quad_M[m_q, m_h]
+                
+                # --- Precompute basic distribution parameters for inline evaluation ---
+                eps_q = (qt_mean ≈ FT(0)) ? eps(FT) : (eps(FT) * qt_mean)
+                eps_θ = eps(FT)
 
-                        q_vap_sat_liq = q_vap_sat_liq_M[m_q, m_h]
-                        q_vap_sat_ice = q_vap_sat_ice_M[m_q, m_h]
+                ν_q, ν_θ, s_q, s_θ, s2_θq, s_c, corr, σ_q, σ_θ, σ_c = (FT(0) for _ in 1:10)
+
+                if quadrature_type isa LogNormalQuad
+                    ν_q = log(qt_mean^2 / max(sqrt(qt_mean^2 + qt′qt′), eps_q))
+                    ν_θ = log(θl_mean^2 / sqrt(θl_mean^2 + θl′θl′))
+                    s_q = sqrt(log(qt′qt′ / max(qt_mean, eps_q)^2 + 1))
+                    s_θ = sqrt(log(θl′θl′ / θl_mean^2 + 1))
+                    corr = θl′qt′ / max(sqrt(qt′qt′), eps_q)
+                    corr = max(min(corr / max(sqrt(θl′θl′), eps_θ), 1), -1)
+                    s2_θq = log(corr * sqrt(θl′θl′ * qt′qt′) / θl_mean / max(qt_mean, eps_q) + 1)
+                    s_c = sqrt(max(s_θ^2 - s2_θq^2 / max(s_q, eps_q)^2, 0))
+                elseif quadrature_type isa GaussianQuad
+                    σ_q_lim = -qt_mean / (sqrt2 * χ[1])
+                    σ_q = min(sqrt(qt′qt′), σ_q_lim)
+                    σ_θ = sqrt(θl′θl′)
+                    corr = θl′qt′ / max(σ_q, eps_q)
+                    corr = max(min(corr / max(σ_θ, eps_θ), 1), -1)
+                    σ_c = sqrt(max(1 - corr * corr, 0)) * σ_θ
+                end
+                # --------------------------------------------------------------------
+
+                @inbounds for m_q in 1:quad_order
+                    if quadrature_type isa LogNormalQuad
+                        qt_hat = exp(ν_q + sqrt2 * s_q * χ[m_q])
+                        ν_c = ν_θ + s2_θq / max(s_q, eps_q)^2 * (log(qt_hat) - ν_q)
+                    elseif quadrature_type isa GaussianQuad
+                        qt_hat = qt_mean + sqrt2 * σ_q * χ[m_q]
+                        μ_c = θl_mean + sqrt2 * corr * σ_θ * χ[m_q]
+                    end
+
+                    @inbounds for m_h in 1:quad_order
+                        if quadrature_type isa LogNormalQuad
+                            h_hat = exp(ν_c + sqrt2 * s_c * χ[m_h])
+                        elseif quadrature_type isa GaussianQuad
+                            h_hat = μ_c + sqrt2 * σ_c * χ[m_h]
+                        end
+
+                        ts_hat = thermo_state_pθq(param_set, p_c[k], h_hat, qt_hat, q_liq, q_ice)
+                        T = TD.air_temperature(thermo_params, ts_hat)
+                        ρ = TD.air_density(thermo_params, ts_hat)
+
+                        q_vap_sat_liq = TD.q_vap_saturation_generic(thermo_params, T, ρ, TD.Liquid())
+                        q_vap_sat_ice = TD.q_vap_saturation_generic(thermo_params, T, ρ, TD.Ice())
 
                         # Quadrature points are deterministic points, so their fraction is strictly 1 or 0 for the point itself
                         liq_frac_q = q_liq_quad_M[m_q, m_h] > zero(FT) ? one(FT) : zero(FT)
@@ -1341,28 +1383,22 @@ function quad_loop(
         var_S_ice = sum(W .* δS_ice .^ 2) / Wtot # Variance of S (σ_S²)
 
         if (q_liq > 2eps(FT)) && (var_S_liq > eps(FT))
-            q′S′ = FT(1) * var_S_liq
-            q_liq_ens .= get_qs_from_saturation_excesses(
+            q_liq_ens .= get_qs_proportional(
                 saturation_excesses_liq,
                 weights .* sqpi_inv,
                 q_liq;
-                q′S′ = q′S′,
-                q′q′ = nothing,
-            ) # for liquid we'll go 1:1 cause it's fast, though supersat struggles to exceed 1. so it might be skewed idk...
-        # q_liq_ens .= q_liq
+                max_boost_factor = FT(2.0),
+            )
         else
             q_liq_ens .= q_liq
         end
         if (q_ice > 2eps(FT)) && (var_S_ice > eps(FT))
-            q′S′ = FT(1e-3) * var_S_ice
-            q_ice_ens .= get_qs_from_saturation_excesses(
+            q_ice_ens .= get_qs_proportional(
                 saturation_excesses_ice,
                 weights .* sqpi_inv,
                 q_ice;
-                q′S′ = q′S′,
-                q′q′ = nothing,
-            ) # for ice we'll go 1:10 because it's slow but vapor excess can be is much higher relative to the ice amount..., and then subimation is slow....
-        # q_ice_ens .= q_ice
+                max_boost_factor = FT(1.1),
+            )
         else
             q_ice_ens .= q_ice
         end
