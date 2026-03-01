@@ -29,10 +29,10 @@ if is_HPC # (if we can)
     import SurfaceFluxes.UniversalFunctions as UF
 
     # RELATIVE IMPORT: Access the submodule defined in src/Parameters.jl
-    import .Parameters as TCP 
+    import .Parameters as TCP
 
     # Helper for the NamedTuple logic
-    namedtuple_fromdict(d::Dict) = (; (Symbol(k) => namedtuple_fromdict(v) for (k,v) in d)...)
+    namedtuple_fromdict(d::Dict) = (; (Symbol(k) => namedtuple_fromdict(v) for (k, v) in d)...)
     namedtuple_fromdict(x) = x
 
     PrecompileTools.@setup_workload begin
@@ -41,7 +41,7 @@ if is_HPC # (if we can)
 
         # --- STEP 1: SETUP MOCK DATA ---
         FT = Float64
-        
+
         # Create a base TOML dictionary (Standard Physics Constants)
         # Note: If this fails without a file, use: CP.create_toml_dict(FT; dict_type="alias") 
         # but usually the default works in newer versions.
@@ -181,7 +181,7 @@ if is_HPC # (if we can)
             println(io, "value = " * string(r_ice_snow))
             println(io, "type = \"float\"")
             println(io, "[cloud_ice_mass_size_relation_coefficient_chim]") # see https://github.com/CliMA/ClimaParams.jl/blob/70c847bd01a2963a1bbddbfc283bbcdc306888d3/src/parameters.toml#L754C2-L754C47
-            println(io, "alias = \"χm_ice\"") 
+            println(io, "alias = \"χm_ice\"")
             println(io, "value = " * string(χm_ice))
             println(io, "type = \"float\"")
             println(io, "[snow_flake_size_distribution_coefficient_nu]") # ν_sno
@@ -209,8 +209,8 @@ if is_HPC # (if we can)
             println(io, "value = " * string(χv_sno))
             println(io, "type = \"float\"")
         end
-        toml_dict = CP.create_toml_dict(FT; override_file = override_file, dict_type="alias")   
-        isfile(override_file) && rm(override_file; force=true)
+        toml_dict = CP.create_toml_dict(FT; override_file = override_file, dict_type = "alias")
+        isfile(override_file) && rm(override_file; force = true)
 
         # --- STEP 2: CONSTRUCT SUB-PARAMETERS ---
         # A. Thermodynamics
@@ -230,12 +230,18 @@ if is_HPC # (if we can)
         # Universal Functions (Businger)
         aliases = ["Pr_0_Businger", "a_m_Businger", "a_h_Businger", "ζ_a_Businger", "γ_Businger"]
         uf_pairs = CP.get_parameter_values!(toml_dict, aliases, "UniversalFunctions")
-        uf_pairs = (; uf_pairs...) 
+        uf_pairs = (; uf_pairs...)
         # Map the TOML names to the struct field names manually
-        pairs_uf_mapped = (; Pr_0 = uf_pairs.Pr_0_Businger, a_m = uf_pairs.a_m_Businger, a_h = uf_pairs.a_h_Businger, ζ_a = uf_pairs.ζ_a_Businger, γ = uf_pairs.γ_Businger)
+        pairs_uf_mapped = (;
+            Pr_0 = uf_pairs.Pr_0_Businger,
+            a_m = uf_pairs.a_m_Businger,
+            a_h = uf_pairs.a_h_Businger,
+            ζ_a = uf_pairs.ζ_a_Businger,
+            γ = uf_pairs.γ_Businger,
+        )
         ufp = UF.BusingerParams{FT}(; pairs_uf_mapped...)
         UFP = typeof(ufp)
-        
+
         # Surface Flux Parameters
         sf_pairs = CP.get_parameter_values!(toml_dict, ["von_karman_const"], "SurfaceFluxesParameters")
         surf_flux_params = SF.Parameters.SurfaceFluxesParameters{FT, UFP, TP}(; sf_pairs..., ufp, thermo_params)
@@ -247,7 +253,7 @@ if is_HPC # (if we can)
             "r_liq_rain" => 30e-6,
             "χm_liq" => 1.0,
             "r_ice_acnv_scaling_factor" => 1.0,
-            "r_ice_snow_threshold_scaling_factor" => 1.6, 
+            "r_ice_snow_threshold_scaling_factor" => 1.6,
             "τ_acnv_sno_threshold" => 100.0,
             "massflux_N_i_boost_factor" => 2.0,
             "sedimentation_N_i_boost_factor" => 0.2,
@@ -255,23 +261,28 @@ if is_HPC # (if we can)
             "apply_sedimentation_N_i_boost" => false,
             "massflux_N_i_boost_max_ratio" => 0.7,
             "massflux_N_i_boost_progress_fraction" => 0.5,
-            "q_min" => 0.0
+            "q_min" => 0.0,
         )
         user_params = namedtuple_fromdict(user_params_dict)
 
         # --- STEP 4: ASSEMBLE THE FINAL STRUCT ---
         aliases = [
-            "microph_scaling_dep_sub", "microph_scaling_melt", "microph_scaling_evap",
-            "microph_scaling_acnv", "microph_scaling_accr", "Omega", "planet_radius"
+            "microph_scaling_dep_sub",
+            "microph_scaling_melt",
+            "microph_scaling_evap",
+            "microph_scaling_acnv",
+            "microph_scaling_accr",
+            "Omega",
+            "planet_radius",
         ]
         tc_pairs = CP.get_parameter_values!(toml_dict, aliases, "TurbulenceConvection")
-        
+
         # Construct the REAL struct from src/Parameters.jl
-        param_set = TCP.TurbulenceConvectionParameters{FT, MP, SFP, typeof(user_params)}(; 
-            tc_pairs..., 
-            microphys_params, 
-            surf_flux_params, 
-            user_params
+        param_set = TCP.TurbulenceConvectionParameters{FT, MP, SFP, typeof(user_params)}(;
+            tc_pairs...,
+            microphys_params,
+            surf_flux_params,
+            user_params,
         )
 
         microphysics_params = TCP.microphysics_params(param_set)
@@ -301,36 +312,65 @@ if is_HPC # (if we can)
             FT = Float64
 
             # Physics variables
-            qi_tendency_sub_dep = FT(1e-9); qi = FT(1e-6); N = FT(200.0); ρ = FT(1.0); ql = FT(0); 
-            N_INP = FT(300.0); q_s = FT(1e-5); μ = FT(0); Δt_factor = FT(1.0); p_c = FT(1e5); ρ_c = FT(1.0)
-            
+            qi_tendency_sub_dep = FT(1e-9)
+            qi = FT(1e-6)
+            N = FT(200.0)
+            ρ = FT(1.0)
+            ql = FT(0)
+            N_INP = FT(300.0)
+            q_s = FT(1e-5)
+            μ = FT(0)
+            Δt_factor = FT(1.0)
+            p_c = FT(1e5)
+            ρ_c = FT(1.0)
+
             # State variables
-            S_ql = FT(1.57e-6); S_qi = FT(8.83e-8); area = FT(0.0499); p = FT(74651.0); T = FT(178.1)
-            w = FT(0.0187); τ_liq = FT(6.65e-9); τ_ice = FT(0.148); q_vap = FT(5.09e-10)
+            S_ql = FT(1.57e-6)
+            S_qi = FT(8.83e-8)
+            area = FT(0.0499)
+            p = FT(74651.0)
+            T = FT(178.1)
+            w = FT(0.0187)
+            τ_liq = FT(6.65e-9)
+            τ_ice = FT(0.148)
+            q_vap = FT(5.09e-10)
             Δt = FT(0.00769)
-            dqvdt = FT(1.28e-5); dTdt = FT(0.0138)
-            Γ_l = FT(1.7); Γ_i = FT(1.6)
-            
+            dqvdt = FT(1.28e-5)
+            dTdt = FT(0.0138)
+            Γ_l = FT(1.7)
+            Γ_i = FT(1.6)
+
             # Construct State Objects
             q = TD.PhasePartition(FT(0.00495), ql, qi)
             q_eq = TD.PhasePartition(FT(0.00020), FT(5.76e-9), FT(2.96e-8))
             ts = TD.PhaseNonEquil(FT(-68295.0), ρ, q)
-            
+
             # Derived variables
-            q_liq = q.liq; q_ice = q.ice
+            q_liq = q.liq
+            q_ice = q.ice
             δ_0 = q_vap - q_eq.liq
             δ_0i = q_vap - q_eq.ice
             δ_eq = 0.0 # Placeholder
             δi_eq = 0.0 # Placeholder
             dδdt_no_S = dqvdt
-            dδdt = dδdt_no_S - (S_ql*Γ_l + S_qi*Γ_i) 
-            
+            dδdt = dδdt_no_S - (S_ql * Γ_l + S_qi * Γ_i)
+
             # ======================================================================
             # 2. ICE NUCLEATION / ADJUSTMENT
             # ======================================================================
-            adjust_ice_N(param_set, N, N_INP, q.ice; 
-                ρ=ρ, S_i=FT(0.05), q_l=ql, q_s=q_s, monodisperse=false, 
-                ice_type=ice_type, decrease_N_if_subsaturated=true, N_INP_top=FT(150.)
+            adjust_ice_N(
+                param_set,
+                N,
+                N_INP,
+                q.ice;
+                ρ = ρ,
+                S_i = FT(0.05),
+                q_l = ql,
+                q_s = q_s,
+                monodisperse = false,
+                ice_type = ice_type,
+                decrease_N_if_subsaturated = true,
+                N_INP_top = FT(150.0),
             )
 
             # ======================================================================
@@ -345,23 +385,48 @@ if is_HPC # (if we can)
 
             # C. Calculate Milestones
             milestone_t, milestone, _, _, _, _ = calculate_next_standard_milestone_time(
-                q_eq, q_liq, q_ice, δ_0, δ_0i, δ_eq, δi_eq, S_ql, S_qi; 
-                dδdt=dδdt, dδdt_is_full_tendency=true, Γ_l=Γ_l, Γ_i=Γ_i, 
-                at_δ_eq_point=false, allow_δ_eq_point=true
+                q_eq,
+                q_liq,
+                q_ice,
+                δ_0,
+                δ_0i,
+                δ_eq,
+                δi_eq,
+                S_ql,
+                S_qi;
+                dδdt = dδdt,
+                dδdt_is_full_tendency = true,
+                Γ_l = Γ_l,
+                Γ_i = Γ_i,
+                at_δ_eq_point = false,
+                allow_δ_eq_point = true,
             )
 
             # D. Time Step Logic
             limiter = StandardSupersaturationMoistureSourcesLimiter()
             step(
-                regime, limiter, Δt, q_liq, q_ice, δ_0, δ_0i, δ_eq, δi_eq, q_eq, S_ql, S_qi, 
-                ((milestone_t < Δt) ? milestone : NotAtSupersaturationMilestone); 
-                dδdt_no_S=dδdt_no_S, Γ_l=Γ_l, Γ_i=Γ_i
+                regime,
+                limiter,
+                Δt,
+                q_liq,
+                q_ice,
+                δ_0,
+                δ_0i,
+                δ_eq,
+                δi_eq,
+                q_eq,
+                S_ql,
+                S_qi,
+                ((milestone_t < Δt) ? milestone : NotAtSupersaturationMilestone);
+                dδdt_no_S = dδdt_no_S,
+                Γ_l = Γ_l,
+                Γ_i = Γ_i,
             )
 
             # E. Regime Transitions
             new_regime_type = get_new_saturation_regime_type_from_milestone(milestone, regime, δ_0, δ_0i)
             add_regime_parameters(new_regime_type, q_liq, q_ice, below_freezing)
-            
+
             resolve_S_S_addit(S_ql, S_qi, Δt, FT(0.0), FT(0.0), milestone_t, Δt + milestone_t)
 
             # ======================================================================
@@ -369,18 +434,68 @@ if is_HPC # (if we can)
             # ======================================================================
             # A. Exponential Part
             morrison_milbrandt_2015_style_exponential_part_only(
-                regime, param_set, area, ρ, p, T, w, τ_liq, τ_ice, δ_0, δ_0i, q, q_eq, Δt, ts; 
-                opts = MM2015Opts{FT}(use_fix=false, return_mixing_ratio=false, dqvdt=dqvdt, dTdt=dTdt, 
-                fallback_to_standard_supersaturation_limiter=false, time_tolerance=FT(1e-6))
+                regime,
+                param_set,
+                area,
+                ρ,
+                p,
+                T,
+                w,
+                τ_liq,
+                τ_ice,
+                δ_0,
+                δ_0i,
+                q,
+                q_eq,
+                Δt,
+                ts;
+                opts = MM2015Opts{FT}(
+                    use_fix = false,
+                    return_mixing_ratio = false,
+                    dqvdt = dqvdt,
+                    dTdt = dTdt,
+                    fallback_to_standard_supersaturation_limiter = false,
+                    time_tolerance = FT(1e-6),
+                ),
             )
 
             # B. Standard Fallback
             do_standard_fallback(
-                milestone_t, milestone, FT(1e-6), S_ql, S_qi, q_liq, q_ice, δ_eq, δi_eq, 
-                dδdt_no_S, Γ_l, Γ_i, regime, param_set, area, ρ, p, T, w, τ_liq, τ_ice, 
-                δ_0, δ_0i, q, q_eq, Δt, ts; 
-                opts = MM2015Opts{FT}(use_fix=false, return_mixing_ratio=true, depth=0, dqvdt=dqvdt, dTdt=dTdt, 
-                fallback_to_standard_supersaturation_limiter=false)
+                milestone_t,
+                milestone,
+                FT(1e-6),
+                S_ql,
+                S_qi,
+                q_liq,
+                q_ice,
+                δ_eq,
+                δi_eq,
+                dδdt_no_S,
+                Γ_l,
+                Γ_i,
+                regime,
+                param_set,
+                area,
+                ρ,
+                p,
+                T,
+                w,
+                τ_liq,
+                τ_ice,
+                δ_0,
+                δ_0i,
+                q,
+                q_eq,
+                Δt,
+                ts;
+                opts = MM2015Opts{FT}(
+                    use_fix = false,
+                    return_mixing_ratio = true,
+                    depth = 0,
+                    dqvdt = dqvdt,
+                    dTdt = dTdt,
+                    fallback_to_standard_supersaturation_limiter = false,
+                ),
             )
 
             # ======================================================================
@@ -388,21 +503,56 @@ if is_HPC # (if we can)
             # ======================================================================
             # Get params helper
             get_params_and_go_to_mixing_ratio_exponential_part_only(
-                param_set, area, ρ, p, T, w, τ_liq, τ_ice, δ_0, δ_0i, dqvdt, dTdt, q, q_eq, Δt, ts; 
-                opts = MM2015Opts{FT}(use_fix=false)
+                param_set,
+                area,
+                ρ,
+                p,
+                T,
+                w,
+                τ_liq,
+                τ_ice,
+                δ_0,
+                δ_0i,
+                dqvdt,
+                dTdt,
+                q,
+                q_eq,
+                Δt,
+                ts;
+                opts = MM2015Opts{FT}(use_fix = false),
             )
-            
+
             # Helper variables for EPA calls
             # (Assuming standard constants for A_c calculation are mocked or calculated)
-            q_sl = FT(0.001); q_si = FT(0.0008); L_i = FT(2.8e6); c_p = FT(1004.0); e_sl = FT(600.0); dqsl_dT = FT(1e-4)
-            
+            q_sl = FT(0.001)
+            q_si = FT(0.0008)
+            L_i = FT(2.8e6)
+            c_p = FT(1004.0)
+            e_sl = FT(600.0)
+            dqsl_dT = FT(1e-4)
+
             # A_c Calc
-            A_c_res = A_c_func_with_and_without_WBF(τ_ice, Γ_l, q_sl, q_si, 9.81, w, c_p, e_sl, L_i, dqsl_dT, dqvdt, dTdt, p, ρ)
+            A_c_res = A_c_func_with_and_without_WBF(
+                τ_ice,
+                Γ_l,
+                q_sl,
+                q_si,
+                9.81,
+                w,
+                c_p,
+                e_sl,
+                L_i,
+                dqsl_dT,
+                dqvdt,
+                dTdt,
+                p,
+                ρ,
+            )
             A_c = A_c_res.A_c
-            
+
             # Tau func
             τ_EPA = τ_func_EPA(τ_liq, τ_ice, L_i, c_p, dqsl_dT, Γ_i)
-            
+
             # Hit values
             t_δ_hit_value(FT(0), δ_0, A_c, τ_EPA)
             get_t_out_of_q_liq_EPA(δ_0, A_c, τ_EPA, τ_liq, q_liq, Γ_l)
@@ -413,30 +563,42 @@ if is_HPC # (if we can)
             # ======================================================================
             aiu, bi, ciu = FT(0.1), FT(0.01), FT(0.001)
             _n0, λ, k = FT(1e6), FT(1e3), FT(2.0)
-            int__v_Dk_n__dD(aiu, bi, ciu, _n0, λ, k; Dmin=FT(0.0), Dmax=FT(Inf), μ=FT(0.0))
+            int__v_Dk_n__dD(aiu, bi, ciu, _n0, λ, k; Dmin = FT(0.0), Dmax = FT(Inf), μ = FT(0.0))
 
             int_nav_dr(
-                param_set, ice_type, Chen2022Vel, FT(1e-6), FT(1.0), FT(1e-5); 
-                Nt=FT(200.0), Dmin=FT(0.0), Dmax=FT(Inf), D_transition=FT((0.625e-3)/2)
+                param_set,
+                ice_type,
+                Chen2022Vel,
+                FT(1e-6),
+                FT(1.0),
+                FT(1e-5);
+                Nt = FT(200.0),
+                Dmin = FT(0.0),
+                Dmax = FT(Inf),
+                D_transition = FT((0.625e-3) / 2),
             )
 
             # ======================================================================
             # 7. SEDIMENTATION & TERMINAL VELOCITY
             # ======================================================================
             velo_scheme = Chen2022Vel
-            
+
             # Effective q
-            q_eff = q_effective_nan_N_safe(param_set, liq_type, FT(1e-6), FT(200.0); monodisperse=true)
-            
+            q_eff = q_effective_nan_N_safe(param_set, liq_type, FT(1e-6), FT(200.0); monodisperse = true)
+
             # Terminal Velocity
             calculate_sedimentation_velocity(
-                param_set, q_eff, ρ, liq_type, FT(200.0); velo_scheme=velo_scheme, Dmax=FT(Inf)
+                param_set,
+                q_eff,
+                ρ,
+                liq_type,
+                FT(200.0);
+                velo_scheme = velo_scheme,
+                Dmax = FT(Inf),
             )
-            
-            my_terminal_velocity(
-                param_set, rain_type, velo_scheme, ρ, q_eff; Dmax=FT(Inf), Nt=FT(2.5e8)
-            )
-                
+
+            my_terminal_velocity(param_set, rain_type, velo_scheme, ρ, q_eff; Dmax = FT(Inf), Nt = FT(2.5e8))
+
         end
-    end    
+    end
 end

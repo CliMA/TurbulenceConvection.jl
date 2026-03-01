@@ -13,7 +13,7 @@ function buoyancy_gradients(
     param_set::APS,
     bg_model::EnvBuoyGrad{FT, EBG};
     is_noneq::Bool = false,
-    latent_heating::FT = zero(FT)
+    latent_heating::FT = zero(FT),
 ) where {FT <: Real, EBG <: AbstractEnvBuoyGradClosure}
 
     thermo_params = TCP.thermodynamics_params(param_set)
@@ -34,7 +34,14 @@ function buoyancy_gradients(
     T_freeze = TCP.T_freeze(param_set)
     below_freezing = (bg_model.t_sat < T_freeze)
     if is_noneq
-        ts_sat = thermo_state_pθq(param_set, bg_model.p, bg_model.θ_liq_ice_sat, bg_model.qt_sat, bg_model.ql_sat, bg_model.qi_sat) # dont assume sat...
+        ts_sat = thermo_state_pθq(
+            param_set,
+            bg_model.p,
+            bg_model.θ_liq_ice_sat,
+            bg_model.qt_sat,
+            bg_model.ql_sat,
+            bg_model.qi_sat,
+        ) # dont assume sat...
     else
         ts_sat = thermo_state_pθq(param_set, bg_model.p, bg_model.θ_liq_ice_sat, bg_model.qt_sat)
     end
@@ -49,8 +56,8 @@ function buoyancy_gradients(
     ∂b∂θv = g * (R_d * bg_model.ρ / bg_model.p) * Π
 
     if (bg_model.en_cld_frac > zero(FT))
-        
-        
+
+
         if (subsaturated) || (abs(latent_heating) < FT(1e-6)) # && ((bg_model.ql_sat + bg_model.qi_sat) < q_min) # completely subsat or no latent heating available
             ∂b∂θl_sat = ∂b∂θv
             ∂b∂qt_sat = zero(FT)
@@ -90,11 +97,27 @@ function buoyancy_gradients(
             if is_noneq # we'll just go for a weighted sum assuming current liquid fraction.
                 # Theoretically should prolly be some fusion term on existing ice in noneq too but idk...
                 # Default to vaporization if above freezing otherwise sublimation
-                lh = (bg_model.ql_sat + bg_model.qi_sat) > q_min ? 
-                    (TD.latent_heat_vapor(thermo_params, ts_sat) * bg_model.ql_sat + TD.latent_heat_sublim(thermo_params, ts_sat) * bg_model.qi_sat) / (bg_model.ql_sat + bg_model.qi_sat) : (below_freezing ? TD.latent_heat_sublim(thermo_params, ts_sat) : TD.latent_heat_vapor(thermo_params, ts_sat))
+                lh =
+                    (bg_model.ql_sat + bg_model.qi_sat) > q_min ?
+                    (
+                        TD.latent_heat_vapor(thermo_params, ts_sat) * bg_model.ql_sat +
+                        TD.latent_heat_sublim(thermo_params, ts_sat) * bg_model.qi_sat
+                    ) / (bg_model.ql_sat + bg_model.qi_sat) :
+                    (
+                        below_freezing ? TD.latent_heat_sublim(thermo_params, ts_sat) :
+                        TD.latent_heat_vapor(thermo_params, ts_sat)
+                    )
             else # we'll use the saturation liquid fraction 
-                lh = (bg_model.ql_sat + bg_model.qi_sat) > q_min ? 
-                    (TD.latent_heat_vapor(thermo_params, ts_sat) * bg_model.ql_sat + TD.latent_heat_sublim(thermo_params, ts_sat) * bg_model.qi_sat) / (bg_model.ql_sat + bg_model.qi_sat) : (below_freezing ? TD.latent_heat_sublim(thermo_params, ts_sat) : TD.latent_heat_vapor(thermo_params, ts_sat))
+                lh =
+                    (bg_model.ql_sat + bg_model.qi_sat) > q_min ?
+                    (
+                        TD.latent_heat_vapor(thermo_params, ts_sat) * bg_model.ql_sat +
+                        TD.latent_heat_sublim(thermo_params, ts_sat) * bg_model.qi_sat
+                    ) / (bg_model.ql_sat + bg_model.qi_sat) :
+                    (
+                        below_freezing ? TD.latent_heat_sublim(thermo_params, ts_sat) :
+                        TD.latent_heat_vapor(thermo_params, ts_sat)
+                    )
             end
 
             cp_m = TD.cp_m(thermo_params, ts_sat)
@@ -146,7 +169,7 @@ function buoyancy_gradients(
 
 
 
-     
+
 
     else
         ∂b∂θl_sat = FT(0)

@@ -143,13 +143,31 @@ for flight_number in flight_numbers
             # nonequilibrium_moisture_scheme = :neural_network
             # nonequilibrium_moisture_scheme = :Base
             # dt_string = "adapt_dt__dt_min_0.5__dt_max_1.0"
-            dt_string = "adapt_dt__dt_min_2.0__dt_max_4.0"
-            # dt_string = "adapt_dt__dt_min_5.0__dt_max_10.0"
+            # dt_string = "adapt_dt__dt_min_2.0__dt_max_4.0"
+            dt_string = "adapt_dt__dt_min_5.0__dt_max_10.0"
             # dt_string = "adapt_dt__dt_min_10.0__dt_max_20.0"
             method = "best_particle_final"
             flight_number = 9
             case_name = "SOCRATES_RF" * string(flight_number, pad = 2) * "_" * lowercase(forcing_str) * "_data" # can't recall why it's lower here lol
-            namelist_path = joinpath(CEDMF_dir, "experiments", "SOCRATES_postprocess_runs_storage", "subexperiments","SOCRATES_"*string(nonequilibrium_moisture_scheme), "Calibrate_and_Run", "tau_autoconv_noneq", dt_string, "iwp_mean__lwp_mean__qi_mean__qip_mean__ql_mean__qr_mean", "postprocessing", "output", "Atlas_LES", "RFAll_obs", method, "data", "Output.$case_name.1_1", "namelist_SOCRATES.in")
+            namelist_path = joinpath(
+                CEDMF_dir,
+                "experiments",
+                "SOCRATES_postprocess_runs_storage",
+                "subexperiments",
+                "SOCRATES_" * string(nonequilibrium_moisture_scheme),
+                "Calibrate_and_Run",
+                "tau_autoconv_noneq",
+                dt_string,
+                "iwp_mean__lwp_mean__qi_mean__qip_mean__ql_mean__qr_mean",
+                "postprocessing",
+                "output",
+                "Atlas_LES",
+                "RFAll_obs",
+                method,
+                "data",
+                "Output.$case_name.1_1",
+                "namelist_SOCRATES.in",
+            )
             namelist = JSON.parsefile(namelist_path, dicttype = Dict, inttype = Int64, null = FT(NaN))
             namelist["meta"]["forcing_type"] = Symbol(namelist["meta"]["forcing_type"]) # this gets messed up for some reason...
             default_namelist = default_namelist = NameList.default_namelist(case_name)
@@ -261,8 +279,8 @@ for flight_number in flight_numbers
             # namelist["relaxation_timescale_params"]["geometric_liq_c_2"] = my_SOTA["geometric_liq_c_2"]
             # namelist["relaxation_timescale_params"]["geometric_liq_c_3"] = my_SOTA["geometric_liq_c_3"]
             # namelist["relaxation_timescale_params"]["geometric_liq_c_4"] = my_SOTA["geometric_liq_c_4"] 
-            
-            
+
+
             # # ================================================================================================= #
             # # --- run this jld2 --- #
 
@@ -286,13 +304,15 @@ for flight_number in flight_numbers
             # # ============================================================================================================================ #
 
             apply_edits = false
-        end 
+        end
 
         # [[ -- fixes -- ]]
 
         if apply_edits
-            if isnothing(get(namelist["grid"], "conservative_interp_kwargs", nothing)) || isnothing(get(namelist["grid"]["conservative_interp_kwargs"], "in", nothing))
-                namelist["grid"]["conservative_interp_kwargs"] = Dict("in" => Dict{Symbol, Union{Bool, String}}(), "out" => Dict{Symbol, Union{Bool, String}}())
+            if isnothing(get(namelist["grid"], "conservative_interp_kwargs", nothing)) ||
+               isnothing(get(namelist["grid"]["conservative_interp_kwargs"], "in", nothing))
+                namelist["grid"]["conservative_interp_kwargs"] =
+                    Dict("in" => Dict{Symbol, Union{Bool, String}}(), "out" => Dict{Symbol, Union{Bool, String}}())
             end
             namelist["grid"]["conservative_interp_kwargs"]["in"] = Dict{Symbol, Union{Bool, String}}(
                 :conservative_interp => true, # leave off by default
@@ -313,7 +333,8 @@ for flight_number in flight_numbers
         # -- Costa_SOTA parameters -- #
         if apply_edits
             # path_to_Costa_SOTA = "/groups/esm/cchristo/cedmf_results/james_v1_runs/results_Inversion_p22_e300_i15_mb_LES_2024-03-15_10-08_Vxo_longer_long_run/Diagnostics.nc"
-            path_to_Costa_SOTA = joinpath(CEDMF_dir, "experiments", "SOCRATES", "Reference", "Costa_SOTA_Diagnostics.nc") #  "/home/jbenjami/Research_Schneider/CliMA/CalibrateEDMF.jl/experiments/SOCRATES/Reference/Costa_SOTA_Diagnostics.nc"
+            path_to_Costa_SOTA =
+                joinpath(CEDMF_dir, "experiments", "SOCRATES", "Reference", "Costa_SOTA_Diagnostics.nc") #  "/home/jbenjami/Research_Schneider/CliMA/CalibrateEDMF.jl/experiments/SOCRATES/Reference/Costa_SOTA_Diagnostics.nc"
             Revise.includet(joinpath(CEDMF_dir, "tools", "DiagnosticsTools.jl")) # provides optimal_parameters()
             Costa_SOTA = optimal_parameters(path_to_Costa_SOTA, method = "last_nn_particle_mean")
             Costa_SOTA = Dict(zip(Costa_SOTA...)) # turn to dict
@@ -331,13 +352,18 @@ for flight_number in flight_numbers
             namelist["turbulence"]["EDMF_PrognosticTKE"]["Prandtl_number_0"] = Costa_SOTA["Prandtl_number_0"]
 
             # Momentum Exchange parameters
-            namelist["turbulence"]["EDMF_PrognosticTKE"]["pressure_normalmode_adv_coeff"] = Costa_SOTA["pressure_normalmode_adv_coeff"]
-            namelist["turbulence"]["EDMF_PrognosticTKE"]["pressure_normalmode_buoy_coeff1"] = Costa_SOTA["pressure_normalmode_buoy_coeff1"]
-            namelist["turbulence"]["EDMF_PrognosticTKE"]["pressure_normalmode_drag_coeff"] = Costa_SOTA["pressure_normalmode_drag_coeff"]
+            namelist["turbulence"]["EDMF_PrognosticTKE"]["pressure_normalmode_adv_coeff"] =
+                Costa_SOTA["pressure_normalmode_adv_coeff"]
+            namelist["turbulence"]["EDMF_PrognosticTKE"]["pressure_normalmode_buoy_coeff1"] =
+                Costa_SOTA["pressure_normalmode_buoy_coeff1"]
+            namelist["turbulence"]["EDMF_PrognosticTKE"]["pressure_normalmode_drag_coeff"] =
+                Costa_SOTA["pressure_normalmode_drag_coeff"]
 
             # Area Limiters
-            namelist["turbulence"]["EDMF_PrognosticTKE"]["min_area_limiter_scale"] = Costa_SOTA["min_area_limiter_scale"]
-            namelist["turbulence"]["EDMF_PrognosticTKE"]["min_area_limiter_power"] = Costa_SOTA["min_area_limiter_power"]
+            namelist["turbulence"]["EDMF_PrognosticTKE"]["min_area_limiter_scale"] =
+                Costa_SOTA["min_area_limiter_scale"]
+            namelist["turbulence"]["EDMF_PrognosticTKE"]["min_area_limiter_power"] =
+                Costa_SOTA["min_area_limiter_power"]
             # ========================================================================================================================= #
             # ========================================================================================================================= #
 
@@ -363,58 +389,61 @@ for flight_number in flight_numbers
 
             user_args = get!(namelist, "user_args", Dict()) # make sure user_args exists, otherwise it will error out later
 
-            merge!(user_args, Dict(
-                "nonequilibrium_moisture_scheme" => nonequilibrium_moisture_scheme,
-                # "nonequilibrium_moisture_sources_limiter_type" = :none, # can go past supersaturation but tendency limited timesteps prevents
-                # "entr_detr_limiter_type" = :none,
-                # "precipitation_tendency_limiter_type" = :none,
-                # "default_tendency_limiter_type" = :none,
-                #
-                # nonequilibrium_moisture_sources_limiter_type = :none,
-                # nonequilibrium_moisture_sources_limiter_type = :basic,
-                # nonequilibrium_moisture_sources_limiter_type = :standard_supersaturation,
-                # nonequilibrium_moisture_sources_limiter_type = :morrison_milbrandt_2015_style,
-                "nonequilibrium_moisture_sources_limiter_type"  => :morrison_milbrandt_2015_style_exponential_part_only,
-                #
-                # fallback_nonequilibrium_moisture_sources_limiter_type = :basic, # can go past supersaturation but tendency limited timesteps should prevent...
-                # fallback_nonequilibrium_moisture_sources_limiter_type = :standard_supersaturation, # has limiter issues...
-                # fallback_nonequilibrium_moisture_sources_limiter_type = :morrison_milbrandt_2015_style,
-                "fallback_nonequilibrium_moisture_sources_limiter_type"  => :morrison_milbrandt_2015_style_exponential_part_only,
-                "fallback_to_standard_supersaturation_limiter"  => true,
-                # precipitation_tendency_limiter_type = :basic,
-                # default_tendency_limiter_type = :basic.
-                # fallback_precipitation_tendency_limiter_type = :basic,
-                # fallback_default_tendency_limiter_type = :basic,
-                #
-                "precipitation_tendency_limiter_type"  => :truncated_basic,
-                "fallback_precipitation_tendency_limiter_type"  => :truncated_basic,
-                "default_tendency_limiter_type"  => :truncated_basic,
-                "fallback_default_tendency_limiter_type"  => :truncated_basic,
-                "truncated_basic_limiter_factor"  => FT(0.9),
-                #
-                # "entr_detr_limiter_type"  => :basic, # kills updrafts
-                # "fallback_entr_detr_limiter_type"  => :basic,
-                "entr_detr_limiter_type"  => :none,
-                "fallback_entr_detr_limiter_type"  => :none,
-                #
-                "use_sedimentation"  => true, 
-                "grid_mean_sedimentation"  => false,
-                "sedimentation_integration_method"  => :upwinding, # could be :right_biased I suppose.
-                "use_heterogeneous_ice_nucleation"  => true, # i think we do need this at correct values to make sure ice doesn't lag around forever nd gets the jumpstart it needs...
-                # "sedimentation_ice_number_concentration" => nonequilibrium_moisture_scheme,
-                # "sedimentation_liq_number_concentration" => nonequilibrium_moisture_scheme, # idk if this is good or bad lol...
-                "liq_terminal_velocity_scheme"  => :Chen2022Vel,
-                "ice_terminal_velocity_scheme"  => :Chen2022Vel,
-                "rain_terminal_velocity_scheme"  => :Chen2022Vel,
-                "snow_terminal_velocity_scheme"  => :Chen2022Vel,
-
-                "adjust_liq_N" => true, # adjust liquid number concentration
-                "adjust_ice_N" => true,
-                )
+            merge!(
+                user_args,
+                Dict(
+                    "nonequilibrium_moisture_scheme" => nonequilibrium_moisture_scheme,
+                    # "nonequilibrium_moisture_sources_limiter_type" = :none, # can go past supersaturation but tendency limited timesteps prevents
+                    # "entr_detr_limiter_type" = :none,
+                    # "precipitation_tendency_limiter_type" = :none,
+                    # "default_tendency_limiter_type" = :none,
+                    #
+                    # nonequilibrium_moisture_sources_limiter_type = :none,
+                    # nonequilibrium_moisture_sources_limiter_type = :basic,
+                    # nonequilibrium_moisture_sources_limiter_type = :standard_supersaturation,
+                    # nonequilibrium_moisture_sources_limiter_type = :morrison_milbrandt_2015_style,
+                    "nonequilibrium_moisture_sources_limiter_type" =>
+                        :morrison_milbrandt_2015_style_exponential_part_only,
+                    #
+                    # fallback_nonequilibrium_moisture_sources_limiter_type = :basic, # can go past supersaturation but tendency limited timesteps should prevent...
+                    # fallback_nonequilibrium_moisture_sources_limiter_type = :standard_supersaturation, # has limiter issues...
+                    # fallback_nonequilibrium_moisture_sources_limiter_type = :morrison_milbrandt_2015_style,
+                    "fallback_nonequilibrium_moisture_sources_limiter_type" =>
+                        :morrison_milbrandt_2015_style_exponential_part_only,
+                    "fallback_to_standard_supersaturation_limiter" => true,
+                    # precipitation_tendency_limiter_type = :basic,
+                    # default_tendency_limiter_type = :basic.
+                    # fallback_precipitation_tendency_limiter_type = :basic,
+                    # fallback_default_tendency_limiter_type = :basic,
+                    #
+                    "precipitation_tendency_limiter_type" => :truncated_basic,
+                    "fallback_precipitation_tendency_limiter_type" => :truncated_basic,
+                    "default_tendency_limiter_type" => :truncated_basic,
+                    "fallback_default_tendency_limiter_type" => :truncated_basic,
+                    "truncated_basic_limiter_factor" => FT(0.9),
+                    #
+                    # "entr_detr_limiter_type"  => :basic, # kills updrafts
+                    # "fallback_entr_detr_limiter_type"  => :basic,
+                    "entr_detr_limiter_type" => :none,
+                    "fallback_entr_detr_limiter_type" => :none,
+                    #
+                    "use_sedimentation" => true,
+                    "grid_mean_sedimentation" => false,
+                    "sedimentation_integration_method" => :upwinding, # could be :right_biased I suppose.
+                    "use_heterogeneous_ice_nucleation" => true, # i think we do need this at correct values to make sure ice doesn't lag around forever nd gets the jumpstart it needs...
+                    # "sedimentation_ice_number_concentration" => nonequilibrium_moisture_scheme,
+                    # "sedimentation_liq_number_concentration" => nonequilibrium_moisture_scheme, # idk if this is good or bad lol...
+                    "liq_terminal_velocity_scheme" => :Chen2022Vel,
+                    "ice_terminal_velocity_scheme" => :Chen2022Vel,
+                    "rain_terminal_velocity_scheme" => :Chen2022Vel,
+                    "snow_terminal_velocity_scheme" => :Chen2022Vel,
+                    "adjust_liq_N" => true, # adjust liquid number concentration
+                    "adjust_ice_N" => true,
+                ),
             )
 
         end
-            
+
         # ---------------------------------------------------------------- #
 
         # namelist["time_stepping"]["dt_min"] = 50.
@@ -428,7 +457,7 @@ for flight_number in flight_numbers
         namelist["stats_io"]["calibrate_io"] = false
         # namelist["stats_io"]["frequency"] = 10.
 
-        namelist["stats_io"]["frequency"] = 600.
+        namelist["stats_io"]["frequency"] = 600.0
         # namelist["stats_io"]["calibrate_io"] = true
         # namelist["thermodynamics"]["moisture_model"] = "equilibrium"
 
@@ -483,15 +512,15 @@ for flight_number in flight_numbers
         namelist["meta"]["flight_number"] = 09
         namelist["meta"]["simname"] = "SOCRATES_RF" * string(namelist["meta"]["flight_number"]; pad = 2) * "_obs_data"
 
-        
+
 
         # namelist["microphysics"]["pow_icenuc"] = zero(FT) # all liquid
-        namelist["microphysics"]["pow_liqnuc"] = FT(Inf) # all ice
+        # namelist["microphysics"]["pow_liqnuc"] = FT(Inf) # all ice
         # namelist["turbulence"]["EDMF_PrognosticTKE"]["convective_tke_buoyancy_coeff"] = FT(0)
 
 
-        namelist["user_params"]["min_N_ice"] = FT(0)
-        namelist["user_params"]["max_τ_ice"] = FT(Inf)
+        # namelist["user_params"]["min_N_ice"] = FT(0)
+        # namelist["user_params"]["max_τ_ice"] = FT(Inf)
 
         # namelist["user_params"]["χm_liq"] = FT(1)
         # namelist["microphysics"]["χm_ice"] = FT(1) # inv(namelist["user_params"]["mean_r_factor_ice"])^3
@@ -504,7 +533,7 @@ for flight_number in flight_numbers
         # namelist["relaxation_timescale_params"]["τ_sub_dep_scaling_factor"] = FT(500)
         # namelist["user_params"]["ice_dep_acnv_scaling_factor"] = FT(1.0)
         # namelist["user_params"]["ice_dep_acnv_scaling_factor_above"] = FT(1.0)
-        namelist["thermodynamics"]["sgs"] = "mean"
+        # namelist["thermodynamics"]["sgs"] = "mean"
         # namelist["thermodynamics"]["sgs"] = "mean_w_quadrature_adjusted_noneq_moisture_sources"
         # namelist["thermodynamics"]["sgs"] = "quadrature"
         # namelist["thermodynamics"]["quadrature_order"] = 12
@@ -554,7 +583,18 @@ for flight_number in flight_numbers
         # namelist["user_params"]["S_ice_min_activation"] = FT(0.1) # default 0.01, higher means less ice nucleation
 
 
-        delete!.(Ref(namelist["user_params"]), ["convective_tke_buoyancy_coeff", "convective_tke_advection_coeff", "convective_tke_dissipation_coeff", "convective_tke_self_dissipation_coeff", "entr_detr_rate_inv_s", "convective_tke_ed_scaling_factor", "tke_conv_entr_inv_s"])
+        delete!.(
+            Ref(namelist["user_params"]),
+            [
+                "convective_tke_buoyancy_coeff",
+                "convective_tke_advection_coeff",
+                "convective_tke_dissipation_coeff",
+                "convective_tke_self_dissipation_coeff",
+                "entr_detr_rate_inv_s",
+                "convective_tke_ed_scaling_factor",
+                "tke_conv_entr_inv_s",
+            ],
+        )
 
         # namelist["user_params"]["apply_nudging_to_updraft"] = true # if this is true, the updraft will feel the nudging just as much as the environment, otherwise the env would feel all of it... I think we need this. The LES updraft for RF09 doesn't go that high. without this i think we risk overshoots when say a warm updraft impinges, the environment takes the nudging cooling in response, and the updraft continues to accelerate.
         # namelist["user_params"]["condensate_qt_SD"] = -.26
@@ -609,13 +649,13 @@ for flight_number in flight_numbers
         if apply_edits
             dt = namelist["time_stepping"]["dt_min"]
             namelist["time_stepping"]["dt_min"] = dt
-            namelist["time_stepping"]["dt_max"] = 2*dt
+            namelist["time_stepping"]["dt_max"] = 2 * dt
 
-            namelist["time_stepping"]["algorithm"] = "Euler"; # jacobian too slow
+            namelist["time_stepping"]["algorithm"] = "Euler" # jacobian too slow
             namelist["time_stepping"]["dt_limit_tendencies_factor"] = 2.0 # for safety (though now it'll probably go up to 20.0 sec)
             namelist["time_stepping"]["use_tendency_timestep_limiter"] = false  # testing
             namelist["time_stepping"]["N_dt_max_edmf_violate_dt_min"] = 1e3
-            namelist["time_stepping"]["allow_cfl_dt_max_violate_dt_min"] = false   
+            namelist["time_stepping"]["allow_cfl_dt_max_violate_dt_min"] = false
             namelist["time_stepping"]["use_fallback_during_spinup"] = true
             namelist["time_stepping"]["allow_spinup_adapt_dt"] = true
             # namelist["time_stepping"]["limit_tendencies_using_dt_min_factor"] = 1.0 # margin of safety [[ depreacated ]]
@@ -628,9 +668,9 @@ for flight_number in flight_numbers
             # namelist["user_params"]["print_sources"] = false
 
 
-            namelist["user_params"]["q_min"] = 0. #eps(FT)
+            namelist["user_params"]["q_min"] = 0.0 #eps(FT)
             namelist["user_params"]["min_τ_liq"] = eps(FT)
-            namelist["user_params"]["max_τ_ice"] = 1/eps(FT)
+            namelist["user_params"]["max_τ_ice"] = 1 / eps(FT)
 
             namelist["turbulence"]["EDMF_PrognosticTKE"]["max_area"] = FT(0.9) # stability (maybe we need to use the limiter instead tho to not get flat cloud tops?)
 
@@ -640,14 +680,14 @@ for flight_number in flight_numbers
             namelist["user_params"]["reweight_extrema_only"] = false
             # namelist["turbulence"]["EDMF_PrognosticTKE"]["stalled_updraft_handler"] = "kill"
             namelist["turbulence"]["EDMF_PrognosticTKE"]["stalled_updraft_handler"] = "mix_to_grid_mean"
-            namelist["turbulence"]["EDMF_PrognosticTKE"]["base_detrainment_rate_inv_s"] = FT(1/(6.0*3600.0)) # 6 hours
+            namelist["turbulence"]["EDMF_PrognosticTKE"]["base_detrainment_rate_inv_s"] = FT(1 / (6.0 * 3600.0)) # 6 hours
             # namelist["user_params"]["tendency_resolver_setup"] = "none" # i think either dict or named tuple is fine, we dispatch depending... # doesn't seem to work anyway...
 
             # namelist["user_args"] =  CalibrateEDMF.HelperFuncs.set_property(namelist["user_args"], :truncated_basic_limiter_factor,  FT(0.9)) # make things take more than 1 timestep...
             # namelist["user_args"] =  CalibrateEDMF.HelperFuncs.set_property(namelist["user_args"], :fallback_to_standard_supersaturation_limiter, true) # make things take more than 1 timestep...
             # namelist["user_args"] =  CalibrateEDMF.HelperFuncs.set_property(namelist["user_args"], :nonequilibrium_moisture_sources_limiter_type, :standard_supersaturation) # make things take more than 1 timestep...
 
-            if namelist["user_params"]["reweight_processes_for_grid"] 
+            if namelist["user_params"]["reweight_processes_for_grid"]
                 @warn ("reweight_processes_for_grid is true, this is a test")
             end
         end
@@ -668,7 +708,8 @@ for flight_number in flight_numbers
         case_name = simname # in case the jld2 changed it
         @info("simname", simname)
         if debug
-            namelist["output"]["output_root"] = expanduser("~/Research_Schneider/CliMA/TurbulenceConvection.jl/test/debug")
+            namelist["output"]["output_root"] =
+                expanduser("~/Research_Schneider/CliMA/TurbulenceConvection.jl/test/debug")
         else
             namelist["output"]["output_root"] = expanduser("~/Research_Schneider/CliMA/TurbulenceConvection.jl/test")
         end
@@ -682,18 +723,19 @@ for flight_number in flight_numbers
         # ============================================================================================================================ #
         # -- print namelist -- #
         # search_locator__1
-        TC.full_print(namelist); println("\n\n")
+        TC.full_print(namelist)
+        println("\n\n")
         # ============================================================================================================================ #
 
     end
 
 
- push!(namelist_stash, namelist)
+    push!(namelist_stash, namelist)
 
-# ========================================================================================================================================================================================================================================================================================================================== #
-# ========================================================================================================================================================================================================================================================================================================================== #
-# ========================================================================================================================================================================================================================================================================================================================== #
-# ========================================================================================================================================================================================================================================================================================================================== #
+    # ========================================================================================================================================================================================================================================================================================================================== #
+    # ========================================================================================================================================================================================================================================================================================================================== #
+    # ========================================================================================================================================================================================================================================================================================================================== #
+    # ========================================================================================================================================================================================================================================================================================================================== #
 
     run_simulation = true
     if run_simulation
@@ -717,8 +759,8 @@ for flight_number in flight_numbers
         "RF" * string(flight_number, pad = 2) * "_" * LES_forcing_str * "-based_SAM_input" * LES_forcing_suffix
 
 
-# ========================================================================================================================================================================================================================================================================================================================== #
-# ========================================================================================================================================================================================================================================================================================================================== #
+    # ========================================================================================================================================================================================================================================================================================================================== #
+    # ========================================================================================================================================================================================================================================================================================================================== #
 
 
     make_plots = false
@@ -737,7 +779,7 @@ for flight_number in flight_numbers
         end
 
         using Plots
-        ENV["GKSwstype"]="nul"
+        ENV["GKSwstype"] = "nul"
         using NCDatasets
         # create directory if doesn't exist
         if !isdir(joinpath(outpath, "Figures"))
@@ -1729,7 +1771,9 @@ for flight_number in flight_numbers
 
         # --------------------------------------------------------------------------------------------- #
         # ql + qr
-        data_simul_lr = simul_data.group["profiles"]["ql_mean"][:, simul_ind] + simul_data.group["profiles"]["qr_mean"][:, simul_ind]
+        data_simul_lr =
+            simul_data.group["profiles"]["ql_mean"][:, simul_ind] +
+            simul_data.group["profiles"]["qr_mean"][:, simul_ind]
         data_truth_lr = truth_data["QCL"][:, truth_ind] ./ 1000 + truth_data["QR"][:, truth_ind] ./ 1000
 
         p_t = plot(
@@ -1750,7 +1794,9 @@ for flight_number in flight_numbers
 
         # --------------------------------------------------------------------------------------------- #
         # qi + qs
-        data_simul_is = simul_data.group["profiles"]["qi_mean"][:, simul_ind] + simul_data.group["profiles"]["qs_mean"][:, simul_ind]
+        data_simul_is =
+            simul_data.group["profiles"]["qi_mean"][:, simul_ind] +
+            simul_data.group["profiles"]["qs_mean"][:, simul_ind]
         data_truth_is = truth_data["QCI"][:, truth_ind] ./ 1000 + truth_data["QS"][:, truth_ind] ./ 1000
 
         p_t = plot(

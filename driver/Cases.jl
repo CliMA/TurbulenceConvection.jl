@@ -133,7 +133,7 @@ LES-driven forcing
 
 $(DocStringExtensions.FIELDS)
 """
-Base.@kwdef struct ForcingBase{T,FT} # this gets initialized in main.jl and then unpacked including in dycore.jl where we need it :)       ( see https://github.com/CliMA/TurbulenceConvection.jl/blob/f3218667a67f7ee37fcd9db8d7076372ce20c20b/driver/main.jl#L212 ) # forcing = Cases.ForcingBase(case, FT; Cases.forcing_kwargs(case, namelist)...)
+Base.@kwdef struct ForcingBase{T, FT} # this gets initialized in main.jl and then unpacked including in dycore.jl where we need it :)       ( see https://github.com/CliMA/TurbulenceConvection.jl/blob/f3218667a67f7ee37fcd9db8d7076372ce20c20b/driver/main.jl#L212 ) # forcing = Cases.ForcingBase(case, FT; Cases.forcing_kwargs(case, namelist)...)
     "Coriolis parameter"
     coriolis_param::FT = zero(FT)
     "Wind relaxation timescale"
@@ -147,19 +147,19 @@ Base.@kwdef struct ForcingBase{T,FT} # this gets initialized in main.jl and then
     "Large-scale divergence (same as in RadiationBase)"
     divergence::FT = zero(FT)
     "Forcing Functions Storage"
-    forcing_funcs::Array{NamedTuple,0} = fill(NamedTuple()) # used 0 d array intead[nothing] to retain mutability in forcing_funcs[]  # use a list here, so that we can mutate the internals of the imutable type (could make it a named tuple type insdie i guess that's what the init returns),... # might be too specific, maybe just Array{NamedTuple,0}
+    forcing_funcs::Array{NamedTuple, 0} = fill(NamedTuple()) # used 0 d array intead[nothing] to retain mutability in forcing_funcs[]  # use a list here, so that we can mutate the internals of the imutable type (could make it a named tuple type insdie i guess that's what the init returns),... # might be too specific, maybe just Array{NamedTuple,0}
 end
 
 force_type(::ForcingBase{T}) where {T} = T
 
-Base.@kwdef struct RadiationBase{T,FT}
+Base.@kwdef struct RadiationBase{T, FT}
     "Large-scale divergence (same as in ForcingBase)"
     divergence::FT = zero(FT)
     alpha_z::FT = zero(FT)
     kappa::FT = zero(FT)
     F0::FT = zero(FT)
     F1::FT = zero(FT)
-    radiation_funcs::Array{NamedTuple,0} = fill(NamedTuple()) # this is redundant no? but we don't wanna edit main1d to accomodate , main1d() says radiation = Cases.RadiationBase(case, FT) so we need to have this here... Alternatively you could just let forcing secretly set dTdt_rad but this is more consistent...
+    radiation_funcs::Array{NamedTuple, 0} = fill(NamedTuple()) # this is redundant no? but we don't wanna edit main1d to accomodate , main1d() says radiation = Cases.RadiationBase(case, FT) so we need to have this here... Alternatively you could just let forcing secretly set dTdt_rad but this is more consistent...
 end
 
 rad_type(::RadiationBase{T}) where {T} = T
@@ -235,16 +235,16 @@ get_radiation_type(::LES_driven_SCM) = RadiationLES
 get_radiation_type(::TRMM_LBA) = RadiationTRMM_LBA
 get_radiation_type(::SOCRATES) = RadiationSOCRATES
 
-large_scale_divergence(::Union{DYCOMS_RF01,DYCOMS_RF02}) = 3.75e-6
+large_scale_divergence(::Union{DYCOMS_RF01, DYCOMS_RF02}) = 3.75e-6
 
-RadiationBase(case::AbstractCaseType, FT) = RadiationBase{Cases.get_radiation_type(case),FT}()
+RadiationBase(case::AbstractCaseType, FT) = RadiationBase{Cases.get_radiation_type(case), FT}()
 
-forcing_kwargs(::AbstractCaseType, namelist) = (; coriolis_param=namelist["forcing"]["coriolis"])
-forcing_kwargs(case::DYCOMS_RF01, namelist) = (; divergence=large_scale_divergence(case))
-forcing_kwargs(case::DYCOMS_RF02, namelist) = (; divergence=large_scale_divergence(case))
+forcing_kwargs(::AbstractCaseType, namelist) = (; coriolis_param = namelist["forcing"]["coriolis"])
+forcing_kwargs(case::DYCOMS_RF01, namelist) = (; divergence = large_scale_divergence(case))
+forcing_kwargs(case::DYCOMS_RF02, namelist) = (; divergence = large_scale_divergence(case))
 aux_data_kwarg(::AbstractCaseType, namelist) = ()
 
-ForcingBase(case::AbstractCaseType, FT; kwargs...) = ForcingBase{get_forcing_type(case),FT}(; kwargs...) # constructor for forcing base above...
+ForcingBase(case::AbstractCaseType, FT; kwargs...) = ForcingBase{get_forcing_type(case), FT}(; kwargs...) # constructor for forcing base above...
 
 #####
 ##### Default case behavior:
@@ -710,11 +710,11 @@ function surface_params(case::TRMM_LBA, surf_ref_state, param_set; Ri_bulk_crit)
     ustar::FT = 0.28 # this is taken from Bomex -- better option is to approximate from LES tke above the surface
     lhf = t -> 554 * max(0, cos(FT(π) / 2 * ((FT(5.25) * 3600 - t) / FT(5.25) / 3600)))^FT(1.3)
     shf = t -> 270 * max(0, cos(FT(π) / 2 * ((FT(5.25) * 3600 - t) / FT(5.25) / 3600)))^FT(1.5)
-    kwargs = (; Tsurface, qsurface, shf, lhf, ustar, Ri_bulk_crit, zero_uv_fluxes=true)
+    kwargs = (; Tsurface, qsurface, shf, lhf, ustar, Ri_bulk_crit, zero_uv_fluxes = true)
     return TC.FixedSurfaceFlux(FT, TC.FixedFrictionVelocity; kwargs...)
 end
 
-RadiationBase(case::TRMM_LBA, FT) = RadiationBase{Cases.get_radiation_type(case),FT}()
+RadiationBase(case::TRMM_LBA, FT) = RadiationBase{Cases.get_radiation_type(case), FT}()
 
 initialize_radiation(::TRMM_LBA, radiation, state, param_set) = initialize(radiation, state)
 
@@ -774,10 +774,10 @@ function surface_params(case::ARM_SGP, surf_ref_state, param_set; Ri_bulk_crit)
     t_Sur_in = arr_type(FT[0.0, 4.0, 6.5, 7.5, 10.0, 12.5, 14.5]) .* 3600 #LES time is in sec
     SH = arr_type(FT[-30.0, 90.0, 140.0, 140.0, 100.0, -10, -10]) # W/m^2
     LH = arr_type(FT[5.0, 250.0, 450.0, 500.0, 420.0, 180.0, 0.0]) # W/m^2
-    shf = Dierckx.Spline1D(t_Sur_in, SH; k=1)
-    lhf = Dierckx.Spline1D(t_Sur_in, LH; k=1)
+    shf = Dierckx.Spline1D(t_Sur_in, SH; k = 1)
+    lhf = Dierckx.Spline1D(t_Sur_in, LH; k = 1)
 
-    kwargs = (; Tsurface, qsurface, shf, lhf, ustar, Ri_bulk_crit, zero_uv_fluxes=true)
+    kwargs = (; Tsurface, qsurface, shf, lhf, ustar, Ri_bulk_crit, zero_uv_fluxes = true)
     return TC.FixedSurfaceFlux(FT, TC.FixedFrictionVelocity; kwargs...)
 end
 
@@ -944,12 +944,12 @@ function initialize_forcing(::DYCOMS_RF01, forcing, state, param_set)
 end
 
 function RadiationBase(case::DYCOMS_RF01, FT)
-    return RadiationBase{Cases.get_radiation_type(case),FT}(;
-        divergence=large_scale_divergence(case),
-        alpha_z=1.0,
-        kappa=85.0,
-        F0=70.0,
-        F1=22.0,
+    return RadiationBase{Cases.get_radiation_type(case), FT}(;
+        divergence = large_scale_divergence(case),
+        alpha_z = 1.0,
+        kappa = 85.0,
+        F0 = 70.0,
+        F1 = 22.0,
     )
 end
 
@@ -1037,12 +1037,12 @@ function initialize_forcing(::DYCOMS_RF02, forcing, state, param_set)
 end
 
 function RadiationBase(case::DYCOMS_RF02, FT)
-    return RadiationBase{Cases.get_radiation_type(case),FT}(;
-        divergence=large_scale_divergence(case),
-        alpha_z=1.0,
-        kappa=85.0,
-        F0=70.0,
-        F1=22.0,
+    return RadiationBase{Cases.get_radiation_type(case), FT}(;
+        divergence = large_scale_divergence(case),
+        alpha_z = 1.0,
+        kappa = 85.0,
+        F0 = 70.0,
+        F1 = 22.0,
     )
 end
 
@@ -1173,7 +1173,7 @@ function forcing_kwargs(::LES_driven_SCM, namelist)
     les_filename = namelist["meta"]["lesfile"]
     cfsite_number, forcing_model, month, experiment = TC.parse_les_path(les_filename)
     LES_library = TC.get_LES_library()
-    les_type = LES_library[forcing_model][string(month, pad=2)]["cfsite_numbers"][string(cfsite_number, pad=2)]
+    les_type = LES_library[forcing_model][string(month, pad = 2)]["cfsite_numbers"][string(cfsite_number, pad = 2)]
     if les_type == "shallow"
         wind_nudge_τᵣ = 6.0 * 3600.0
         scalar_nudge_zᵢ = 3000.0
@@ -1283,13 +1283,13 @@ function surface_params(case::LES_driven_SCM, surf_ref_state, param_set; Ri_bulk
         imax = LESDat.imax
 
         zrough = FT(1.0e-4)
-        Tsurface = Statistics.mean(data.group["timeseries"]["surface_temperature"][:][imin:imax], dims=1)[1]
+        Tsurface = Statistics.mean(data.group["timeseries"]["surface_temperature"][:][imin:imax], dims = 1)[1]
         # get surface value of q
-        mean_qt_prof = Statistics.mean(data.group["profiles"]["qt_mean"][:][:, imin:imax], dims=2)[:]
+        mean_qt_prof = Statistics.mean(data.group["profiles"]["qt_mean"][:][:, imin:imax], dims = 2)[:]
         # TODO: this will need to be changed if/when we don't prescribe surface fluxes
         qsurface = FT(0)
-        lhf = FT(Statistics.mean(data.group["timeseries"]["lhf_surface_mean"][:][imin:imax], dims=1)[1])
-        shf = FT(Statistics.mean(data.group["timeseries"]["shf_surface_mean"][:][imin:imax], dims=1)[1])
+        lhf = FT(Statistics.mean(data.group["timeseries"]["lhf_surface_mean"][:][imin:imax], dims = 1)[1])
+        shf = FT(Statistics.mean(data.group["timeseries"]["shf_surface_mean"][:][imin:imax], dims = 1)[1])
         (; zrough, Tsurface, qsurface, lhf, shf)
     end
     UnPack.@unpack zrough, Tsurface, qsurface, lhf, shf = nt
@@ -1299,11 +1299,9 @@ function surface_params(case::LES_driven_SCM, surf_ref_state, param_set; Ri_bulk
     return TC.FixedSurfaceFlux(FT, TC.VariableFrictionVelocity; kwargs...)
 end
 
-initialize_forcing(::LES_driven_SCM, forcing, state, param_set; LESDat) =
-    initialize(forcing, state, LESDat)
+initialize_forcing(::LES_driven_SCM, forcing, state, param_set; LESDat) = initialize(forcing, state, LESDat)
 
-initialize_radiation(::LES_driven_SCM, radiation, state, param_set; LESDat) =
-    initialize(radiation, state, LESDat)
+initialize_radiation(::LES_driven_SCM, radiation, state, param_set; LESDat) = initialize(radiation, state, LESDat)
 
 
 #####
@@ -1312,13 +1310,14 @@ initialize_radiation(::LES_driven_SCM, radiation, state, param_set; LESDat) =
 
 function aux_data_kwarg(case::SOCRATES, namelist, param_set::APS, grid::TC.Grid)
     FT = Float64
-    if haskey(namelist["grid"], "conservative_interp_kwargs") && haskey(namelist["grid"]["conservative_interp_kwargs"], "in") # if it exists, use it
+    if haskey(namelist["grid"], "conservative_interp_kwargs") &&
+       haskey(namelist["grid"]["conservative_interp_kwargs"], "in") # if it exists, use it
         conservative_interp_kwargs = namelist["grid"]["conservative_interp_kwargs"]["in"] # convert to nt no matter what for type stability, but don't convert to SSCF yet bc that strips out conservative_interp key...
     else
         if !haskey(namelist["grid"], "conservative_interp_kwargs")
-            namelist["grid"]["conservative_interp_kwargs"] = Dict{String,Any}()
+            namelist["grid"]["conservative_interp_kwargs"] = Dict{String, Any}()
         end
-        namelist["grid"]["conservative_interp_kwargs"]["in"] = Dict{String,Union{Bool,String,FT}}() # will default to no conwservative interp
+        namelist["grid"]["conservative_interp_kwargs"]["in"] = Dict{String, Union{Bool, String, FT}}() # will default to no conwservative interp
         conservative_interp_kwargs = namelist["grid"]["conservative_interp_kwargs"]["in"] # convert to nt no matter what for type stability, but don't convert to SSCF yet bc that strips out conservative_interp key...
     end
 
@@ -1327,7 +1326,8 @@ function aux_data_kwarg(case::SOCRATES, namelist, param_set::APS, grid::TC.Grid)
     # should be Dict of String -> Union{Bool, String}
     # conservative_interp_kwargs = Dict{Symbol, Union{Bool, Symbol}}(Symbol(k) => isa(v, String) ? Symbol(v) : v for (k, v) in conservative_interp_kwargs)
     # conservative_interp_kwargs = NamedTuple((Symbol(k) => isa(v, String) ? Symbol(v) : v for (k, v) in conservative_interp_kwargs) ) # convert Strings to symbols
-    conservative_interp_kwargs = (; (Symbol(k) => (isa(v, String) ? Symbol(v) : v) for (k, v) in conservative_interp_kwargs)...)
+    conservative_interp_kwargs =
+        (; (Symbol(k) => (isa(v, String) ? Symbol(v) : v) for (k, v) in conservative_interp_kwargs)...)
 
 
     conservative_interp = get(conservative_interp_kwargs, :conservative_interp, false) # break out bc SSCF hanles this separately and will strip it from the tuple
@@ -1337,7 +1337,7 @@ function aux_data_kwarg(case::SOCRATES, namelist, param_set::APS, grid::TC.Grid)
 
 
     # zrough = FT(0.1) # copied from gabls which is also w/ monin obhukov boundary layer [[ i think this is far too high. GABLS is a land case!!!]]
-    zrough::FT = TC.parse_namelist(namelist, "user_params", "zrough", default=FT(6e-4))
+    zrough::FT = TC.parse_namelist(namelist, "user_params", "zrough", default = FT(6e-4))
 
     # Call here so we dont need to repeat the call in radiation [[ leave the initial condition calls alone for now]] -- We would need to figure out how to pass in state or grid here...
     new_zc = vec(grid.zc.z)
@@ -1345,24 +1345,24 @@ function aux_data_kwarg(case::SOCRATES, namelist, param_set::APS, grid::TC.Grid)
     thermo_params = TCP.thermodynamics_params(param_set)
     forcing_funcs = SSCF.process_case(
         case.flight_number;
-        forcing_type=case.forcing_type,
-        new_z=(;
-            dTdt_hadv=new_zc,
-            H_nudge=new_zc,
-            dqtdt_hadv=new_zc,
-            qt_nudge=new_zc,
-            subsidence=new_zc,
-            u_nudge=new_zc,
-            v_nudge=new_zc,
-            ug_nudge=new_zc,
-            vg_nudge=new_zc,
-            dTdt_rad=new_zc,
+        forcing_type = case.forcing_type,
+        new_z = (;
+            dTdt_hadv = new_zc,
+            H_nudge = new_zc,
+            dqtdt_hadv = new_zc,
+            qt_nudge = new_zc,
+            subsidence = new_zc,
+            u_nudge = new_zc,
+            v_nudge = new_zc,
+            ug_nudge = new_zc,
+            vg_nudge = new_zc,
+            dTdt_rad = new_zc,
         ),
-        initial_condition=false,
-        thermo_params=thermo_params,
-        conservative_interp=conservative_interp, # parsed in aux_data_kwarg()
-        conservative_interp_kwargs=conservative_interp_kwargs, # parsed in aux_data_kwarg()
-        use_svectors=true,
+        initial_condition = false,
+        thermo_params = thermo_params,
+        conservative_interp = conservative_interp, # parsed in aux_data_kwarg()
+        conservative_interp_kwargs = conservative_interp_kwargs, # parsed in aux_data_kwarg()
+        use_svectors = true,
     )
 
     return (; conservative_interp, conservative_interp_kwargs, zrough, forcing_funcs)
@@ -1373,10 +1373,10 @@ function surface_ref_state(case::SOCRATES, param_set::APS, namelist) # adopted m
     thermo_params = TCP.thermodynamics_params(param_set)
     return SSCF.process_case(
         case.flight_number;
-        forcing_type=case.forcing_type,
-        surface="ref",
-        thermo_params=thermo_params,
-        use_svectors=true,
+        forcing_type = case.forcing_type,
+        surface = "ref",
+        thermo_params = thermo_params,
+        use_svectors = true,
     )
 end
 
@@ -1387,31 +1387,31 @@ function initialize_profiles(case::SOCRATES, param_set, state; kwargs...) # Reli
     prog_gm = TC.center_prog_grid_mean(state)
     thermo_params = TCP.thermodynamics_params(param_set)
     new_zc = vec(grid.zc.z)
-    new_zf = vec(grid.zf.z)[1:(end-1)] # apply the zf interpolated forcing on zc ahead (I think that's what atlas did..., we might just have different face/center logic
+    new_zf = vec(grid.zf.z)[1:(end - 1)] # apply the zf interpolated forcing on zc ahead (I think that's what atlas did..., we might just have different face/center logic
     FT = TC.float_type(state)
 
     (; conservative_interp, conservative_interp_kwargs) = values(kwargs) # values converts kwargs to named tuple which we then unpack... we could also use kwargs[:conservative_interp] ...
 
     IC = SSCF.process_case(
         case.flight_number;
-        forcing_type=case.forcing_type,
-        new_z=(;
-            dTdt_hadv=new_zc,
-            H_nudge=new_zc,
-            dqtdt_hadv=new_zc,
-            qt_nudge=new_zc,
-            subsidence=new_zc,
-            u_nudge=new_zc,
-            v_nudge=new_zc,
-            ug_nudge=new_zc,
-            vg_nudge=new_zc,
-            dTdt_rad=new_zc,
+        forcing_type = case.forcing_type,
+        new_z = (;
+            dTdt_hadv = new_zc,
+            H_nudge = new_zc,
+            dqtdt_hadv = new_zc,
+            qt_nudge = new_zc,
+            subsidence = new_zc,
+            u_nudge = new_zc,
+            v_nudge = new_zc,
+            ug_nudge = new_zc,
+            vg_nudge = new_zc,
+            dTdt_rad = new_zc,
         ),
-        initial_condition=true,
-        thermo_params=thermo_params,
-        conservative_interp=conservative_interp, #  aux_data_kwarg()
-        conservative_interp_kwargs=conservative_interp_kwargs, # parsed in aux_data_kwarg()
-        use_svectors=true,
+        initial_condition = true,
+        thermo_params = thermo_params,
+        conservative_interp = conservative_interp, #  aux_data_kwarg()
+        conservative_interp_kwargs = conservative_interp_kwargs, # parsed in aux_data_kwarg()
+        use_svectors = true,
     )
 
     prog_gm_u = copy(aux_gm.q_tot) # copy as template cause u,g go into a uₕ vector so this is easier to work with (copied from other cases...)
@@ -1424,7 +1424,13 @@ function initialize_profiles(case::SOCRATES, param_set, state; kwargs...) # Reli
 
         #= sat adjust (no ice) for initialization =#
         # to avoid high supersat messing with liq and ice activation [[ LES is sat adjust so]] :: Now that buoyancy gradient and convective tke are fixed, we're not relying on that initial shock anymore
-        ts_eq_liq = TC.PhaseEquil_pθq_given_liquid_fraction(thermo_params, aux_gm.p[k], aux_gm.θ_liq_ice[k], aux_gm.q_tot[k], one(FT)) # assme 1 liquid fraction....
+        ts_eq_liq = TC.PhaseEquil_pθq_given_liquid_fraction(
+            thermo_params,
+            aux_gm.p[k],
+            aux_gm.θ_liq_ice[k],
+            aux_gm.q_tot[k],
+            one(FT),
+        ) # assme 1 liquid fraction....
         aux_gm.q_liq[k] = TC.liquid_specific_humidity_given_liquid_fraction(thermo_params, ts_eq_liq, one(FT)) # can't set prog here because we dont know moisture model
         # aux_gm.q_ice[k] = FT(0) # can't set prog here because we dont know moisture model
 
@@ -1460,9 +1466,9 @@ function overwrite_ref_state_from_file!(case::SOCRATES, state, param_set)
     # calculate new reference states
     reference_state_profiles = SSCF.get_LES_reference_profiles(
         case.flight_number;
-        forcing_type=case.forcing_type,
-        new_zc=new_zc,
-        new_zf=new_zf,
+        forcing_type = case.forcing_type,
+        new_zc = new_zc,
+        new_zf = new_zf,
     )
 
     # set center profiles
@@ -1485,10 +1491,10 @@ function surface_params(case::SOCRATES, surf_ref_state, param_set; kwargs...) # 
     thermo_params = TCP.thermodynamics_params(param_set)
     sc = SSCF.process_case(
         case.flight_number;
-        forcing_type=case.forcing_type,
-        surface="conditions",
-        thermo_params=thermo_params,
-        use_svectors=true,
+        forcing_type = case.forcing_type,
+        surface = "conditions",
+        thermo_params = thermo_params,
+        use_svectors = true,
     )
 
     # drop conservative_interp_kwargs from kwargs
@@ -1502,14 +1508,14 @@ function surface_params(case::SOCRATES, surf_ref_state, param_set; kwargs...) # 
 
     # no ustar w/ monin obukhov i guess, seems to be calculated in https://github.com/CliMA/SurfaceFluxes.jl src/SurfaceFluxes.jl/compute_ustar()
     # kwargs = (; Tsurface = sc.Tg, qsurface = sc.qg, kwargs...) # taken from gabls cause only other one w/ moninobhukov interactive, [ I think using Tg is a mistake becase w get too low LHF and SHF. in rf09 that reduces convection]
-    kwargs = (; Tsurface=sc.Tsfc, qsurface=sc.qg, kwargs...) # taken from gabls cause only other one w/ moninobhukov interactive, # This seems to be most accurate... [[ i think this is better becaue it brings more qt to heights, though it does leave more at cloud top spike ]]
+    kwargs = (; Tsurface = sc.Tsfc, qsurface = sc.qg, kwargs...) # taken from gabls cause only other one w/ moninobhukov interactive, # This seems to be most accurate... [[ i think this is better becaue it brings more qt to heights, though it does leave more at cloud top spike ]]
     return TC.MoninObukhovSurface(FT; kwargs...) # interactive?
 end
 
 function initialize_forcing(case::SOCRATES, forcing, state, param_set; kwargs...) # param_set isn't used but matches form in main.jl
     grid = TC.Grid(state)
     new_zc = vec(grid.zc.z)
-    new_zf = vec(grid.zf.z)[1:(end-1)]
+    new_zf = vec(grid.zf.z)[1:(end - 1)]
 
     (; conservative_interp, conservative_interp_kwargs, forcing_funcs) = values(kwargs) # values converts kwargs to named tuple which we then unpack... we could also use kwargs[:conservative_interp] ...
 
@@ -1535,7 +1541,17 @@ function initialize_forcing(case::SOCRATES, forcing, state, param_set; kwargs...
     #     conservative_interp_kwargs = conservative_interp_kwargs, # parsed in aux_data_kwarg()
     #     use_svectors = true,
     # )[(:dTdt_hadv, :H_nudge, :dqtdt_hadv, :qt_nudge, :subsidence, :u_nudge, :v_nudge, :ug_nudge, :vg_nudge,)] #:dTdt_rad)] # only keep relevant keys
-    forcing.forcing_funcs[] = forcing_funcs[(:dTdt_hadv, :H_nudge, :dqtdt_hadv, :qt_nudge, :subsidence, :u_nudge, :v_nudge, :ug_nudge, :vg_nudge,)] #:dTdt_rad)] # only keep relevant keys
+    forcing.forcing_funcs[] = forcing_funcs[(
+        :dTdt_hadv,
+        :H_nudge,
+        :dqtdt_hadv,
+        :qt_nudge,
+        :subsidence,
+        :u_nudge,
+        :v_nudge,
+        :ug_nudge,
+        :vg_nudge,
+    )] #:dTdt_rad)] # only keep relevant keys
     initialize(forcing, state) # we have this default already to plug t=0 into functions, or else we would do this like update_forcing below right...
 end
 
@@ -1543,11 +1559,11 @@ function forcing_kwargs(case::SOCRATES, namelist) # call in main.jl is forcing =
     if case.forcing_type === :obs_data # use the socrates type to handle timescale setting
         wind_nudge_τᵣ = get(namelist["forcing"], "wind_nudge_τᵣ", 20 * 60) # paper standard (should I cast as FT?)
         scalar_nudge_τᵣ = get(namelist["forcing"], "scalar_nudge_τᵣ", 20 * 60) # paper standard
-        (; wind_nudge_τᵣ=wind_nudge_τᵣ, scalar_nudge_τᵣ=scalar_nudge_τᵣ)
+        (; wind_nudge_τᵣ = wind_nudge_τᵣ, scalar_nudge_τᵣ = scalar_nudge_τᵣ)
     elseif case.forcing_type === :ERA5_data # ERA5
         wind_nudge_τᵣ = get(namelist["forcing"], "wind_nudge_τᵣ", 60 * 60) # paper standard
         scalar_nudge_τᵣ = get(namelist["forcing"], "scalar_nudge_τᵣ", (Inf * 60) * 60) # paper standard = do not relax (for T, qt i.e. H_nudge, qt_nudge -- can test 6 hours again later sincee don't have RRTMG to be in line more w/ appendix D
-        (; wind_nudge_τᵣ=wind_nudge_τᵣ, scalar_nudge_τᵣ=scalar_nudge_τᵣ)
+        (; wind_nudge_τᵣ = wind_nudge_τᵣ, scalar_nudge_τᵣ = scalar_nudge_τᵣ)
     else # error catching for resiliency against coding bugs
         error("Cannot set nudging τ timescales, forcing type not recognized")
     end
@@ -1602,7 +1618,7 @@ end
 
 
 # currently still nothing just cause idk what to do w/ RRTMG or if it's long enough to need...
-RadiationBase(case::SOCRATES, FT) = RadiationBase{Cases.get_radiation_type(case),FT}() # i think this should default to none, would deprecate this call for now cause we dont have a use, default is just none... but aux_data_kwarg is in the end of the main.jl initialize_radiation.jl cal so we gotta improvise
+RadiationBase(case::SOCRATES, FT) = RadiationBase{Cases.get_radiation_type(case), FT}() # i think this should default to none, would deprecate this call for now cause we dont have a use, default is just none... but aux_data_kwarg is in the end of the main.jl initialize_radiation.jl cal so we gotta improvise
 
 function initialize_radiation(case::SOCRATES, radiation, state, param_set; kwargs...)
     # grid = TC.Grid(state)

@@ -103,12 +103,20 @@ end
 
     ... short derivation here ... 
 """
-function moist_gradient_Richardson_number_helper(mixing_length_params, param_set::APS, ∂b∂z::FT, ∂MSE∂z::FT, Shear²::FT, ϵ::FT, T::FT) where {FT}
+function moist_gradient_Richardson_number_helper(
+    mixing_length_params,
+    param_set::APS,
+    ∂b∂z::FT,
+    ∂MSE∂z::FT,
+    Shear²::FT,
+    ϵ::FT,
+    T::FT,
+) where {FT}
     g::FT = TCP.grav(param_set)
     c_p::FT = TCP.cp_d(param_set)
     Ri_c::FT = mixing_length_params.Ri_c
 
-    ∂b∂z_moist =  g/(c_p * T) * ∂MSE∂z
+    ∂b∂z_moist = g / (c_p * T) * ∂MSE∂z
     return min(min(∂b∂z, ∂b∂z_moist) / max(Shear², ϵ), Ri_c) # the same as usual but the less stable of the two gradients
 end
 
@@ -118,7 +126,21 @@ This one checks which state we're in... for example using moist is ok if subsat 
 Perhaps what you'd want to pass in to avoid some complexity is the latent heating rate... but that's not strictly available in Eq ....
 
 """
-function moist_gradient_Richardson_number(mixing_length_params, param_set::APS, ts::TD.ThermodynamicState, qr::FT, qs::FT, ∂b∂z::FT, ∂MSE∂z::FT, Shear²::FT, ϵ::FT; is_noneq::Bool=true, RH_liq::FT=FT(NaN), RH_ice::FT=FT(NaN), T::FT = FT(NaN)) where {FT}
+function moist_gradient_Richardson_number(
+    mixing_length_params,
+    param_set::APS,
+    ts::TD.ThermodynamicState,
+    qr::FT,
+    qs::FT,
+    ∂b∂z::FT,
+    ∂MSE∂z::FT,
+    Shear²::FT,
+    ϵ::FT;
+    is_noneq::Bool = true,
+    RH_liq::FT = FT(NaN),
+    RH_ice::FT = FT(NaN),
+    T::FT = FT(NaN),
+) where {FT}
     thermo_params = TCP.thermodynamics_params(param_set)
     T_freeze::FT = TCP.T_freeze(param_set)
     T::FT = isnan(T) ? TD.air_temperature(thermo_params, ts) : T
@@ -133,7 +155,7 @@ function moist_gradient_Richardson_number(mixing_length_params, param_set::APS, 
         RH_liq = isnan(RH_liq) ? relative_humidity_over_liquid(thermo_params, ts) : RH_liq
         if (
             (RH_ice < FT(1)) ||
-            ((RH_liq > FT(1)) && below_freezing) || 
+            ((RH_liq > FT(1)) && below_freezing) ||
             (RH_ice < FT(1) && ((q.ice + qs) < q_min)) ||
             (RH_liq < FT(1) && (q.liq + qr) < q_min)
         )
@@ -146,7 +168,7 @@ function moist_gradient_Richardson_number(mixing_length_params, param_set::APS, 
 
         if ((q.ice + qs) < q_min) && ((q.liq + qr) < q_min) # Having condensate implies not subsat in Eq. Hard to know what direction we're going then.
             return gradient_Richardson_number(mixing_length_params, ∂b∂z, Shear², ϵ)
-        # saturated and MSE gradient I guess is all we have, there's no supersaturation or lack of condensate to check for
+            # saturated and MSE gradient I guess is all we have, there's no supersaturation or lack of condensate to check for
         else # we have condensate. so we're at sat... presumably...
             return moist_gradient_Richardson_number_helper(mixing_length_params, param_set, ∂b∂z, ∂MSE∂z, Shear², ϵ, T)
         end

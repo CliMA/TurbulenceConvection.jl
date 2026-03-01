@@ -7,16 +7,16 @@ abstract type AbstractDomain end
 
 # --- Level 1: Categories
 abstract type AbstractPrimitiveDomain <: AbstractDomain end
-abstract type AbstractDerivedDomain   <: AbstractDomain end
+abstract type AbstractDerivedDomain <: AbstractDomain end
 
 # --- Level 2: Concrete domains
 # Original EDMF domains
-struct EnvDomain          <: AbstractPrimitiveDomain end
-struct BulkDomain         <: AbstractPrimitiveDomain end
-struct UpDomain           <: AbstractPrimitiveDomain end
+struct EnvDomain <: AbstractPrimitiveDomain end
+struct BulkDomain <: AbstractPrimitiveDomain end
+struct UpDomain <: AbstractPrimitiveDomain end
 # Regions for cloaking
-struct CloakUpDomain      <: AbstractDerivedDomain end
-struct CloakDownDomain    <: AbstractDerivedDomain end
+struct CloakUpDomain <: AbstractDerivedDomain end
+struct CloakDownDomain <: AbstractDerivedDomain end
 struct EnvRemainingDomain <: AbstractDerivedDomain end
 
 const EnvOrUpDomain = Union{EnvDomain, BulkDomain, UpDomain} # for functions that work on both env and updrafts, but this cant be instantiated
@@ -129,10 +129,13 @@ Base.@kwdef struct NoneqMoistureSources{FT}
     qi_tendency::FT
 end
 # null constructor [separate name to not clobber kwdef method]
-null_NoneqMoistureSources(::Type{FT}; fill_value::FT = FT(NaN)) where {FT} = NoneqMoistureSources{FT}(fill_value, fill_value)
+null_NoneqMoistureSources(::Type{FT}; fill_value::FT = FT(NaN)) where {FT} =
+    NoneqMoistureSources{FT}(fill_value, fill_value)
 
-Base.:+(a::NoneqMoistureSources{FT}, b::NoneqMoistureSources{FT}) where {FT} = NoneqMoistureSources{FT}(a.ql_tendency + b.ql_tendency, a.qi_tendency + b.qi_tendency)
-Base.:-(a::NoneqMoistureSources{FT}, b::NoneqMoistureSources{FT}) where {FT} = NoneqMoistureSources{FT}(a.ql_tendency - b.ql_tendency, a.qi_tendency - b.qi_tendency)
+Base.:+(a::NoneqMoistureSources{FT}, b::NoneqMoistureSources{FT}) where {FT} =
+    NoneqMoistureSources{FT}(a.ql_tendency + b.ql_tendency, a.qi_tendency + b.qi_tendency)
+Base.:-(a::NoneqMoistureSources{FT}, b::NoneqMoistureSources{FT}) where {FT} =
+    NoneqMoistureSources{FT}(a.ql_tendency - b.ql_tendency, a.qi_tendency - b.qi_tendency)
 
 Base.:*(a::NoneqMoistureSources{FT}, b::FT) where {FT} = NoneqMoistureSources{FT}(a.ql_tendency * b, a.qi_tendency * b)
 Base.:*(a::FT, b::NoneqMoistureSources{FT}) where {FT} = NoneqMoistureSources{FT}(a * b.ql_tendency, a * b.qi_tendency)
@@ -154,8 +157,10 @@ end
 # null constructor [separate name to not clobber kwdef method]
 null_NoneqMoistureSource(::Type{FT}; fill_value::FT = FT(NaN)) where {FT} = NoneqMoistureSource{FT}(fill_value)
 
-Base.:+(a::NoneqMoistureSource{FT}, b::NoneqMoistureSource{FT}) where {FT} = NoneqMoistureSource{FT}(a.q_tendency + b.q_tendency)
-Base.:-(a::NoneqMoistureSource{FT}, b::NoneqMoistureSource{FT}) where {FT} = NoneqMoistureSource{FT}(a.q_tendency - b.q_tendency)
+Base.:+(a::NoneqMoistureSource{FT}, b::NoneqMoistureSource{FT}) where {FT} =
+    NoneqMoistureSource{FT}(a.q_tendency + b.q_tendency)
+Base.:-(a::NoneqMoistureSource{FT}, b::NoneqMoistureSource{FT}) where {FT} =
+    NoneqMoistureSource{FT}(a.q_tendency - b.q_tendency)
 
 Base.:*(a::NoneqMoistureSource{FT}, b::FT) where {FT} = NoneqMoistureSource{FT}(a.q_tendency * b)
 Base.:*(a::FT, b::NoneqMoistureSource{FT}) where {FT} = NoneqMoistureSource{FT}(a * b.q_tendency)
@@ -442,17 +447,70 @@ struct ConvectiveTKE{FT} <: AbstractYesConvectiveTKEHandler
 end
 function ConvectiveTKE(param_set::APS, namelist)
     FT = eltype(param_set)
-    buoyancy_coeff = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "convective_tke_buoyancy_coeff"; default = FT(1.0))
-    advection_coeff = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "convective_tke_advection_coeff"; default = FT(1.0))
-    dissipation_coeff = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "convective_tke_dissipation_coeff"; default = FT(1.0))
-    self_dissipation_coeff = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "convective_tke_self_dissipation_coeff"; default = FT(1.0))
-    max_scaling_factor = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "convective_tke_max_scaling_factor"; default = FT(1.0))
+    buoyancy_coeff =
+        parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "convective_tke_buoyancy_coeff"; default = FT(1.0))
+    advection_coeff = parse_namelist(
+        namelist,
+        "turbulence",
+        "EDMF_PrognosticTKE",
+        "convective_tke_advection_coeff";
+        default = FT(1.0),
+    )
+    dissipation_coeff = parse_namelist(
+        namelist,
+        "turbulence",
+        "EDMF_PrognosticTKE",
+        "convective_tke_dissipation_coeff";
+        default = FT(1.0),
+    )
+    self_dissipation_coeff = parse_namelist(
+        namelist,
+        "turbulence",
+        "EDMF_PrognosticTKE",
+        "convective_tke_self_dissipation_coeff";
+        default = FT(1.0),
+    )
+    max_scaling_factor = parse_namelist(
+        namelist,
+        "turbulence",
+        "EDMF_PrognosticTKE",
+        "convective_tke_max_scaling_factor";
+        default = FT(1.0),
+    )
     # use_separate_ed_coeff = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "convective_tke_use_separate_ed_coeff"; default = false, valid_options = [true, false])
-    ed_scaling_factor = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "convective_tke_ed_scaling_factor"; default = FT(1.0))
-    transport_tke_by_advection = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "convective_tke_transport_tke_by_advection"; default = true, valid_options = [true, false])
-    transport_condensed_by_advection = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "convective_tke_transport_condensed_by_advection"; default = false, valid_options = [true, false]) # ql, qi, qr, qs
-    transport_conserved_by_advection = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "convective_tke_transport_conserved_by_advection"; default = true, valid_options = [true, false]) # θ_liq_ice, qt
-    entr_detr_rate_inv_s = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "tke_conv_entr_detr_rate_inv_s"; default = FT(0)) # default 0 means no grafting onto updraft (infinite time scale)
+    ed_scaling_factor = parse_namelist(
+        namelist,
+        "turbulence",
+        "EDMF_PrognosticTKE",
+        "convective_tke_ed_scaling_factor";
+        default = FT(1.0),
+    )
+    transport_tke_by_advection = parse_namelist(
+        namelist,
+        "turbulence",
+        "EDMF_PrognosticTKE",
+        "convective_tke_transport_tke_by_advection";
+        default = true,
+        valid_options = [true, false],
+    )
+    transport_condensed_by_advection = parse_namelist(
+        namelist,
+        "turbulence",
+        "EDMF_PrognosticTKE",
+        "convective_tke_transport_condensed_by_advection";
+        default = false,
+        valid_options = [true, false],
+    ) # ql, qi, qr, qs
+    transport_conserved_by_advection = parse_namelist(
+        namelist,
+        "turbulence",
+        "EDMF_PrognosticTKE",
+        "convective_tke_transport_conserved_by_advection";
+        default = true,
+        valid_options = [true, false],
+    ) # θ_liq_ice, qt
+    entr_detr_rate_inv_s =
+        parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "tke_conv_entr_detr_rate_inv_s"; default = FT(0)) # default 0 means no grafting onto updraft (infinite time scale)
     return ConvectiveTKE{FT}(
         buoyancy_coeff,
         advection_coeff,
@@ -465,7 +523,7 @@ function ConvectiveTKE(param_set::APS, namelist)
         transport_condensed_by_advection,
         transport_conserved_by_advection,
         entr_detr_rate_inv_s,
-    )            
+    )
 end
 
 struct ConvectiveTKEProductionAndGraftOnly{FT} <: AbstractYesConvectiveTKEHandler # Only calculates convective tke production, and grafts it onto the updraft
@@ -476,16 +534,22 @@ struct ConvectiveTKEProductionAndGraftOnly{FT} <: AbstractYesConvectiveTKEHandle
 end
 function ConvectiveTKEProductionAndGraftOnly(param_set::APS, namelist)
     FT = eltype(param_set)
-    buoyancy_coeff = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "convective_tke_buoyancy_coeff"; default = FT(1.0))
-    entr_detr_rate_inv_s = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "tke_conv_entr_detr_rate_inv_s"; default = FT(0)) # default 0 means no grafting onto updraft (infinite time scale)
-    return ConvectiveTKEProductionAndGraftOnly{FT}(
-        buoyancy_coeff,
-        entr_detr_rate_inv_s,
-    )            
+    buoyancy_coeff =
+        parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "convective_tke_buoyancy_coeff"; default = FT(1.0))
+    entr_detr_rate_inv_s =
+        parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "tke_conv_entr_detr_rate_inv_s"; default = FT(0)) # default 0 means no grafting onto updraft (infinite time scale)
+    return ConvectiveTKEProductionAndGraftOnly{FT}(buoyancy_coeff, entr_detr_rate_inv_s)
 end
 
 function get_ConvectiveTKE(param_set::APS, namelist)
-    convective_tke_model_type = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "convective_tke_model_type"; default = "no_convective_tke", valid_options = ["no_convective_tke", "convective_tke", "convective_tke_production_and_graft_only"])
+    convective_tke_model_type = parse_namelist(
+        namelist,
+        "turbulence",
+        "EDMF_PrognosticTKE",
+        "convective_tke_model_type";
+        default = "no_convective_tke",
+        valid_options = ["no_convective_tke", "convective_tke", "convective_tke_production_and_graft_only"],
+    )
     if convective_tke_model_type == "convective_tke"
         return ConvectiveTKE(param_set, namelist)
     elseif convective_tke_model_type == "convective_tke_production_and_graft_only"
@@ -525,11 +589,23 @@ struct StandardAreaPartitionModel{FT} <: AbstractAreaPartitionModel
     "second_order_correction_limit_factor::FT"
     second_order_correction_limit_factor::FT # factor to limit the second order correction to avoid overshoots. 0 means no correction, 1 means full correction
 
-    end;
+end;
 function StandardAreaPartitionModel(param_set::APS, namelist)
     FT = eltype(param_set)
-    apply_second_order_flux_correction = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "apply_second_order_flux_correction"; default = false)
-    second_order_correction_limit_factor = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "second_order_correction_limit_factor"; default = FT(Inf)) # default Inf (no limit)
+    apply_second_order_flux_correction = parse_namelist(
+        namelist,
+        "turbulence",
+        "EDMF_PrognosticTKE",
+        "apply_second_order_flux_correction";
+        default = false,
+    )
+    second_order_correction_limit_factor = parse_namelist(
+        namelist,
+        "turbulence",
+        "EDMF_PrognosticTKE",
+        "second_order_correction_limit_factor";
+        default = FT(Inf),
+    ) # default Inf (no limit)
     return StandardAreaPartitionModel{FT}(apply_second_order_flux_correction, second_order_correction_limit_factor)
 end
 
@@ -557,7 +633,7 @@ end
                 This does pose some challenges since if q_env = 0, this precludes any vertical advection in the cloak when it might really be real...
 
             To calculate advective tendencies in the env then, we just do these cloak regions. We do need to limit losses so that we don't get negative ql or qi in the env
-        
+
             We derive an upper limit for q_cloak_up such that q_cloak_dn >= 0.
                 This is:  q_cloak_up <= (qi_mean - a_up * q_updraft) / a_cloak_up
         =#
@@ -582,16 +658,53 @@ end
 """
 function CoreCloakAreaPartitionModel(param_set::APS, namelist)
     FT = eltype(param_set)
-    cloak_area_factor = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "cloak_area_factor"; default = FT(4.0))
-    cloak_dn_area_factor = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "cloak_dn_area_factor"; default = FT(1.0))
-    cloak_mix_factor = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "cloak_mix_factor"; default = FT(0.5))
-    confine_all_downdraft_to_cloak = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "confine_all_downdraft_to_cloak"; default = false)
+    cloak_area_factor =
+        parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "cloak_area_factor"; default = FT(4.0))
+    cloak_dn_area_factor =
+        parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "cloak_dn_area_factor"; default = FT(1.0))
+    cloak_mix_factor =
+        parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "cloak_mix_factor"; default = FT(0.5))
+    confine_all_downdraft_to_cloak =
+        parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "confine_all_downdraft_to_cloak"; default = false)
     # combine_fluxes_before_gradients = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "combine_fluxes_before_gradients"; default = true) # I'm not sure this does anything w/o prognostic q in each region. Instead we opt for a second order correction....
-    apply_second_order_flux_correction = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "apply_second_order_flux_correction"; default = false)
-    second_order_correction_limit_factor = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "second_order_correction_limit_factor"; default = FT(Inf)) # no limit
-    apply_cloak_to_condensate_formation = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "apply_cloak_to_condensate_formation"; default = true)
-    fraction_of_area_above_max_area_allowed_in_cloak = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "fraction_of_area_above_max_area_allowed_in_cloak"; default = FT(0.5))
-    return CoreCloakAreaPartitionModel{FT}(cloak_area_factor, cloak_dn_area_factor, cloak_mix_factor, confine_all_downdraft_to_cloak, apply_second_order_flux_correction, second_order_correction_limit_factor, apply_cloak_to_condensate_formation, fraction_of_area_above_max_area_allowed_in_cloak)
+    apply_second_order_flux_correction = parse_namelist(
+        namelist,
+        "turbulence",
+        "EDMF_PrognosticTKE",
+        "apply_second_order_flux_correction";
+        default = false,
+    )
+    second_order_correction_limit_factor = parse_namelist(
+        namelist,
+        "turbulence",
+        "EDMF_PrognosticTKE",
+        "second_order_correction_limit_factor";
+        default = FT(Inf),
+    ) # no limit
+    apply_cloak_to_condensate_formation = parse_namelist(
+        namelist,
+        "turbulence",
+        "EDMF_PrognosticTKE",
+        "apply_cloak_to_condensate_formation";
+        default = true,
+    )
+    fraction_of_area_above_max_area_allowed_in_cloak = parse_namelist(
+        namelist,
+        "turbulence",
+        "EDMF_PrognosticTKE",
+        "fraction_of_area_above_max_area_allowed_in_cloak";
+        default = FT(0.5),
+    )
+    return CoreCloakAreaPartitionModel{FT}(
+        cloak_area_factor,
+        cloak_dn_area_factor,
+        cloak_mix_factor,
+        confine_all_downdraft_to_cloak,
+        apply_second_order_flux_correction,
+        second_order_correction_limit_factor,
+        apply_cloak_to_condensate_formation,
+        fraction_of_area_above_max_area_allowed_in_cloak,
+    )
 end
 # ============================================================================================================= #
 
@@ -771,14 +884,17 @@ struct EquilibriumMoisture{RTT <: AbstractNonEquillibriumSourcesType, FT <: Abst
     condensate_qt_SD::FT
 end
 function EquilibriumMoisture(param_set::APS, namelist)
-    nonequilibrium_moisture_scheme_type::Symbol = Symbol(parse_namelist(namelist, "user_args", "nonequilibrium_moisture_scheme"; default = :relax_to_equilibrium))
+    nonequilibrium_moisture_scheme_type::Symbol =
+        Symbol(parse_namelist(namelist, "user_args", "nonequilibrium_moisture_scheme"; default = :relax_to_equilibrium))
 
     nonequilibrium_moisture_scheme = if nonequilibrium_moisture_scheme_type === :relax_to_equilibrium
         # RelaxToEquilibrium()
         RelaxToEquilibrium(param_set, namelist)
-    # elseif nonequilibrium_moisture_scheme_type === :KorolevMazin2007
-    #     KorolevMazin2007()
-    elseif (nonequilibrium_moisture_scheme_type ∈ valid_relaxation_timescale_types) && (nonequilibrium_moisture_scheme_type ∉ [:neural_network, :neural_network_no_weights, :neural_network_extended])
+        # elseif nonequilibrium_moisture_scheme_type === :KorolevMazin2007
+        #     KorolevMazin2007()
+    elseif (nonequilibrium_moisture_scheme_type ∈ valid_relaxation_timescale_types) && (
+        nonequilibrium_moisture_scheme_type ∉ [:neural_network, :neural_network_no_weights, :neural_network_extended]
+    )
         get_relaxation_timescale_type(nonequilibrium_moisture_scheme_type, param_set, namelist) # we really could just pass namelist here...
     elseif nonequilibrium_moisture_scheme_type ∈ [:neural_network, :neural_network_no_weights, :neural_network_extended]
         # we decided to stop storing NN things in the param_set... it's redundant for all the objects but it's especially bad for the NN, as every call w/ param_set has to deal w/ massive tuple/svector
@@ -798,21 +914,32 @@ end
 
 struct NonEquilibriumMoisture{RTT <: AbstractNonEquillibriumSourcesType, FT <: AbstractFloat} <: AbstractMoistureModel
     scheme::RTT
-    heterogeneous_ice_nucleation::NamedTuple{(:use_heterogeneous_ice_nucleation, :heterogeneous_ice_nucleation_coefficient, :heterogeneous_ice_nucleation_exponent, :use_ice_mult), Tuple{Bool, FT, FT, Bool}}
+    heterogeneous_ice_nucleation::NamedTuple{
+        (
+            :use_heterogeneous_ice_nucleation,
+            :heterogeneous_ice_nucleation_coefficient,
+            :heterogeneous_ice_nucleation_exponent,
+            :use_ice_mult,
+        ),
+        Tuple{Bool, FT, FT, Bool},
+    }
     # heterogeneous_ice_nucleation::Tuple{Bool, FT, FT, Bool}
     condensate_qt_SD::FT
 end
 
 function NonEquilibriumMoisture(param_set::APS, namelist)
     FT = eltype(param_set)
-    nonequilibrium_moisture_scheme_type::Symbol = Symbol(parse_namelist(namelist, "user_args", "nonequilibrium_moisture_scheme"; default = :relax_to_equilibrium))
+    nonequilibrium_moisture_scheme_type::Symbol =
+        Symbol(parse_namelist(namelist, "user_args", "nonequilibrium_moisture_scheme"; default = :relax_to_equilibrium))
 
     nonequilibrium_moisture_scheme = if nonequilibrium_moisture_scheme_type === :relax_to_equilibrium
         # RelaxToEquilibrium()
         RelaxToEquilibrium(param_set, namelist)
-    # elseif nonequilibrium_moisture_scheme_type === :KorolevMazin2007
-    #     KorolevMazin2007()
-    elseif (nonequilibrium_moisture_scheme_type ∈ valid_relaxation_timescale_types) && (nonequilibrium_moisture_scheme_type ∉ [:neural_network, :neural_network_no_weights, :neural_network_extended])
+        # elseif nonequilibrium_moisture_scheme_type === :KorolevMazin2007
+        #     KorolevMazin2007()
+    elseif (nonequilibrium_moisture_scheme_type ∈ valid_relaxation_timescale_types) && (
+        nonequilibrium_moisture_scheme_type ∉ [:neural_network, :neural_network_no_weights, :neural_network_extended]
+    )
         get_relaxation_timescale_type(nonequilibrium_moisture_scheme_type, param_set, namelist) # we really could just pass namelist here...
     elseif nonequilibrium_moisture_scheme_type ∈ [:neural_network, :neural_network_no_weights, :neural_network_extended]
         # we decided to stop storing NN things in the param_set... it's redundant for all the objects but it's especially bad for the NN, as every call w/ param_set has to deal w/ massive tuple/svector
@@ -821,18 +948,30 @@ function NonEquilibriumMoisture(param_set::APS, namelist)
         error("Invalid nonequilibrium_moisture_scheme type: $nonequilibrium_moisture_scheme_type")
     end
 
-    use_heterogeneous_ice_nucleation = parse_namelist(namelist, "user_args", "use_heterogeneous_ice_nucleation"; default = false)
-    heterogeneous_ice_nucleation_coefficient = parse_namelist(namelist, "user_params", "heterogeneous_ice_nucleation_coefficient"; default = FT(1))
-    heterogeneous_ice_nucleation_exponent = parse_namelist(namelist, "user_params", "heterogeneous_ice_nucleation_exponent"; default = FT(1))
+    use_heterogeneous_ice_nucleation =
+        parse_namelist(namelist, "user_args", "use_heterogeneous_ice_nucleation"; default = false)
+    heterogeneous_ice_nucleation_coefficient =
+        parse_namelist(namelist, "user_params", "heterogeneous_ice_nucleation_coefficient"; default = FT(1))
+    heterogeneous_ice_nucleation_exponent =
+        parse_namelist(namelist, "user_params", "heterogeneous_ice_nucleation_exponent"; default = FT(1))
     use_ice_mult = parse_namelist(namelist, "user_args", "use_ice_mult"; default = false)
 
     # heterogeneous_ice_nucleation_named_tuple = (heterogeneous_ice_nucleation, heterogeneous_ice_nucleation_coefficient, heterogeneous_ice_nucleation_exponent, use_ice_mult) 
-    heterogeneous_ice_nucleation_named_tuple = (; use_heterogeneous_ice_nucleation, heterogeneous_ice_nucleation_coefficient, heterogeneous_ice_nucleation_exponent, use_ice_mult) 
+    heterogeneous_ice_nucleation_named_tuple = (;
+        use_heterogeneous_ice_nucleation,
+        heterogeneous_ice_nucleation_coefficient,
+        heterogeneous_ice_nucleation_exponent,
+        use_ice_mult,
+    )
 
     condensate_qt_SD::FT = parse_namelist(namelist, "user_params", "condensate_qt_SD"; default = zero(FT))
 
     RTT = typeof(nonequilibrium_moisture_scheme)
-    return NonEquilibriumMoisture{RTT, FT}(nonequilibrium_moisture_scheme, heterogeneous_ice_nucleation_named_tuple, condensate_qt_SD)
+    return NonEquilibriumMoisture{RTT, FT}(
+        nonequilibrium_moisture_scheme,
+        heterogeneous_ice_nucleation_named_tuple,
+        condensate_qt_SD,
+    )
 end
 
 """
@@ -851,7 +990,12 @@ struct UpwindDifferencingScheme <: AbstractIntegrationScheme end
 struct RightBiasedDifferencingScheme <: AbstractIntegrationScheme end
 abstract type AbstractCloudSedimentationModel end
 # struct CloudSedimentationModel{FT <: AbstractFloat, LTVS <: Union{CMT.Blk1MVelType, CMT.Chen2022Type}, ITVS <: Union{CMT.Blk1MVelType, CMT.Chen2022Type}, SLNC <: Union{AbstractFloat, AbstractRelaxationTimescaleType}, SINC <: Union{AbstractFloat, AbstractRelaxationTimescaleType}, SIM <: AbstractIntegrationScheme} <: AbstractCloudSedimentationModel
-struct CloudSedimentationModel{FT <: AbstractFloat, LTVS <: Union{CMT.Blk1MVelType, CMT.Chen2022Type}, ITVS <: Union{CMT.Blk1MVelType, CMT.Chen2022Type}, SIM <: AbstractIntegrationScheme} <: AbstractCloudSedimentationModel
+struct CloudSedimentationModel{
+    FT <: AbstractFloat,
+    LTVS <: Union{CMT.Blk1MVelType, CMT.Chen2022Type},
+    ITVS <: Union{CMT.Blk1MVelType, CMT.Chen2022Type},
+    SIM <: AbstractIntegrationScheme,
+} <: AbstractCloudSedimentationModel
     liq_terminal_velocity_scheme::LTVS
     ice_terminal_velocity_scheme::ITVS
     # sedimentation_liq_number_concentration::SLNC # we now cache N_i, which derives directly from moisture_model, and term_vel_ice, derived from that N_i, so we don't need this.
@@ -870,15 +1014,15 @@ struct CloudSedimentationModel{FT <: AbstractFloat, LTVS <: Union{CMT.Blk1MVelTy
     grid_mean::Bool # whether or not sedimentation is applied to the grid mean only instead of in env/up separately
 end
 
-struct CloudNoSedimentationModel{FT <: AbstractFloat} <: AbstractCloudSedimentationModel 
+struct CloudNoSedimentationModel{FT <: AbstractFloat} <: AbstractCloudSedimentationModel
     liq_Dmax::FT
     ice_Dmax::FT
 end
 
 function CloudNoSedimentationModel(param_set::APS, namelist)
     FT = eltype(param_set)
-    liq_Dmax = parse_namelist(namelist, "user_params", "liq_sedimentation_Dmax"; default =  FT(Inf))
-    ice_Dmax = parse_namelist(namelist, "user_params", "ice_sedimentation_Dmax"; default =  FT(Inf))
+    liq_Dmax = parse_namelist(namelist, "user_params", "liq_sedimentation_Dmax"; default = FT(Inf))
+    ice_Dmax = parse_namelist(namelist, "user_params", "ice_sedimentation_Dmax"; default = FT(Inf))
 
     # NaN's (e.g. from json) get converted to Inf here
     liq_Dmax = isnan(liq_Dmax) ? FT(Inf) : liq_Dmax
@@ -886,27 +1030,38 @@ function CloudNoSedimentationModel(param_set::APS, namelist)
 
     return CloudNoSedimentationModel{FT}(liq_Dmax, ice_Dmax)
 end
-CloudNoSedimentationModel(cloud_sedimentation_model::CloudSedimentationModel) = CloudNoSedimentationModel{typeof(cloud_sedimentation_model.liq_Dmax)}(cloud_sedimentation_model.liq_Dmax, cloud_sedimentation_model.ice_Dmax)
+CloudNoSedimentationModel(cloud_sedimentation_model::CloudSedimentationModel) =
+    CloudNoSedimentationModel{typeof(cloud_sedimentation_model.liq_Dmax)}(
+        cloud_sedimentation_model.liq_Dmax,
+        cloud_sedimentation_model.ice_Dmax,
+    )
 
 function CloudSedimentationModel(param_set::APS, moisture_model::AbstractMoistureModel, namelist)
     FT = eltype(param_set)
 
-    liq_terminal_velocity_scheme = get_termvel_type(Symbol(parse_namelist(namelist, "user_args", "liq_terminal_velocity_scheme"; default = :Blk1MVel)))
-    ice_terminal_velocity_scheme = get_termvel_type(Symbol(parse_namelist(namelist, "user_args", "ice_terminal_velocity_scheme"; default = :Blk1MVel)))
+    liq_terminal_velocity_scheme = get_termvel_type(
+        Symbol(parse_namelist(namelist, "user_args", "liq_terminal_velocity_scheme"; default = :Blk1MVel)),
+    )
+    ice_terminal_velocity_scheme = get_termvel_type(
+        Symbol(parse_namelist(namelist, "user_args", "ice_terminal_velocity_scheme"; default = :Blk1MVel)),
+    )
 
 
-    liq_Dmax = parse_namelist(namelist, "user_params", "liq_sedimentation_Dmax"; default =  FT(Inf))
-    ice_Dmax = parse_namelist(namelist, "user_params", "ice_sedimentation_Dmax"; default =  FT(62.5e-6 * 2)) # maybe this should also be inf? for chen it's not clear...
+    liq_Dmax = parse_namelist(namelist, "user_params", "liq_sedimentation_Dmax"; default = FT(Inf))
+    ice_Dmax = parse_namelist(namelist, "user_params", "ice_sedimentation_Dmax"; default = FT(62.5e-6 * 2)) # maybe this should also be inf? for chen it's not clear...
 
     # NaN's (e.g. from json) get converted to Inf here
     liq_Dmax = isnan(liq_Dmax) ? FT(Inf) : liq_Dmax
     ice_Dmax = isnan(ice_Dmax) ? FT(Inf) : ice_Dmax
 
 
-    liq_sedimentation_scaling_factor = parse_namelist(namelist, "user_params", "liq_sedimentation_scaling_factor"; default = FT(1.0))
-    ice_sedimentation_scaling_factor = parse_namelist(namelist, "user_params", "ice_sedimentation_scaling_factor"; default = FT(1.0))
+    liq_sedimentation_scaling_factor =
+        parse_namelist(namelist, "user_params", "liq_sedimentation_scaling_factor"; default = FT(1.0))
+    ice_sedimentation_scaling_factor =
+        parse_namelist(namelist, "user_params", "ice_sedimentation_scaling_factor"; default = FT(1.0))
 
-    sedimentation_differencing_scheme_type::Symbol = Symbol(parse_namelist(namelist, "user_args", "sedimentation_differencing_scheme"; default = :upwinding))
+    sedimentation_differencing_scheme_type::Symbol =
+        Symbol(parse_namelist(namelist, "user_args", "sedimentation_differencing_scheme"; default = :upwinding))
     sedimentation_differencing_scheme = if sedimentation_differencing_scheme_type === :upwinding
         UpwindDifferencingScheme()
     elseif sedimentation_differencing_scheme_type === :right_biased
@@ -934,7 +1089,7 @@ function CloudSedimentationModel(param_set::APS, moisture_model::AbstractMoistur
 
     # return CloudSedimentationModel{FT, LTVS, ITVS, SLNC, SINC, SDS}(
     return CloudSedimentationModel{FT, LTVS, ITVS, SDS}(
-        liq_terminal_velocity_scheme, 
+        liq_terminal_velocity_scheme,
         ice_terminal_velocity_scheme,
         # sedimentation_liq_number_concentration,
         # sedimentation_ice_number_concentration,
@@ -963,7 +1118,10 @@ abstract type AbstractPrecipitationModel end
 struct NoPrecipitation <: AbstractPrecipitationModel end
 struct Clima0M <: AbstractPrecipitationModel end
 # struct Clima1M{FT, RTVST <: Union{CMT.Blk1MVelType, CMT.Chen2022Type}, STVST <: Union{CMT.Blk1MVelType, CMT.Chen2022Type}} <: AbstractPrecipitationModel 
-struct Clima1M{RTVST <: Union{CMT.Blk1MVelType, CMT.Chen2022Type}, STVST <: Union{CMT.Blk1MVelType, CMT.Chen2022Type}} <: AbstractPrecipitationModel 
+struct Clima1M{
+    RTVST <: Union{CMT.Blk1MVelType, CMT.Chen2022Type},
+    STVST <: Union{CMT.Blk1MVelType, CMT.Chen2022Type},
+} <: AbstractPrecipitationModel
     # rain_sedimentation_scaling_factor::FT # just use χv
     # snow_sedimentation_scaling_factor::FT # just use χv
     rain_terminal_velocity_scheme::RTVST
@@ -975,8 +1133,12 @@ function Clima1M(param_set::APS, namelist)
 
     # rain_sedimentation_scaling_factor::FT = parse_namelist(namelist, "user_params", "rain_sedimentation_scaling_factor"; default =  FT(1.0))
     # snow_sedimentation_scaling_factor::FT = parse_namelist(namelist, "user_params", "snow_sedimentation_scaling_factor"; default =  FT(1.0))
-    rain_terminal_velocity_scheme = get_termvel_type(Symbol(parse_namelist(namelist, "user_args", "rain_terminal_velocity_scheme"; default =  :Blk1MVel)))
-    snow_terminal_velocity_scheme = get_termvel_type(Symbol(parse_namelist(namelist, "user_args", "snow_terminal_velocity_scheme"; default =  :Blk1MVel)))
+    rain_terminal_velocity_scheme = get_termvel_type(
+        Symbol(parse_namelist(namelist, "user_args", "rain_terminal_velocity_scheme"; default = :Blk1MVel)),
+    )
+    snow_terminal_velocity_scheme = get_termvel_type(
+        Symbol(parse_namelist(namelist, "user_args", "snow_terminal_velocity_scheme"; default = :Blk1MVel)),
+    )
 
 
     # sedimentation_differencing_scheme_type::Symbol = Symbol(parse_namelist(namelist, "user_args", "sedimentation_differencing_scheme"; default = :upwinding))
@@ -1026,11 +1188,19 @@ end
 function NonEquilibriumSnowFormationModel(param_set::APS, namelist)
     FT = eltype(param_set)
     ice_dep_acnv_scaling_factor = parse_namelist(namelist, "user_params", "ice_dep_acnv_scaling_factor"; default = 1.0)
-    ice_dep_acnv_scaling_factor_above = parse_namelist(namelist, "user_params", "ice_dep_acnv_scaling_factor_above"; default = 1.0)
+    ice_dep_acnv_scaling_factor_above =
+        parse_namelist(namelist, "user_params", "ice_dep_acnv_scaling_factor_above"; default = 1.0)
     ice_acnv_power = parse_namelist(namelist, "user_params", "ice_acnv_power"; default = 1.0)
     r_ice_acnv_scaling_factor = parse_namelist(namelist, "user_params", "r_ice_acnv_scaling_factor"; default = 1.0)
-    r_ice_snow_threshold_scaling_factor = parse_namelist(namelist, "user_params", "r_ice_snow_threshold_scaling_factor"; default = 1.0)
-    return NonEquilibriumSnowFormationModel{FT}(ice_dep_acnv_scaling_factor, ice_dep_acnv_scaling_factor_above, ice_acnv_power, r_ice_acnv_scaling_factor, r_ice_snow_threshold_scaling_factor)
+    r_ice_snow_threshold_scaling_factor =
+        parse_namelist(namelist, "user_params", "r_ice_snow_threshold_scaling_factor"; default = 1.0)
+    return NonEquilibriumSnowFormationModel{FT}(
+        ice_dep_acnv_scaling_factor,
+        ice_dep_acnv_scaling_factor_above,
+        ice_acnv_power,
+        r_ice_acnv_scaling_factor,
+        r_ice_snow_threshold_scaling_factor,
+    )
 end
 
 function SnowFormationModel(param_set::APS, moisture_model::AbstractMoistureModel, namelist)
@@ -1038,7 +1208,7 @@ function SnowFormationModel(param_set::APS, moisture_model::AbstractMoistureMode
     if moisture_model isa NonEquilibriumMoisture
         snow_formation_model = if moisture_model.scheme isa RelaxToEquilibrium
             DefaultSnowFormationModel()
-        # elseif moisture_model.scheme isa KorolevMazin2007
+            # elseif moisture_model.scheme isa KorolevMazin2007
             # DefaultSnowFormationModel() # should this be default? I guess maybe cause there's no N prediction?
         elseif moisture_model.scheme isa AbstractRelaxationTimescaleType
             NonEquilibriumSnowFormationModel(param_set, namelist)
@@ -1082,15 +1252,18 @@ struct NoTendencyLimiter <: AbstractTendencyLimiter end
 limit_tendency(::NoTendencyLimiter, x::FT, x_up::FT, Δt::FT) where {FT} = x
 limit_tendency(::NoTendencyLimiter, x::FT, x_up::FT, x_en::FT, Δt::FT) where {FT} = x
 struct BasicTendencyLimiter <: AbstractTendencyLimiter end # Truncate to the available value within a timestep
-limit_tendency(::BasicTendencyLimiter, x::FT, x_avail::FT, Δt::FT) where {FT} = max(x, -x_avail/Δt) #
-limit_tendency(::BasicTendencyLimiter, x::FT, x_up::FT, x_en::FT, Δt::FT) where {FT} = safe_clamp(x, -x_up/Δt, x_en/Δt)
+limit_tendency(::BasicTendencyLimiter, x::FT, x_avail::FT, Δt::FT) where {FT} = max(x, -x_avail / Δt) #
+limit_tendency(::BasicTendencyLimiter, x::FT, x_up::FT, x_en::FT, Δt::FT) where {FT} =
+    safe_clamp(x, -x_up / Δt, x_en / Δt)
 
-struct TruncatedBasicTendencyLimiter{FT} <: AbstractTendencyLimiter 
+struct TruncatedBasicTendencyLimiter{FT} <: AbstractTendencyLimiter
     factor::FT
 end # Same as BasicTendencyLimiter but scaled down so things take more than 1 timestep. For stability.
 
-limit_tendency(limiter::TruncatedBasicTendencyLimiter, x::FT, x_avail::FT, Δt::FT) where {FT} = max(x, -x_avail/Δt * limiter.factor)
-limit_tendency(limiter::TruncatedBasicTendencyLimiter, x::FT, x_up::FT, x_en::FT, Δt::FT) where {FT} = safe_clamp(x, -x_up/Δt * limiter.factor, x_en/Δt * limiter.factor)
+limit_tendency(limiter::TruncatedBasicTendencyLimiter, x::FT, x_avail::FT, Δt::FT) where {FT} =
+    max(x, -x_avail / Δt * limiter.factor)
+limit_tendency(limiter::TruncatedBasicTendencyLimiter, x::FT, x_up::FT, x_en::FT, Δt::FT) where {FT} =
+    safe_clamp(x, -x_up / Δt * limiter.factor, x_en / Δt * limiter.factor)
 
 # Maybe consider adding
 # abstract type AbstractdtDependentTendencyLimiter <: AbstractTendencyLimiter end that can supertype all dt dependent tendencies... rn using !isa(NoTendencyLimiter, limiter) is a bit hacky
@@ -1101,7 +1274,7 @@ limit_tendency(limiter::TruncatedBasicTendencyLimiter, x::FT, x_up::FT, x_en::FT
 abstract type AbstractMoistureSourcesLimiter <: AbstractTendencyLimiter end
 struct NoMoistureSourcesLimiter <: AbstractMoistureSourcesLimiter end # No limiting is done, the sources are just directly calculated
 struct BasicMoistureSourcesLimiter <: AbstractMoistureSourcesLimiter end # Sources are truncated to their available value within a timestep
-struct TruncatedBasicMoistureSourcesLimiter{FT} <: AbstractMoistureSourcesLimiter 
+struct TruncatedBasicMoistureSourcesLimiter{FT} <: AbstractMoistureSourcesLimiter
     factor::FT
 end # Same as BasicMoistureSourcesLimiter but scaled down so things take more than 1 timestep. For stability.
 struct StandardSupersaturationMoistureSourcesLimiter <: AbstractMoistureSourcesLimiter end # Sources are truncated to their available value within a timestep but this is geared towards supersaturation relaxation. It does a lot of checks that are unnecessary if you're just relaxing to equilibrium e.g. WBF regimes etc.
@@ -1110,12 +1283,15 @@ struct MorrisonMilbrandt2015ExponentialPartOnlyMoistureSourcesLimiter <: Abstrac
     fallback_to_standard_supersaturation_limiter::Bool
 end
 # Fallbacks (in noneq_moisture sources we have our own setup, but for dispatch these may be needed elsewhere)
-limit_tendency(::AbstractMoistureSourcesLimiter, x::FT, x_avail::FT, Δt::FT) where {FT} = max(x, -x_avail/Δt)
-limit_tendency(::AbstractMoistureSourcesLimiter, x::FT, x_up::FT, x_en::FT, Δt::FT) where {FT} = safe_clamp(x, -x_up/Δt, x_en/Δt) 
+limit_tendency(::AbstractMoistureSourcesLimiter, x::FT, x_avail::FT, Δt::FT) where {FT} = max(x, -x_avail / Δt)
+limit_tendency(::AbstractMoistureSourcesLimiter, x::FT, x_up::FT, x_en::FT, Δt::FT) where {FT} =
+    safe_clamp(x, -x_up / Δt, x_en / Δt)
 limit_tendency(::NoMoistureSourcesLimiter, x::FT, x_avail::FT, Δt::FT) where {FT} = x
 limit_tendency(::NoMoistureSourcesLimiter, x::FT, x_up::FT, x_en::FT, Δt::FT) where {FT} = x
-limit_tendency(limiter::TruncatedBasicMoistureSourcesLimiter, x::FT, x_avail::FT, Δt::FT) where {FT} = max(x, -x_avail/Δt * limiter.factor)
-limit_tendency(limiter::TruncatedBasicMoistureSourcesLimiter, x::FT, x_up::FT, x_en::FT, Δt::FT) where {FT} = safe_clamp(x, -x_up/Δt * limiter.factor, x_en/Δt * limiter.factor)
+limit_tendency(limiter::TruncatedBasicMoistureSourcesLimiter, x::FT, x_avail::FT, Δt::FT) where {FT} =
+    max(x, -x_avail / Δt * limiter.factor)
+limit_tendency(limiter::TruncatedBasicMoistureSourcesLimiter, x::FT, x_up::FT, x_en::FT, Δt::FT) where {FT} =
+    safe_clamp(x, -x_up / Δt * limiter.factor, x_en / Δt * limiter.factor)
 
 # # Small Tendency Limiter
 # abstract type AbstractSmallTendencyLimiter <: AbstractTendencyLimiter end
@@ -1141,7 +1317,16 @@ For limiters like basic and the noneq ones, maybe only stick to consistent times
 
 
 """
-struct TendencyLimiterSet{DTLT <: AbstractTendencyLimiter, MSLT <: AbstractMoistureSourcesLimiter, EDTLT <: AbstractTendencyLimiter, PTLT <: AbstractTendencyLimiter, FDTLT <: AbstractTendencyLimiter, FMSLT <: AbstractMoistureSourcesLimiter, FEDTLT <: AbstractTendencyLimiter, FPTLT <: AbstractTendencyLimiter} <: AbstractTendencyLimiterSet
+struct TendencyLimiterSet{
+    DTLT <: AbstractTendencyLimiter,
+    MSLT <: AbstractMoistureSourcesLimiter,
+    EDTLT <: AbstractTendencyLimiter,
+    PTLT <: AbstractTendencyLimiter,
+    FDTLT <: AbstractTendencyLimiter,
+    FMSLT <: AbstractMoistureSourcesLimiter,
+    FEDTLT <: AbstractTendencyLimiter,
+    FPTLT <: AbstractTendencyLimiter,
+} <: AbstractTendencyLimiterSet
     default_tendency_limiter::DTLT #  for all other tendencies (gm, up etc) and as a
     moisture_sources_limiter::MSLT # if we're not a nonequilibrium moisture model, there's no limiting...can just use NoMoistureSourcesLimiter
     entr_detr_tendency_limiter::EDTLT
@@ -1162,10 +1347,18 @@ struct TendencyLimiterSet{DTLT <: AbstractTendencyLimiter, MSLT <: AbstractMoist
     use_tendency_resolver_on_full_tendencies::Bool
 end
 
-get_tendency_limiter(tendency_limiter_set::TendencyLimiterSet, ::Val{:default}, use_fallback::Bool) = use_fallback ? tendency_limiter_set.fallback_default_tendency_limiter : tendency_limiter_set.default_tendency_limiter
-get_tendency_limiter(tendency_limiter_set::TendencyLimiterSet, ::Val{:moisture_sources}, use_fallback::Bool) = use_fallback ? tendency_limiter_set.fallback_moisture_sources_limiter : tendency_limiter_set.moisture_sources_limiter
-get_tendency_limiter(tendency_limiter_set::TendencyLimiterSet, ::Val{:entr_detr}, use_fallback::Bool) = use_fallback ? tendency_limiter_set.fallback_entr_detr_tendency_limiter : tendency_limiter_set.entr_detr_tendency_limiter
-get_tendency_limiter(tendency_limiter_set::TendencyLimiterSet, ::Val{:precipitation}, use_fallback::Bool) = use_fallback ? tendency_limiter_set.fallback_precipitation_tendency_limiter : tendency_limiter_set.precipitation_tendency_limiter
+get_tendency_limiter(tendency_limiter_set::TendencyLimiterSet, ::Val{:default}, use_fallback::Bool) =
+    use_fallback ? tendency_limiter_set.fallback_default_tendency_limiter :
+    tendency_limiter_set.default_tendency_limiter
+get_tendency_limiter(tendency_limiter_set::TendencyLimiterSet, ::Val{:moisture_sources}, use_fallback::Bool) =
+    use_fallback ? tendency_limiter_set.fallback_moisture_sources_limiter :
+    tendency_limiter_set.moisture_sources_limiter
+get_tendency_limiter(tendency_limiter_set::TendencyLimiterSet, ::Val{:entr_detr}, use_fallback::Bool) =
+    use_fallback ? tendency_limiter_set.fallback_entr_detr_tendency_limiter :
+    tendency_limiter_set.entr_detr_tendency_limiter
+get_tendency_limiter(tendency_limiter_set::TendencyLimiterSet, ::Val{:precipitation}, use_fallback::Bool) =
+    use_fallback ? tendency_limiter_set.fallback_precipitation_tendency_limiter :
+    tendency_limiter_set.precipitation_tendency_limiter
 
 function TendencyLimiterSet(param_set::APS, moisture_model::AbstractMoistureModel, namelist)
     FT = eltype(param_set)
@@ -1173,7 +1366,8 @@ function TendencyLimiterSet(param_set::APS, moisture_model::AbstractMoistureMode
     factor::FT = parse_namelist(namelist, "user_args", "truncated_basic_limiter_factor"; default = FT(1.0)) # ideally in user_args so it's with the other limiter settings but i don't remember if scalars are ok there...
 
     # ------------------ Default Tendency Limiter ------------------ #
-    default_tendency_limiter_type::Symbol = Symbol(parse_namelist(namelist, "user_args", "default_tendency_limiter_type"; default = :none))  # Default to none bc that's purest (basic is how anna wrote it though)
+    default_tendency_limiter_type::Symbol =
+        Symbol(parse_namelist(namelist, "user_args", "default_tendency_limiter_type"; default = :none))  # Default to none bc that's purest (basic is how anna wrote it though)
     default_tendency_limiter = if default_tendency_limiter_type === :none
         NoTendencyLimiter()
     elseif default_tendency_limiter_type === :basic
@@ -1184,7 +1378,8 @@ function TendencyLimiterSet(param_set::APS, moisture_model::AbstractMoistureMode
         error("Invalid default_tendency_limiter_type: $default_tendency_limiter_type, valid options are :none, :basic")
     end
 
-    fallback_default_tendency_limiter_type::Symbol = Symbol(parse_namelist(namelist, "user_args", "fallback_default_tendency_limiter_type"; default = :none))  # Default to none bc that's purest (basic is how anna wrote it though)
+    fallback_default_tendency_limiter_type::Symbol =
+        Symbol(parse_namelist(namelist, "user_args", "fallback_default_tendency_limiter_type"; default = :none))  # Default to none bc that's purest (basic is how anna wrote it though)
     fallback_default_tendency_limiter = if fallback_default_tendency_limiter_type === :none
         NoTendencyLimiter()
     elseif fallback_default_tendency_limiter_type === :basic
@@ -1192,7 +1387,9 @@ function TendencyLimiterSet(param_set::APS, moisture_model::AbstractMoistureMode
     elseif fallback_default_tendency_limiter_type === :truncated_basic
         TruncatedBasicTendencyLimiter(factor)
     else
-        error("Invalid fallback_default_tendency_limiter_type: $fallback_default_tendency_limiter_type, valid options are :none, :basic")
+        error(
+            "Invalid fallback_default_tendency_limiter_type: $fallback_default_tendency_limiter_type, valid options are :none, :basic",
+        )
     end
 
     # ------------------ Moisture Sources Limiter ------------------ #
@@ -1202,15 +1399,24 @@ function TendencyLimiterSet(param_set::APS, moisture_model::AbstractMoistureMode
         fallback_moisture_sources_limiter = NoMoistureSourcesLimiter()
     elseif moisture_model isa NonEquilibriumMoisture
 
-        nonequilibrium_moisture_scheme_type::Symbol = Symbol(parse_namelist(namelist, "user_args", "nonequilibrium_moisture_scheme"; default = :relax_to_equilibrium))
+        nonequilibrium_moisture_scheme_type::Symbol = Symbol(
+            parse_namelist(namelist, "user_args", "nonequilibrium_moisture_scheme"; default = :relax_to_equilibrium),
+        )
 
-        nonequilibrium_moisture_sources_limiter_type::Symbol = Symbol(parse_namelist(namelist, "user_args", "nonequilibrium_moisture_sources_limiter_type"; default = :standard_supersaturation))
+        nonequilibrium_moisture_sources_limiter_type::Symbol = Symbol(
+            parse_namelist(
+                namelist,
+                "user_args",
+                "nonequilibrium_moisture_sources_limiter_type";
+                default = :standard_supersaturation,
+            ),
+        )
 
-        local fallback_to_standard_supersaturation_limiter::Bool 
+        local fallback_to_standard_supersaturation_limiter::Bool
         if nonequilibrium_moisture_scheme_type === :relax_to_equilibrium
-            @assert nonequilibrium_moisture_sources_limiter_type ∈ [:None, :standard_supersaturation,] "Relaxation to equilibrium only supports no integrator limiter or basic integrator limiter"
+            @assert nonequilibrium_moisture_sources_limiter_type ∈ [:None, :standard_supersaturation] "Relaxation to equilibrium only supports no integrator limiter or basic integrator limiter"
         end
-        
+
         moisture_sources_limiter = if nonequilibrium_moisture_sources_limiter_type === :none
             NoMoistureSourcesLimiter()
         elseif nonequilibrium_moisture_sources_limiter_type === :standard_supersaturation
@@ -1222,15 +1428,29 @@ function TendencyLimiterSet(param_set::APS, moisture_model::AbstractMoistureMode
         elseif nonequilibrium_moisture_sources_limiter_type === :morrison_milbrandt_2015_style
             MorrisonMilbrandt2015MoistureSourcesLimiter()
         elseif nonequilibrium_moisture_sources_limiter_type === :morrison_milbrandt_2015_style_exponential_part_only
-            fallback_to_standard_supersaturation_limiter = parse_namelist(namelist, "user_args", "fallback_to_standard_supersaturation_limiter"; default = false)
+            fallback_to_standard_supersaturation_limiter = parse_namelist(
+                namelist,
+                "user_args",
+                "fallback_to_standard_supersaturation_limiter";
+                default = false,
+            )
             MorrisonMilbrandt2015ExponentialPartOnlyMoistureSourcesLimiter(fallback_to_standard_supersaturation_limiter)
         else
-            error("Invalid nonequilibrium_moisture_sources_limiter_type: $nonequilibrium_moisture_sources_limiter_type, valid options are :none, :standard_supersaturation, :morrison_milbrandt_2015_style, :morrison_milbrandt_2015_style_exponential_part_only")
+            error(
+                "Invalid nonequilibrium_moisture_sources_limiter_type: $nonequilibrium_moisture_sources_limiter_type, valid options are :none, :standard_supersaturation, :morrison_milbrandt_2015_style, :morrison_milbrandt_2015_style_exponential_part_only",
+            )
         end
 
-        fallback_nonequilibrium_moisture_sources_limiter_type::Symbol = Symbol(parse_namelist(namelist, "user_args", "fallback_nonequilibrium_moisture_sources_limiter_type"; default = :none))  # Default to none bc that's purest (basic is how anna wrote it though)
+        fallback_nonequilibrium_moisture_sources_limiter_type::Symbol = Symbol(
+            parse_namelist(
+                namelist,
+                "user_args",
+                "fallback_nonequilibrium_moisture_sources_limiter_type";
+                default = :none,
+            ),
+        )  # Default to none bc that's purest (basic is how anna wrote it though)
         if nonequilibrium_moisture_scheme_type === :relax_to_equilibrium
-            @assert fallback_nonequilibrium_moisture_sources_limiter_type ∈ [:None, :standard_supersaturation,] "Relaxation to equilibrium only supports no integrator limiter or basic integrator limiter"
+            @assert fallback_nonequilibrium_moisture_sources_limiter_type ∈ [:None, :standard_supersaturation] "Relaxation to equilibrium only supports no integrator limiter or basic integrator limiter"
         end
 
         fallback_moisture_sources_limiter = if fallback_nonequilibrium_moisture_sources_limiter_type === :none
@@ -1243,20 +1463,29 @@ function TendencyLimiterSet(param_set::APS, moisture_model::AbstractMoistureMode
             StandardSupersaturationMoistureSourcesLimiter()
         elseif fallback_nonequilibrium_moisture_sources_limiter_type === :morrison_milbrandt_2015_style
             MorrisonMilbrandt2015MoistureSourcesLimiter()
-        elseif fallback_nonequilibrium_moisture_sources_limiter_type === :morrison_milbrandt_2015_style_exponential_part_only
-            fallback_to_standard_supersaturation_limiter = parse_namelist(namelist, "user_args", "fallback_to_standard_supersaturation_limiter"; default = false)
+        elseif fallback_nonequilibrium_moisture_sources_limiter_type ===
+               :morrison_milbrandt_2015_style_exponential_part_only
+            fallback_to_standard_supersaturation_limiter = parse_namelist(
+                namelist,
+                "user_args",
+                "fallback_to_standard_supersaturation_limiter";
+                default = false,
+            )
             MorrisonMilbrandt2015ExponentialPartOnlyMoistureSourcesLimiter(fallback_to_standard_supersaturation_limiter)
         else
-            error("Invalid fallback_nonequilibrium_moisture_sources_limiter_type: $fallback_nonequilibrium_moisture_sources_limiter_type, valid options are :none, :basic, :standard_supersaturation, :morrison_milbrandt_2015_style, :morrison_milbrandt_2015_style_exponential_part_only")
+            error(
+                "Invalid fallback_nonequilibrium_moisture_sources_limiter_type: $fallback_nonequilibrium_moisture_sources_limiter_type, valid options are :none, :basic, :standard_supersaturation, :morrison_milbrandt_2015_style, :morrison_milbrandt_2015_style_exponential_part_only",
+            )
         end
 
     else
         error("Something went wrong. Invalid moisture model: `$moisture_model`")
     end
-    
+
 
     # ------------------ Entrainment/Detrainment Limiter ------------------ #
-    entr_detr_limiter_type::Symbol = Symbol(parse_namelist(namelist, "user_args", "entr_detr_limiter_type"; default = :none))  # Default to none bc that's purest (basic is how anna wrote it though)
+    entr_detr_limiter_type::Symbol =
+        Symbol(parse_namelist(namelist, "user_args", "entr_detr_limiter_type"; default = :none))  # Default to none bc that's purest (basic is how anna wrote it though)
     entr_detr_tendency_limiter = if entr_detr_limiter_type === :none
         NoTendencyLimiter()
     elseif entr_detr_limiter_type === :basic
@@ -1267,7 +1496,8 @@ function TendencyLimiterSet(param_set::APS, moisture_model::AbstractMoistureMode
         error("Invalid entr_detr_limiter_type: $entr_detr_limiter_type, valid options are :none, :basic")
     end
 
-    fallback_entr_detr_limiter_type::Symbol = Symbol(parse_namelist(namelist, "user_args", "fallback_entr_detr_limiter_type"; default = :none))  # Default to none bc that's purest (basic is how anna wrote it though)
+    fallback_entr_detr_limiter_type::Symbol =
+        Symbol(parse_namelist(namelist, "user_args", "fallback_entr_detr_limiter_type"; default = :none))  # Default to none bc that's purest (basic is how anna wrote it though)
     fallback_entr_detr_tendency_limiter = if fallback_entr_detr_limiter_type === :none
         NoTendencyLimiter()
     elseif fallback_entr_detr_limiter_type === :basic
@@ -1277,9 +1507,10 @@ function TendencyLimiterSet(param_set::APS, moisture_model::AbstractMoistureMode
     else
         error("Invalid fallback_entr_detr_limiter_type: $fallback_entr_detr_limiter_type, valid options are :none, :basic")
     end
-    
+
     # ------------------ Precipitation Limiter ------------------ #
-    precipitation_tendency_limiter_type::Symbol = Symbol(parse_namelist(namelist, "user_args", "precipitation_tendency_limiter_type"; default = :none))  # Default to none bc that's purest (basic is how anna wrote it though)
+    precipitation_tendency_limiter_type::Symbol =
+        Symbol(parse_namelist(namelist, "user_args", "precipitation_tendency_limiter_type"; default = :none))  # Default to none bc that's purest (basic is how anna wrote it though)
     precipitation_tendency_limiter = if precipitation_tendency_limiter_type === :none
         NoTendencyLimiter()
     elseif precipitation_tendency_limiter_type === :basic
@@ -1287,10 +1518,13 @@ function TendencyLimiterSet(param_set::APS, moisture_model::AbstractMoistureMode
     elseif precipitation_tendency_limiter_type === :truncated_basic
         TruncatedBasicTendencyLimiter(factor)
     else
-        error("Invalid precipitation_tendency_limiter_type: $precipitation_tendency_limiter_type, valid options are :none, :basic")
+        error(
+            "Invalid precipitation_tendency_limiter_type: $precipitation_tendency_limiter_type, valid options are :none, :basic",
+        )
     end
 
-    fallback_precipitation_tendency_limiter_type::Symbol = Symbol(parse_namelist(namelist, "user_args", "fallback_precipitation_tendency_limiter_type"; default = :none))
+    fallback_precipitation_tendency_limiter_type::Symbol =
+        Symbol(parse_namelist(namelist, "user_args", "fallback_precipitation_tendency_limiter_type"; default = :none))
     fallback_precipitation_tendency_limiter = if fallback_precipitation_tendency_limiter_type === :none
         NoTendencyLimiter()
     elseif fallback_precipitation_tendency_limiter_type === :basic
@@ -1298,12 +1532,15 @@ function TendencyLimiterSet(param_set::APS, moisture_model::AbstractMoistureMode
     elseif fallback_precipitation_tendency_limiter_type === :truncated_basic
         TruncatedBasicTendencyLimiter(factor)
     else
-        error("Invalid fallback_precipitation_tendency_limiter_type: $fallback_precipitation_tendency_limiter_type, valid options are :none, :basic")
+        error(
+            "Invalid fallback_precipitation_tendency_limiter_type: $fallback_precipitation_tendency_limiter_type, valid options are :none, :basic",
+        )
     end
 
 
     # ------------------ Tendency Resolver ------------------ #
-    tendency_resolver_setup::Symbol = Symbol(parse_namelist(namelist, "user_args", "tendency_resolver_setup"; default = :none)) # if you do it just on entr/det's it's funamentally unstable....
+    tendency_resolver_setup::Symbol =
+        Symbol(parse_namelist(namelist, "user_args", "tendency_resolver_setup"; default = :none)) # if you do it just on entr/det's it's funamentally unstable....
     if tendency_resolver_setup == :none
         use_tendency_resolver = false
         use_tendency_resolver_on_full_tendencies = false
@@ -1318,7 +1555,7 @@ function TendencyLimiterSet(param_set::APS, moisture_model::AbstractMoistureMode
     end
 
     # ------------------ Return ------------------ #
- 
+
     DTLT = typeof(default_tendency_limiter)
     MSLT = typeof(moisture_sources_limiter)
     EDTLT = typeof(entr_detr_tendency_limiter)
@@ -1369,8 +1606,8 @@ end
 # limit_value(::MinValueLimiter, x::FT, min_value::FT) where {FT} = max(x, min_value)
 # limit_value(::MaxValueLimiter, x::FT, max_value::FT) where {FT} = min(x, max_value)
 cutoff_small_values(x::FT, cutoff::FT) where {FT} = abs(x) < cutoff ? zero(FT) : x
-cutoff_small_values_positive(x::FT, cutoff::FT) where {FT} =  x < cutoff ? zero(FT) : x
-cutoff_small_values_negative(x::FT, cutoff::FT) where {FT} =  x > -cutoff ? zero(FT) : x
+cutoff_small_values_positive(x::FT, cutoff::FT) where {FT} = x < cutoff ? zero(FT) : x
+cutoff_small_values_negative(x::FT, cutoff::FT) where {FT} = x > -cutoff ? zero(FT) : x
 
 
 # =============== #
@@ -1501,12 +1738,7 @@ Base.@kwdef struct MoninObukhovSurface{FT, TS, QS} <: AbstractSurfaceParameters{
     Ri_bulk_crit::FT = FT(0)
 end
 
-function MoninObukhovSurface(
-    ::Type{FT};
-    Tsurface::FloatOrFunc{FT},
-    qsurface::FloatOrFunc{FT},
-    kwargs...,
-) where {FT}
+function MoninObukhovSurface(::Type{FT}; Tsurface::FloatOrFunc{FT}, qsurface::FloatOrFunc{FT}, kwargs...) where {FT}
     TS = typeof(Tsurface)
     QS = typeof(qsurface)
     return MoninObukhovSurface{FT, TS, QS}(; Tsurface, qsurface, kwargs...)
@@ -1543,7 +1775,32 @@ Base.@kwdef struct SurfaceBase{FT}
 end
 
 # struct EDMFModel{N_up, FT, SABC, MM, TCM, PM, RFM, PFM, ENT, EBGC, MLP, PMP, EC, MLEC, ET, EDS, DDS, EPG}
-struct EDMFModel{N_up, FT, SFCA, SABC, MM <: AbstractMoistureModel, CSM <: AbstractCloudSedimentationModel, TCM, PM, RFM, SFM, PFM, ENT, EBGC, MLP, PMP, EC, MLEC, ET, EDS, DDS, EPG, TLT <: AbstractTendencyLimiterSet, APM <: AbstractAreaPartitionModel, CTKE <: AbstractConvectiveTKEHandler}
+struct EDMFModel{
+    N_up,
+    FT,
+    SFCA,
+    SABC,
+    MM <: AbstractMoistureModel,
+    CSM <: AbstractCloudSedimentationModel,
+    TCM,
+    PM,
+    RFM,
+    SFM,
+    PFM,
+    ENT,
+    EBGC,
+    MLP,
+    PMP,
+    EC,
+    MLEC,
+    ET,
+    EDS,
+    DDS,
+    EPG,
+    TLT <: AbstractTendencyLimiterSet,
+    APM <: AbstractAreaPartitionModel,
+    CTKE <: AbstractConvectiveTKEHandler,
+}
     # surface_area::FT
     surface_area::SFCA # trying to allow for non even split of surface area in updrafts... we'll read this in driver/initial_conditions.jl which will call src/EDMF_Functions.jl area_surface_bc()
     surface_area_bc::SABC
@@ -1624,7 +1881,9 @@ function EDMFModel(::Type{FT}, namelist, precip_model, rain_formation_model, par
     snow_formation_model = SnowFormationModel(param_set, moisture_model, namelist) # rn this has to go after moisture_model, if we need it to go before later we can go back to dispatching on symbols etc...
 
     use_sedimentation = parse_namelist(namelist, "user_args", "use_sedimentation"; default = false)
-    cloud_sedimentation_model = use_sedimentation ? CloudSedimentationModel(param_set, moisture_model, namelist) : CloudNoSedimentationModel(param_set, namelist)
+    cloud_sedimentation_model =
+        use_sedimentation ? CloudSedimentationModel(param_set, moisture_model, namelist) :
+        CloudNoSedimentationModel(param_set, namelist)
 
     tendency_limiters = TendencyLimiterSet(param_set, moisture_model, namelist)
 
@@ -1657,8 +1916,13 @@ function EDMFModel(::Type{FT}, namelist, precip_model, rain_formation_model, par
     # Create the environment variable class (major diagnostic and prognostic variables)
 
     # Create the class for environment thermodynamics and buoyancy gradient computation
-    en_sgs_name =
-        parse_namelist(namelist, "thermodynamics", "sgs"; default = "mean", valid_options = ["mean", "quadrature", "mean_w_quadrature_adjusted_noneq_moisture_sources"])
+    en_sgs_name = parse_namelist(
+        namelist,
+        "thermodynamics",
+        "sgs";
+        default = "mean",
+        valid_options = ["mean", "quadrature", "mean_w_quadrature_adjusted_noneq_moisture_sources"],
+    )
     en_thermo = if en_sgs_name == "mean"
         SGSMean()
     elseif en_sgs_name == "quadrature"
@@ -1828,7 +2092,14 @@ function EDMFModel(::Type{FT}, namelist, precip_model, rain_formation_model, par
 
     # -- Stalled updraft handler ----------------------------------------------------- #
 
-    stalled_updraft_handler = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "stalled_updraft_handler", default = "kill", valid_options = ["none", "mix_to_grid_mean", "kill", "detrain_downdrafts"]) # kill bc that was original default
+    stalled_updraft_handler = parse_namelist(
+        namelist,
+        "turbulence",
+        "EDMF_PrognosticTKE",
+        "stalled_updraft_handler",
+        default = "kill",
+        valid_options = ["none", "mix_to_grid_mean", "kill", "detrain_downdrafts"],
+    ) # kill bc that was original default
     stalled_updraft_handler = if stalled_updraft_handler == "none"
         StalledUpdraftDoNothing()
     elseif stalled_updraft_handler == "mix_to_grid_mean"
@@ -1860,15 +2131,25 @@ function EDMFModel(::Type{FT}, namelist, precip_model, rain_formation_model, par
 
     if entrainment_type == "fractional"
         # entrainment_type = FractionalEntrModel()
-        entrainment_type = FractionalEntrModel(;
-        stalled_updraft_handler = stalled_updraft_handler,
-        )
+        entrainment_type = FractionalEntrModel(; stalled_updraft_handler = stalled_updraft_handler)
     elseif entrainment_type == "total_rate"
         # entrainment_type = TotalRateEntrModel()
         entrainment_type = TotalRateEntrModel(;
-        base_detrainment_rate_inv_s = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "base_detrainment_rate_inv_s", default = 0.0), # assume infinite timescale so 0 inv timescale (consider choosing a better default like 6 hours or something...)
-        base_entrainment_rate_inv_s = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "base_entrainment_rate_inv_s", default = 0.0), # assume infinite timescale so 0 inv timescale (consider choosing a better default like 6 hours or something...)
-        stalled_updraft_handler = stalled_updraft_handler, 
+            base_detrainment_rate_inv_s = parse_namelist(
+                namelist,
+                "turbulence",
+                "EDMF_PrognosticTKE",
+                "base_detrainment_rate_inv_s",
+                default = 0.0,
+            ), # assume infinite timescale so 0 inv timescale (consider choosing a better default like 6 hours or something...)
+            base_entrainment_rate_inv_s = parse_namelist(
+                namelist,
+                "turbulence",
+                "EDMF_PrognosticTKE",
+                "base_entrainment_rate_inv_s",
+                default = 0.0,
+            ), # assume infinite timescale so 0 inv timescale (consider choosing a better default like 6 hours or something...)
+            stalled_updraft_handler = stalled_updraft_handler,
         )
     else
         error("Something went wrong. Invalid entrainment type '$entrainment_type'")
@@ -1918,7 +2199,13 @@ function EDMFModel(::Type{FT}, namelist, precip_model, rain_formation_model, par
         Le = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "Lewis_number"; default = 1.0),
         smin_ub = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "smin_ub"),
         l_max = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "l_max"; default = 1.0e6),
-        unstable_ref_factor = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "unstable_ref_factor"; default = 1.1), # How much larger mixing is at Neutral (0) vs small stable reference point of (∂b∂z_ref = 1e-5). Prevents sudden jumps to l_max and smooth transition to instability.
+        unstable_ref_factor = parse_namelist(
+            namelist,
+            "turbulence",
+            "EDMF_PrognosticTKE",
+            "unstable_ref_factor";
+            default = 1.1,
+        ), # How much larger mixing is at Neutral (0) vs small stable reference point of (∂b∂z_ref = 1e-5). Prevents sudden jumps to l_max and smooth transition to instability.
         #
         # My additions
         c_KQl = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "c_KQl"; default = 1.0),
@@ -2030,7 +2317,14 @@ function EDMFModel(::Type{FT}, namelist, precip_model, rain_formation_model, par
 
     # -- Area partition model ----------------------------------------------------- #
 
-    area_partition_model = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "area_partition_model", default = "standard", valid_options = ["standard", "core_cloak"],) # standard bc that was original default
+    area_partition_model = parse_namelist(
+        namelist,
+        "turbulence",
+        "EDMF_PrognosticTKE",
+        "area_partition_model",
+        default = "standard",
+        valid_options = ["standard", "core_cloak"],
+    ) # standard bc that was original default
     area_partition_model = if area_partition_model == "standard"
         StandardAreaPartitionModel(param_set, namelist)
     elseif area_partition_model == "core_cloak"
@@ -2212,11 +2506,11 @@ function column_state(prog, aux, tendencies, colidx, calibrate_io::Bool)
     # USE BRACKETS [colidx]
     prog_cent_column = prog.cent[colidx]
     prog_face_column = prog.face[colidx]
-    aux_cent_column  = aux.cent[colidx]
-    aux_face_column  = aux.face[colidx]
+    aux_cent_column = aux.cent[colidx]
+    aux_face_column = aux.face[colidx]
     tends_cent_column = tendencies.cent[colidx]
     tends_face_column = tendencies.face[colidx]
-    
+
     prog_column = CC.Fields.FieldVector(cent = prog_cent_column, face = prog_face_column)
     aux_column = CC.Fields.FieldVector(cent = aux_cent_column, face = aux_face_column)
     tends_column = CC.Fields.FieldVector(cent = tends_cent_column, face = tends_face_column)
@@ -2256,11 +2550,11 @@ prog_cent_column = prog.cent[colidx]
 function column_prog_aux(prog, aux, colidx, calibrate_io::Bool)
     # USE BRACKETS [colidx] to get a 1D VF (Vertical Field) view
     # CC.column(...) returns a 3D VIJFH view, which crashes the broadcaster
-    
+
     prog_cent_column = prog.cent[colidx]
     prog_face_column = prog.face[colidx]
-    aux_cent_column  = aux.cent[colidx]
-    aux_face_column  = aux.face[colidx]
+    aux_cent_column = aux.cent[colidx]
+    aux_face_column = aux.face[colidx]
 
     # Reconstruct FieldVectors using these 1D views
     prog_column = CC.Fields.FieldVector(cent = prog_cent_column, face = prog_face_column)
@@ -2316,8 +2610,8 @@ function fv_field_summary_helper(f::CC.Fields.Field)
 end
 
 
-function do_print(io, fv_strings; indent::Int=0, return_str::Bool=false)
-    function action(io, xargs..., ; s, return_str::Bool=return_str)
+function do_print(io, fv_strings; indent::Int = 0, return_str::Bool = false)
+    function action(io, xargs..., ; s, return_str::Bool = return_str)
         if return_str
             return s * string(xargs...)
         else
@@ -2325,17 +2619,17 @@ function do_print(io, fv_strings; indent::Int=0, return_str::Bool=false)
             return string() # for type stability, don't return `nothing`
         end
     end
-    
+
     big_space_and_newline = "\n              " # for some reason, this triggers nicer output w/ @info
     s::String = "" # you have to start with this to get the nice formatting w/ @info, otherwise it just prints in a long line
     if fv_strings isa String
-        s = action(io, fv_strings, big_space_and_newline; s=s)
+        s = action(io, fv_strings, big_space_and_newline; s = s)
     elseif fv_strings isa Tuple || s isa Base.Generator
         for (pn, psummary) in fv_strings
-            s = action(io, " "^indent; s=s)
-            s = action(io, "`", pn, "`::",; s=s)
+            s = action(io, " "^indent; s = s)
+            s = action(io, "`", pn, "`::", ; s = s)
             if !(psummary isa String)
-                s = action(io, big_space_and_newline; s=s)
+                s = action(io, big_space_and_newline; s = s)
             end
 
             if return_str
@@ -2361,18 +2655,18 @@ function fv_field_summary(io::IO, f::CC.Fields.Field)
 end
 
 function fv_field_summary(f::CC.Fields.Field)
-    s = fv_field_summary_helper(f);
+    s = fv_field_summary_helper(f)
     big_space_and_newline = "\n              " # for some reason, this triggers nicer output w/ @info
-    s =  big_space_and_newline  * do_print(stdout, s; return_str = true) # add leading big space to outermost call
+    s = big_space_and_newline * do_print(stdout, s; return_str = true) # add leading big space to outermost call
     return s
 end
-    
+
 
 function Base.summary(io::IO, f::CC.Fields.Field)
     fv_field_summary(io, f)
 end
 
-function Base.summary(f::CC.Fields.Field) 
+function Base.summary(f::CC.Fields.Field)
     fv_field_summary(f)
 end
 
@@ -2384,12 +2678,12 @@ function Base.summary(io::IO, fv::CC.Fields.FieldVector)
         print(io, fv)
         return
     end
-    
+
     for pn in propertynames(fv)[1:2]
         prop = getproperty(fv, pn)
 
         if prop isa CC.Fields.Field
-           fv_field_summary(io, prop)
+            fv_field_summary(io, prop)
         elseif prop isa CC.Fields.FieldVector
             Base.summary(io, prop)
         else

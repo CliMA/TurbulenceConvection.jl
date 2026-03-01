@@ -61,10 +61,10 @@ function compute_brunt_vaisala!(N²::CC.Fields.Field, state::State, param_set::A
     g = TCP.grav(param_set)
     aux_en = center_aux_environment(state)
     θ_virt = aux_en.θ_virt
-    
+
     # Compute N² = (g/θ_v) * ∂θ_v/∂z using ClimaCore operators
     @. N² = (g / θ_virt) * ∇c(wvec(Ifx(θ_virt)))
-    
+
     return nothing
 end
 
@@ -101,7 +101,7 @@ Returns: Scalar length scale in meters
 function compute_l_inf(tke::CC.Fields.Field, grid::Grid{FT}, Δz) where {FT}
     numer = FT(0)
     denom = FT(0)
-    
+
     @inbounds for k in real_center_indices(grid)
         sqrt_tke = sqrt(max(tke[k], SHOC_MINTKE))
         z_k = grid.zc[k].z
@@ -109,7 +109,7 @@ function compute_l_inf(tke::CC.Fields.Field, grid::Grid{FT}, Δz) where {FT}
         numer += sqrt_tke * z_k * dz_k
         denom += sqrt_tke * dz_k
     end
-    
+
     return FT(0.1) * (numer / max(denom, eps(FT)))
 end
 
@@ -150,19 +150,25 @@ Returns: (wstar, tscale) where:
   - wstar: Convective velocity scale (m/s)
   - tscale: Convective time scale = pblh/wstar (s), or default 100 s if wstar is very small
 """
-function compute_conv_velocity(wthv_flux::CC.Fields.Field, θ_virt::CC.Fields.Field, 
-                               pblh::FT, grid::Grid{FT}, g::FT, Δz) where {FT}
+function compute_conv_velocity(
+    wthv_flux::CC.Fields.Field,
+    θ_virt::CC.Fields.Field,
+    pblh::FT,
+    grid::Grid{FT},
+    g::FT,
+    Δz,
+) where {FT}
     conv_vel3 = FT(0)
-    
+
     @inbounds for k in real_center_indices(grid)
         if grid.zc[k].z < pblh
             conv_vel3 += FT(2.5) * Δz[k.i] * (g / θ_virt[k]) * wthv_flux[k]
         end
     end
-    
+
     wstar = cbrt(max(conv_vel3, FT(0)))
     tscale = wstar > 0 ? pblh / wstar : FT(100)
-    
+
     return wstar, tscale
 end
 
@@ -208,13 +214,20 @@ Arguments:
   - vk: von Kármán constant (≈ 0.4)
 
 """
-function compute_shoc_mixing_length!(ℓ_mix::CC.Fields.Field, tke::CC.Fields.Field,
-                                     N²::CC.Fields.Field, pblh::FT, l_inf::FT,
-                                     tscale::FT, grid::Grid{FT}, vk::FT) where {FT}
+function compute_shoc_mixing_length!(
+    ℓ_mix::CC.Fields.Field,
+    tke::CC.Fields.Field,
+    N²::CC.Fields.Field,
+    pblh::FT,
+    l_inf::FT,
+    tscale::FT,
+    grid::Grid{FT},
+    vk::FT,
+) where {FT}
     @inbounds for k in real_center_indices(grid)
         z_k = grid.zc[k].z
         tke_k = max(tke[k], SHOC_MINTKE)
-        
+
         # Stability-dependent length scale
         if N²[k] > eps(FT)  # Stable
             L = l_inf * min(FT(1), sqrt(tke_k / (N²[k] * z_k + eps(FT))))
@@ -225,11 +238,11 @@ function compute_shoc_mixing_length!(ℓ_mix::CC.Fields.Field, tke::CC.Fields.Fi
                 L = l_inf
             end
         end
-        
+
         # Apply bounds and length_fac tuning
         ℓ_mix[k] = SHOC_LENGTH_FAC * clamp(L, SHOC_MINLEN, SHOC_MAXLEN)
     end
-    
+
     return nothing
 end
 
@@ -266,12 +279,18 @@ Arguments:
   - Δz: Vertical grid spacing array (m) [currently unused, kept for future use]
 
 """
-function compute_shear_production!(shear_prod::CC.Fields.Field, u::CC.Fields.Field,
-                                  v::CC.Fields.Field, grid::Grid{FT}, Ck_sh::FT, Δz) where {FT}
+function compute_shear_production!(
+    shear_prod::CC.Fields.Field,
+    u::CC.Fields.Field,
+    v::CC.Fields.Field,
+    grid::Grid{FT},
+    Ck_sh::FT,
+    Δz,
+) where {FT}
     # Compute velocity gradients using ClimaCore operators
     # Use inline computation to avoid allocating dudz and dvdz separately
     @. shear_prod = Ck_sh * ((∇c(wvec(Ifx(u))))^2 + (∇c(wvec(Ifx(v))))^2)
-    
+
     return nothing
 end
 
@@ -315,10 +334,16 @@ Usage: Output Km and Kh are used to compute turbulent fluxes:
   - Heat flux: Q = -ρ·cp·Kh·(∂T/∂z)
 
 """
-function compute_eddy_diffusivities!(Km::CC.Fields.Field, Kh::CC.Fields.Field, tke::CC.Fields.Field, ℓ_mix::CC.Fields.Field, Pr::FT = 1.0) where {FT}
+function compute_eddy_diffusivities!(
+    Km::CC.Fields.Field,
+    Kh::CC.Fields.Field,
+    tke::CC.Fields.Field,
+    ℓ_mix::CC.Fields.Field,
+    Pr::FT = 1.0,
+) where {FT}
     @. Km = ℓ_mix * sqrt(max(tke, SHOC_MINTKE))
     @. Kh = Km / Pr
-    
+
     return nothing
 end
 
@@ -339,7 +364,7 @@ function compute_shoc_isotropy!(
     p_c::CC.Fields.Field,
     Δz::AbstractArray,
     grid::Grid{FT},
-    g::FT
+    g::FT,
 ) where {FT}
     lambda_low = FT(0.001)
     lambda_high = FT(0.04)
@@ -393,13 +418,16 @@ function compute_shoc_w3!(
     Δz::AbstractArray,
     grid::Grid{FT},
     g::FT;
-    isotropy_c::CC.Fields.Field
+    isotropy_c::CC.Fields.Field,
 ) where {FT}
 
     compute_shoc_isotropy!(isotropy_c, brunt_c, tke, ℓ_mix, p_c, Δz, grid, g)
 
     # Face interpolation operators
-    If_wsec = CCO.InterpolateC2F(; bottom = CCO.SetValue(FT(2 / 3) * FT(SHOC_MINTKE)), top = CCO.SetValue(FT(2 / 3) * FT(SHOC_MINTKE)))
+    If_wsec = CCO.InterpolateC2F(;
+        bottom = CCO.SetValue(FT(2 / 3) * FT(SHOC_MINTKE)),
+        top = CCO.SetValue(FT(2 / 3) * FT(SHOC_MINTKE)),
+    )
     If_iso = CCO.InterpolateC2F(; bottom = CCO.SetValue(FT(0)), top = CCO.SetValue(FT(0)))
     If_brunt = CCO.InterpolateC2F(; bottom = CCO.SetValue(FT(SHOC_LARGENEG)), top = CCO.SetValue(FT(SHOC_LARGENEG)))
     If_thetal = CCO.InterpolateC2F(; bottom = CCO.SetValue(FT(0)), top = CCO.SetValue(FT(0)))
@@ -438,7 +466,9 @@ function compute_shoc_w3!(
         # Intermediate closure terms (Canuto et al. 2001)
         f0 = thedz2 * (bet2^3) * (iso^4) * wthl_f[kf] * thl_sec_diff
         f1 = thedz2 * (bet2^2) * (iso^3) * (wthl_f[kf] * wthl_sec_diff + FT(0.5) * w_sec_zi[kf] * thl_sec_diff)
-        f2 = thedz * bet2 * isosqrd * wthl_f[kf] * wsec_diff + FT(2) * thedz2 * bet2 * isosqrd * w_sec_zi[kf] * wthl_sec_diff
+        f2 =
+            thedz * bet2 * isosqrd * wthl_f[kf] * wsec_diff +
+            FT(2) * thedz2 * bet2 * isosqrd * w_sec_zi[kf] * wthl_sec_diff
         f3 = thedz2 * bet2 * isosqrd * w_sec_zi[kf] * wthl_sec_diff + thedz * bet2 * isosqrd * (wthl_f[kf] * tke_diff)
         f4 = thedz * iso * w_sec_zi[kf] * (wsec_diff + tke_diff)
         f5 = thedz * iso * w_sec_zi[kf] * wsec_diff
@@ -567,7 +597,7 @@ function compute_shoc_pdf_and_ql_qi_fluxes!(
     thl_var_scratch::CC.Fields.Field,
     wqls_c::CC.Fields.Field,
     liq_frac_c::CC.Fields.Field,
-  ) where {FT}
+) where {FT}
     thermo_params = TCP.thermodynamics_params(param_set)
     aux_en = center_aux_environment(state)
     aux_gm = center_aux_grid_mean(state)
@@ -581,29 +611,42 @@ function compute_shoc_pdf_and_ql_qi_fluxes!(
     # @. aux_shoc.tke_eff = w2_c * (3 / 2)  # Store effective TKE for debugging
 
     if use_tc_second_moments
-      thl_var_c = aux_en.Hvar
-      qt_var_c = aux_en.QTvar
-      thl_qt_cov_c = aux_en.HQTcov
+        thl_var_c = aux_en.Hvar
+        qt_var_c = aux_en.QTvar
+        thl_qt_cov_c = aux_en.HQTcov
     else
-      ∂θl∂z_c = aux_tc.∂θl∂z
-      ∂qt∂z_c = aux_tc.∂qt∂z
-      thl_var_c = thl_var_scratch
-      @. thl_var_c = SHOC_THL2TUNE * (ℓ_mix^2) * (∂θl∂z_c^2)
-      qt_var_c = @. SHOC_QW2TUNE * (ℓ_mix^2) * (∂qt∂z_c^2)
-      thl_qt_cov_c = @. SHOC_QWTHL2TUNE * (ℓ_mix^2) * ∂θl∂z_c * ∂qt∂z_c
+        ∂θl∂z_c = aux_tc.∂θl∂z
+        ∂qt∂z_c = aux_tc.∂qt∂z
+        thl_var_c = thl_var_scratch
+        @. thl_var_c = SHOC_THL2TUNE * (ℓ_mix^2) * (∂θl∂z_c^2)
+        qt_var_c = @. SHOC_QW2TUNE * (ℓ_mix^2) * (∂qt∂z_c^2)
+        thl_qt_cov_c = @. SHOC_QWTHL2TUNE * (ℓ_mix^2) * ∂θl∂z_c * ∂qt∂z_c
     end
     # @. aux_shoc.thl_var = thl_var_c  # Store for debugging
     # @. aux_shoc.qt_var = qt_var_c  # Store for debugging
     # @. aux_shoc.thl_qt_cov = thl_qt_cov_c  # Store for debugging
 
     if use_tc_wthird
-      w3_c = aux_gm.W_third_m
+        w3_c = aux_gm.W_third_m
     else
-      w3_f = aux_tc_f.temporary_f1
-      isotropy_c = aux_tc.temporary_2
-      compute_shoc_w3!(w3_f, w2_c, thl_var_c, wthl_f, tke, ℓ_mix, N²,
-                       aux_en.θ_liq_ice, aux_en.p, Δz, grid, g; isotropy_c=isotropy_c)
-      w3_c = Ic.(w3_f)
+        w3_f = aux_tc_f.temporary_f1
+        isotropy_c = aux_tc.temporary_2
+        compute_shoc_w3!(
+            w3_f,
+            w2_c,
+            thl_var_c,
+            wthl_f,
+            tke,
+            ℓ_mix,
+            N²,
+            aux_en.θ_liq_ice,
+            aux_en.p,
+            Δz,
+            grid,
+            g;
+            isotropy_c = isotropy_c,
+        )
+        w3_c = Ic.(w3_f)
     end
     # @. aux_shoc.w3 = w3_c  # Store for debugging
 
@@ -616,68 +659,89 @@ function compute_shoc_pdf_and_ql_qi_fluxes!(
     zero_field!(wqls_c)
 
     @inbounds for k in real_center_indices(grid)
-      thl_mean_k = aux_en.θ_liq_ice[k]
-      qt_mean_k = aux_en.q_tot[k]
-      w_mean_k = w_en_c[k]
-      w2_k = w2_c[k]
-      w3_k = w3_c[k]
-      thl_var_k = thl_var_c[k]
-      qt_var_k = qt_var_c[k]
-      thl_qt_cov_k = thl_qt_cov_c[k]
-      wthl_sec_k = wthl_sec_c[k]
-      wqw_sec_k = wqw_sec_c[k]
-      p_k = aux_en.p[k]
+        thl_mean_k = aux_en.θ_liq_ice[k]
+        qt_mean_k = aux_en.q_tot[k]
+        w_mean_k = w_en_c[k]
+        w2_k = w2_c[k]
+        w3_k = w3_c[k]
+        thl_var_k = thl_var_c[k]
+        qt_var_k = qt_var_c[k]
+        thl_qt_cov_k = thl_qt_cov_c[k]
+        wthl_sec_k = wthl_sec_c[k]
+        wqw_sec_k = wqw_sec_c[k]
+        p_k = aux_en.p[k]
 
-      liq_frac_mean_k = TD.liquid_fraction(thermo_params, aux_en.ts[k])
-      # Note: SHOC PDF returns TOTAL CONDENSATE (liquid + ice), not just liquid
-      # The variable name ql_mean_k is misleading - it's actually total condensate
-      (cloud_frac_k, qc_mean_k, wqls_k, _wthv_sec_k, _ql_var_k, s1_k, s2_k,
-       thl1_1_k, thl1_2_k, qw1_1_k, qw1_2_k, w1_1_k, w1_2_k, a_k, qs1_k, qs2_k) =
-        shoc_assumed_pdf_point(
-          thl_mean_k, qt_mean_k, w_mean_k,
-          w2_k, w3_k,
-          thl_var_k, qt_var_k, thl_qt_cov_k,
-          wthl_sec_k, wqw_sec_k,
-          p_k,
-          thermo_params;
-          liq_frac_mean = liq_frac_mean_k,
+        liq_frac_mean_k = TD.liquid_fraction(thermo_params, aux_en.ts[k])
+        # Note: SHOC PDF returns TOTAL CONDENSATE (liquid + ice), not just liquid
+        # The variable name ql_mean_k is misleading - it's actually total condensate
+        (
+            cloud_frac_k,
+            qc_mean_k,
+            wqls_k,
+            _wthv_sec_k,
+            _ql_var_k,
+            s1_k,
+            s2_k,
+            thl1_1_k,
+            thl1_2_k,
+            qw1_1_k,
+            qw1_2_k,
+            w1_1_k,
+            w1_2_k,
+            a_k,
+            qs1_k,
+            qs2_k,
+        ) = shoc_assumed_pdf_point(
+            thl_mean_k,
+            qt_mean_k,
+            w_mean_k,
+            w2_k,
+            w3_k,
+            thl_var_k,
+            qt_var_k,
+            thl_qt_cov_k,
+            wthl_sec_k,
+            wqw_sec_k,
+            p_k,
+            thermo_params;
+            liq_frac_mean = liq_frac_mean_k,
         )
 
-      # # Store PDF diagnostics for debugging
-      # aux_shoc.pdf_qt_mean[k] = qt_mean_k
-      # aux_shoc.pdf_thl_mean[k] = thl_mean_k
-      # aux_shoc.pdf_qt_var_input[k] = qt_var_k
-      # aux_shoc.pdf_thl_var_input[k] = thl_var_k
-      # aux_shoc.pdf_thl_qt_cov_input[k] = thl_qt_cov_k
-      
-      # # Store plume states
-      # aux_shoc.pdf_thl1_1[k] = thl1_1_k
-      # aux_shoc.pdf_thl1_2[k] = thl1_2_k
-      # aux_shoc.pdf_qw1_1[k] = qw1_1_k
-      # aux_shoc.pdf_qw1_2[k] = qw1_2_k
-      # aux_shoc.pdf_w1_1[k] = w1_1_k
-      # aux_shoc.pdf_w1_2[k] = w1_2_k
-      # aux_shoc.pdf_area_frac[k] = a_k
-      
-      # # Store saturation values (SIGNED - can be negative for undersaturation)
-      # aux_shoc.pdf_qs1[k] = qs1_k
-      # aux_shoc.pdf_qs2[k] = qs2_k
-      # aux_shoc.pdf_s1_signed[k] = s1_k  # NOT clipped, shows true saturation/undersaturation
-      # aux_shoc.pdf_s2_signed[k] = s2_k  # NOT clipped
-      # aux_shoc.pdf_qsat_mean[k] = (qs1_k + qs2_k) / FT(2)
+        # # Store PDF diagnostics for debugging
+        # aux_shoc.pdf_qt_mean[k] = qt_mean_k
+        # aux_shoc.pdf_thl_mean[k] = thl_mean_k
+        # aux_shoc.pdf_qt_var_input[k] = qt_var_k
+        # aux_shoc.pdf_thl_var_input[k] = thl_var_k
+        # aux_shoc.pdf_thl_qt_cov_input[k] = thl_qt_cov_k
+
+        # # Store plume states
+        # aux_shoc.pdf_thl1_1[k] = thl1_1_k
+        # aux_shoc.pdf_thl1_2[k] = thl1_2_k
+        # aux_shoc.pdf_qw1_1[k] = qw1_1_k
+        # aux_shoc.pdf_qw1_2[k] = qw1_2_k
+        # aux_shoc.pdf_w1_1[k] = w1_1_k
+        # aux_shoc.pdf_w1_2[k] = w1_2_k
+        # aux_shoc.pdf_area_frac[k] = a_k
+
+        # # Store saturation values (SIGNED - can be negative for undersaturation)
+        # aux_shoc.pdf_qs1[k] = qs1_k
+        # aux_shoc.pdf_qs2[k] = qs2_k
+        # aux_shoc.pdf_s1_signed[k] = s1_k  # NOT clipped, shows true saturation/undersaturation
+        # aux_shoc.pdf_s2_signed[k] = s2_k  # NOT clipped
+        # aux_shoc.pdf_qsat_mean[k] = (qs1_k + qs2_k) / FT(2)
 
         # Optional scaling to match existing env condensate (ql+qi) when state is not updated from PDF
         qc_mean_scaled = qc_mean_k
         wqls_scaled = wqls_k
         ql_var_scaled = _ql_var_k
         if match_qc_to_state
-          qc_state_k = aux_en.q_liq[k] + aux_en.q_ice[k]
-          if qc_mean_k > eps(FT)
-            r_qc = clamp(qc_state_k / qc_mean_k, qc_match_min, qc_match_max)
-            qc_mean_scaled = qc_mean_k * r_qc
-            wqls_scaled = wqls_k * r_qc
-            ql_var_scaled = _ql_var_k * r_qc^2
-          end
+            qc_state_k = aux_en.q_liq[k] + aux_en.q_ice[k]
+            if qc_mean_k > eps(FT)
+                r_qc = clamp(qc_state_k / qc_mean_k, qc_match_min, qc_match_max)
+                qc_mean_scaled = qc_mean_k * r_qc
+                wqls_scaled = wqls_k * r_qc
+                ql_var_scaled = _ql_var_k * r_qc^2
+            end
         end
 
         aux_en.cloud_fraction[k] = cloud_frac_k
@@ -690,31 +754,31 @@ function compute_shoc_pdf_and_ql_qi_fluxes!(
         # aux_shoc.wthv_sec[k] = _wthv_sec_k
         # aux_shoc.ql_var[k] = ql_var_scaled
 
-      # Optionally partition total condensate into liquid and ice state variables
-      # (only in equilibrium mode where q_liq/q_ice are diagnostic)
-      # By default, only SGS fluxes are computed, not state variables
-      if update_ql_qi_from_pdf && (edmf.moisture_model isa EquilibriumMoisture)
-        aux_en.q_liq[k] = qc_mean_scaled * liq_frac_mean_k
-        aux_en.q_ice[k] = qc_mean_scaled * (FT(1) - liq_frac_mean_k)
-      end
-      wqls_c[k] = wqls_scaled
+        # Optionally partition total condensate into liquid and ice state variables
+        # (only in equilibrium mode where q_liq/q_ice are diagnostic)
+        # By default, only SGS fluxes are computed, not state variables
+        if update_ql_qi_from_pdf && (edmf.moisture_model isa EquilibriumMoisture)
+            aux_en.q_liq[k] = qc_mean_scaled * liq_frac_mean_k
+            aux_en.q_ice[k] = qc_mean_scaled * (FT(1) - liq_frac_mean_k)
+        end
+        wqls_c[k] = wqls_scaled
     end
 
     if (edmf.moisture_model isa EquilibriumMoisture) || (edmf.moisture_model isa NonEquilibriumMoisture)
-      wqls_f = Ifx.(wqls_c)
-      @. liq_frac_c = TD.liquid_fraction(thermo_params, aux_en.ts)
-      liq_frac_f = Ifx.(liq_frac_c)
-      ice_frac_f = @. one(FT) - liq_frac_f
+        wqls_f = Ifx.(wqls_c)
+        @. liq_frac_c = TD.liquid_fraction(thermo_params, aux_en.ts)
+        liq_frac_f = Ifx.(liq_frac_c)
+        ice_frac_f = @. one(FT) - liq_frac_f
 
-      @. aux_tc_f.diffusive_flux_ql = wqls_f * liq_frac_f
-      @. aux_tc_f.diffusive_flux_qi = wqls_f * ice_frac_f
+        @. aux_tc_f.diffusive_flux_ql = wqls_f * liq_frac_f
+        @. aux_tc_f.diffusive_flux_qi = wqls_f * ice_frac_f
 
-      kf_surf = kf_surface(grid)
-      kf_toa = kf_top_of_atmos(grid)
-      aux_tc_f.diffusive_flux_ql[kf_surf] = surf.ρq_liq_flux
-      aux_tc_f.diffusive_flux_qi[kf_surf] = surf.ρq_ice_flux
-      aux_tc_f.diffusive_flux_ql[kf_toa] = FT(0)
-      aux_tc_f.diffusive_flux_qi[kf_toa] = FT(0)
+        kf_surf = kf_surface(grid)
+        kf_toa = kf_top_of_atmos(grid)
+        aux_tc_f.diffusive_flux_ql[kf_surf] = surf.ρq_liq_flux
+        aux_tc_f.diffusive_flux_qi[kf_surf] = surf.ρq_ice_flux
+        aux_tc_f.diffusive_flux_ql[kf_toa] = FT(0)
+        aux_tc_f.diffusive_flux_qi[kf_toa] = FT(0)
     end
 
     return nothing
@@ -806,44 +870,70 @@ function shoc_assumed_pdf_point(
     sqrtthl = max(thl_tol, sqrt(max(thl_var, FT(0))))
     sqrtqt = max(rt_tol, sqrt(max(qt_var, FT(0))))
 
-    Skew_w, w1_1, w1_2, w2_1, w2_2, a = shoc_assumed_pdf_vv_parameters(
-        w_mean, w2, w3, w_tol_sqd,
-    )
+    Skew_w, w1_1, w1_2, w2_1, w2_2, a = shoc_assumed_pdf_vv_parameters(w_mean, w2, w3, w_tol_sqd)
 
     thl1_1, thl1_2, thl2_1, thl2_2, sqrtthl2_1, sqrtthl2_2 =
-        shoc_assumed_pdf_thl_parameters(
-            wthl, sqrtw2, sqrtthl, thl_var, thl_mean, w1_1, w1_2, Skew_w, a, dothetal_skew,
-        )
+        shoc_assumed_pdf_thl_parameters(wthl, sqrtw2, sqrtthl, thl_var, thl_mean, w1_1, w1_2, Skew_w, a, dothetal_skew)
 
     qw1_1, qw1_2, qw2_1, qw2_2, sqrtqw2_1, sqrtqw2_2 =
-        shoc_assumed_pdf_qw_parameters(
-            wqw, sqrtw2, Skew_w, sqrtqt, qt_var, w1_2, w1_1, qt_mean, a,
-        )
+        shoc_assumed_pdf_qw_parameters(wqw, sqrtw2, Skew_w, sqrtqt, qt_var, w1_2, w1_1, qt_mean, a)
 
     w1_1 = shoc_assumed_pdf_tilde_to_real(w_mean, sqrtw2, w1_1)
     w1_2 = shoc_assumed_pdf_tilde_to_real(w_mean, sqrtw2, w1_2)
 
     r_qwthl_1 = shoc_assumed_pdf_inplume_correlations(
-        sqrtqw2_1, sqrtthl2_1, a, sqrtqw2_2, sqrtthl2_2,
-        thl_qt_cov, qw1_1, qt_mean, thl1_1, thl_mean, qw1_2, thl1_2,
+        sqrtqw2_1,
+        sqrtthl2_1,
+        a,
+        sqrtqw2_2,
+        sqrtthl2_2,
+        thl_qt_cov,
+        qw1_1,
+        qt_mean,
+        thl1_1,
+        thl_mean,
+        qw1_2,
+        thl1_2,
     )
 
     Tl1_1 = shoc_assumed_pdf_compute_temperature(thl1_1, basepres, p, Rd, cp)
     Tl1_2 = shoc_assumed_pdf_compute_temperature(thl1_2, basepres, p, Rd, cp)
 
-    qs1, beta1, qs2, beta2 = shoc_assumed_pdf_compute_qs(
-        Tl1_1, Tl1_2, p, Rd, Rv, cp, Lv, thermo_params, liq_frac_mean,
-    )
+    qs1, beta1, qs2, beta2 = shoc_assumed_pdf_compute_qs(Tl1_1, Tl1_2, p, Rd, Rv, cp, Lv, thermo_params, liq_frac_mean)
 
     s1, std_s1, qn1, C1 = shoc_assumed_pdf_compute_s(
-        qw1_1, qs1, beta1, p, thl2_1, qw2_1, sqrtthl2_1, sqrtqw2_1, r_qwthl_1, basepres, Rd, cp, Lv,
+        qw1_1,
+        qs1,
+        beta1,
+        p,
+        thl2_1,
+        qw2_1,
+        sqrtthl2_1,
+        sqrtqw2_1,
+        r_qwthl_1,
+        basepres,
+        Rd,
+        cp,
+        Lv,
     )
 
     if (qw1_1 == qw1_2) && (thl2_1 == thl2_2) && (qs1 == qs2)
         s2, std_s2, qn2, C2 = s1, std_s1, qn1, C1
     else
         s2, std_s2, qn2, C2 = shoc_assumed_pdf_compute_s(
-            qw1_2, qs2, beta2, p, thl2_2, qw2_2, sqrtthl2_2, sqrtqw2_2, r_qwthl_1, basepres, Rd, cp, Lv,
+            qw1_2,
+            qs2,
+            beta2,
+            p,
+            thl2_2,
+            qw2_2,
+            sqrtthl2_2,
+            sqrtqw2_2,
+            r_qwthl_1,
+            basepres,
+            Rd,
+            cp,
+            Lv,
         )
     end
 
@@ -882,7 +972,18 @@ end
 end
 
 """Compute liquid potential temperature distribution parameters for ADG1 PDF."""
-@inline function shoc_assumed_pdf_thl_parameters(wthl::FT, sqrtw2::FT, sqrtthl::FT, thl_var::FT, thl_first::FT, w1_1::FT, w1_2::FT, Skew_w::FT, a::FT, dothetal_skew::Bool) where {FT}
+@inline function shoc_assumed_pdf_thl_parameters(
+    wthl::FT,
+    sqrtw2::FT,
+    sqrtthl::FT,
+    thl_var::FT,
+    thl_first::FT,
+    w1_1::FT,
+    w1_2::FT,
+    Skew_w::FT,
+    a::FT,
+    dothetal_skew::Bool,
+) where {FT}
     thl_tol = FT(1e-2)
     w_thresh = zero(thl_var)
     corr = clamp(wthl / (sqrtw2 * sqrtthl), FT(-1), FT(1))
@@ -906,9 +1007,11 @@ end
         end
     end
 
-    thl2_1 = (3 * thl1_2 * (1 - a * thl1_1^2 - (1 - a) * thl1_2^2) - (Skew_thl - a * thl1_1^3 - (1 - a) * thl1_2^3)) /
+    thl2_1 =
+        (3 * thl1_2 * (1 - a * thl1_1^2 - (1 - a) * thl1_2^2) - (Skew_thl - a * thl1_1^3 - (1 - a) * thl1_2^3)) /
         (3 * a * (thl1_2 - thl1_1))
-    thl2_2 = (-3 * thl1_1 * (1 - a * thl1_1^2 - (1 - a) * thl1_2^2) + (Skew_thl - a * thl1_1^3 - (1 - a) * thl1_2^3)) /
+    thl2_2 =
+        (-3 * thl1_1 * (1 - a * thl1_1^2 - (1 - a) * thl1_2^2) + (Skew_thl - a * thl1_1^3 - (1 - a) * thl1_2^3)) /
         (3 * (1 - a) * (thl1_2 - thl1_1))
 
     thl2_1 = min(FT(100), max(zero(thl_var), thl2_1)) * thl_var
@@ -921,7 +1024,17 @@ end
 end
 
 """Compute total water distribution parameters for ADG1 PDF."""
-@inline function shoc_assumed_pdf_qw_parameters(wqw::FT, sqrtw2::FT, Skew_w::FT, sqrtqt::FT, qt_var::FT, w1_2::FT, w1_1::FT, qw_first::FT, a::FT) where {FT}
+@inline function shoc_assumed_pdf_qw_parameters(
+    wqw::FT,
+    sqrtw2::FT,
+    Skew_w::FT,
+    sqrtqt::FT,
+    qt_var::FT,
+    w1_2::FT,
+    w1_1::FT,
+    qw_first::FT,
+    a::FT,
+) where {FT}
     rt_tol = FT(1e-4)
     w_thresh = zero(qt_var)
     corr = clamp(wqw / (sqrtw2 * sqrtqt), FT(-1), FT(1))
@@ -942,9 +1055,11 @@ end
         Skew_qw = (FT(1.2) * Skew_w / FT(0.2)) * (tsign - FT(0.2))
     end
 
-    qw2_1 = (3 * qw1_2 * (1 - a * qw1_1^2 - (1 - a) * qw1_2^2) - (Skew_qw - a * qw1_1^3 - (1 - a) * qw1_2^3)) /
+    qw2_1 =
+        (3 * qw1_2 * (1 - a * qw1_1^2 - (1 - a) * qw1_2^2) - (Skew_qw - a * qw1_1^3 - (1 - a) * qw1_2^3)) /
         (3 * a * (qw1_2 - qw1_1))
-    qw2_2 = (-3 * qw1_1 * (1 - a * qw1_1^2 - (1 - a) * qw1_2^2) + (Skew_qw - a * qw1_1^3 - (1 - a) * qw1_2^3)) /
+    qw2_2 =
+        (-3 * qw1_1 * (1 - a * qw1_1^2 - (1 - a) * qw1_2^2) + (Skew_qw - a * qw1_1^3 - (1 - a) * qw1_2^3)) /
         (3 * (1 - a) * (qw1_2 - qw1_1))
 
     qw2_1 = min(FT(100), max(zero(qt_var), qw2_1)) * qt_var
@@ -989,7 +1104,11 @@ Inputs:
     if iszero(testvar)
         return zero(testvar)
     end
-    r = (qwthlsec - a * (qw1_1 - qw_first) * (thl1_1 - thl_first) - (one(a) - a) * (qw1_2 - qw_first) * (thl1_2 - thl_first)) / testvar
+    r =
+        (
+            qwthlsec - a * (qw1_1 - qw_first) * (thl1_1 - thl_first) -
+            (one(a) - a) * (qw1_2 - qw_first) * (thl1_2 - thl_first)
+        ) / testvar
     return clamp(r, FT(-1), FT(1))
 end
 
@@ -1062,7 +1181,22 @@ Inputs:
 - `require_cloud_for_condensate`: If true, set qn=0 when cloud fraction C=0. 
   Set to false when computing fluxes with non-equilibrium microphysics.
 """
-@inline function shoc_assumed_pdf_compute_s(qw1::FT, qs1::FT, beta::FT, pval::FT, thl2::FT, qw2::FT, sqrtthl2::FT, sqrtqw2::FT, r_qwthl::FT, basepres::FT, Rd::FT, cp::FT, Lv::FT; require_cloud_for_condensate::Bool=false) where {FT}
+@inline function shoc_assumed_pdf_compute_s(
+    qw1::FT,
+    qs1::FT,
+    beta::FT,
+    pval::FT,
+    thl2::FT,
+    qw2::FT,
+    sqrtthl2::FT,
+    sqrtqw2::FT,
+    r_qwthl::FT,
+    basepres::FT,
+    Rd::FT,
+    cp::FT,
+    Lv::FT;
+    require_cloud_for_condensate::Bool = false,
+) where {FT}
     sqrt2 = sqrt(FT(2))
     sqrt2pi = sqrt(FT(2) * π)
 
@@ -1095,19 +1229,49 @@ end
 end
 
 """Compute variance of cloud liquid water from double-Gaussian statistics."""
-@inline function shoc_assumed_pdf_compute_cloud_liquid_variance(a::FT, s1::FT, ql1::FT, C1::FT, std_s1::FT, s2::FT, ql2::FT, C2::FT, std_s2::FT, ql_mean::FT) where {FT}
+@inline function shoc_assumed_pdf_compute_cloud_liquid_variance(
+    a::FT,
+    s1::FT,
+    ql1::FT,
+    C1::FT,
+    std_s1::FT,
+    s2::FT,
+    ql2::FT,
+    C2::FT,
+    std_s2::FT,
+    ql_mean::FT,
+) where {FT}
     ql2_val = a * (s1 * ql1 + C1 * std_s1^2) + (one(ql1) - a) * (s2 * ql2 + C2 * std_s2^2) - ql_mean^2
     return max(zero(ql_mean), ql2_val)
 end
 
-@inline function shoc_assumed_pdf_compute_liquid_water_flux(a::FT, w1_1::FT, w_first::FT, ql1::FT, w1_2::FT, ql2::FT) where {FT}
+@inline function shoc_assumed_pdf_compute_liquid_water_flux(
+    a::FT,
+    w1_1::FT,
+    w_first::FT,
+    ql1::FT,
+    w1_2::FT,
+    ql2::FT,
+) where {FT}
     return a * (w1_1 - w_first) * ql1 + (one(w_first) - a) * (w1_2 - w_first) * ql2
 end
 
 """Compute buoyancy flux w'θ_v' from sensible and latent heat fluxes and liquid water flux."""
-@inline function shoc_assumed_pdf_compute_buoyancy_flux(wthlsec::FT, epsterm::FT, wqwsec::FT, pval::FT, wqls::FT, basetemp::FT, basepres::FT, Rd::FT, cp::FT, Lv::FT) where {FT}
-    return wthlsec + ((one(wthlsec) - epsterm) / epsterm) * basetemp * wqwsec +
-      ((Lv / cp) * (basepres / pval)^(Rd / cp) - (one(wthlsec) / epsterm) * basetemp) * wqls
+@inline function shoc_assumed_pdf_compute_buoyancy_flux(
+    wthlsec::FT,
+    epsterm::FT,
+    wqwsec::FT,
+    pval::FT,
+    wqls::FT,
+    basetemp::FT,
+    basepres::FT,
+    Rd::FT,
+    cp::FT,
+    Lv::FT,
+) where {FT}
+    return wthlsec +
+           ((one(wthlsec) - epsterm) / epsterm) * basetemp * wqwsec +
+           ((Lv / cp) * (basepres / pval)^(Rd / cp) - (one(wthlsec) / epsterm) * basetemp) * wqls
 end
 
 # ============================================================
@@ -1193,18 +1357,23 @@ References:
   - Bogenschutz & Krueger (2013): https://doi.org/10.1002/jame.20018
   - SHOC-MF (2022): https://doi.org/10.5194/gmd-16-1909-2023
 """
-function compute_SHOC_fluxes!(edmf::EDMFModel, state::State, surf::SurfaceBase, param_set::APS;
-                              use_tc_n2::Bool = true,
-                              use_tc_mixing_length::Bool = true,
-                              use_tc_kh_km::Bool = true,
-                              use_tc_shear::Bool = true,
-                              use_tc_second_moments::Bool = true,
-                              use_tc_wthird::Bool = false)
+function compute_SHOC_fluxes!(
+    edmf::EDMFModel,
+    state::State,
+    surf::SurfaceBase,
+    param_set::APS;
+    use_tc_n2::Bool = true,
+    use_tc_mixing_length::Bool = true,
+    use_tc_kh_km::Bool = true,
+    use_tc_shear::Bool = true,
+    use_tc_second_moments::Bool = true,
+    use_tc_wthird::Bool = false,
+)
     FT = float_type(state)
     grid = Grid(state)
     thermo_params = TCP.thermodynamics_params(param_set)
     g = TCP.grav(param_set)
-    
+
     # Access state variables
     aux_gm = center_aux_grid_mean(state)
     aux_gm_f = face_aux_grid_mean(state)
@@ -1215,14 +1384,14 @@ function compute_SHOC_fluxes!(edmf::EDMFModel, state::State, surf::SurfaceBase, 
     prog_gm = center_prog_grid_mean(state)
     prog_pr = center_prog_precipitation(state)
     aux_tc_f = face_aux_turbconv(state)
-    
+
     # Get grid spacing
     Δz = get_Δz(prog_gm.ρ) # centers
-    
+
     # Get or allocate working arrays
     N² = aux_tc.temporary_1  # Reuse temporary field
     ℓ_mix = aux_tc.mixing_length
-    
+
     # 1. Compute Brunt-Väisälä frequency using TC or SHOC formulation
     if use_tc_n2
         θ_virt = aux_en.θ_virt
@@ -1232,31 +1401,31 @@ function compute_SHOC_fluxes!(edmf::EDMFModel, state::State, surf::SurfaceBase, 
         compute_brunt_vaisala!(N², state, param_set)
     end
     # @. aux_shoc.N2 = N²  # Store N² for debugging
-    
+
     # 2. Get TKE from TC environment (SHOC is a diagnostic closure, doesn't compute its own TKE)
     tke = aux_en.tke
-    
+
     # 3. Compute integral length scale
     l_inf = compute_l_inf(tke, grid, Δz)
     # @. aux_shoc.l_inf = l_inf  # Store for debugging
-    
+
     # 4. Estimate PBL height (simplified - use PBLH from state if available)
     pblh = FT(1000)  # Default, should use aux_gm.pblh or similar
     # @. aux_shoc.pblh = pblh  # Store for debugging
-    
+
     # 5. Compute convective velocity scale (using ENVIRONMENT fields, not grid-mean)
     wthv_flux = aux_en.buoy  # Buoyancy flux in environment
     θ_virt = aux_en.θ_virt  # Environment virtual potential temperature
     wstar, tscale = compute_conv_velocity(wthv_flux, θ_virt, pblh, grid, g, Δz)
     # @. aux_shoc.wstar = wstar  # Store for debugging
     # @. aux_shoc.tscale = tscale  # Store for debugging
-    
+
     # 6. Compute mixing length (or use TC precomputed value)
     if !use_tc_mixing_length
         compute_shoc_mixing_length!(ℓ_mix, tke, N², pblh, l_inf, tscale, grid, FT(SHOC_VK))
     end
     # @. aux_shoc.mixing_length = ℓ_mix  # Store for debugging
-    
+
     # 7. Compute eddy diffusivities (or use TC precomputed values)
     if use_tc_kh_km
         Km_shoc = aux_tc.KM
@@ -1268,7 +1437,7 @@ function compute_SHOC_fluxes!(edmf::EDMFModel, state::State, surf::SurfaceBase, 
     end
     # @. aux_shoc.Km = Km_shoc  # Store for debugging
     # @. aux_shoc.Kh = Kh_shoc  # Store for debugging
-    
+
     # 8. Compute shear production (optional; TC already computes aux_en_2m.tke.shear)
     if !use_tc_shear
         shear_prod = aux_tc.temporary_4
@@ -1276,22 +1445,22 @@ function compute_SHOC_fluxes!(edmf::EDMFModel, state::State, surf::SurfaceBase, 
         v_gm = physical_grid_mean_v(state)
         compute_shear_production!(shear_prod, u_gm, v_gm, grid, FT(0.1), Δz)
     end
-    
+
     # 9. Interpolate diffusivities to faces for flux computation
     Km_f = Ifx.(Km_shoc)
     Kh_f = Ifx.(Kh_shoc)
-    
+
     # 10. Compute diffusive fluxes using ENVIRONMENT gradients
     # NOTE: Compute gradients directly on faces using GradientC2F to avoid checkerboarding
     # from double interpolation (C→F→C→F pattern). The standard approach in update_aux.jl
     # computes gradients at centers (∇c(Ifx(...))), which when interpolated to faces again
     # causes checkerboarding artifacts.
-    
+
     # Compute gradients directly on faces from center values
     ∇f = CCO.GradientC2F(; bottom = CCO.SetGradient(wvec(FT(0))), top = CCO.SetGradient(wvec(FT(0))))
     dθl_dz_f = @. toscalar(wvec(∇f(aux_en.θ_liq_ice)))
     dqt_dz_f = @. toscalar(wvec(∇f(aux_en.q_tot)))
-    
+
     # Diffusive fluxes (downgradient) on faces using environment diffusivity
     # NOTE: These represent the ENVIRONMENT turbulent diffusive contribution in the EDMF framework
     @. aux_tc_f.diffusive_flux_h = -Kh_f * dθl_dz_f
@@ -1304,28 +1473,28 @@ function compute_SHOC_fluxes!(edmf::EDMFModel, state::State, surf::SurfaceBase, 
     aux_tc_f.diffusive_flux_qt[kf_surf] = surf.ρq_tot_flux
     aux_tc_f.diffusive_flux_h[kf_toa] = FT(0)
     aux_tc_f.diffusive_flux_qt[kf_toa] = FT(0)
-    
+
     compute_shoc_pdf_and_ql_qi_fluxes!(
-      edmf,
-      state,
-      surf,
-      param_set,
-      aux_tc_f.diffusive_flux_h,
-      aux_tc_f.diffusive_flux_qt,
-      tke,
-      ℓ_mix,
-      N²,
-      Δz,
-      grid,
-      g;
-      use_tc_second_moments = use_tc_second_moments,
-      use_tc_wthird = use_tc_wthird,
-      wthl_sec_c = aux_tc.temporary_1,
-      wqw_sec_c = aux_tc.temporary_5,
-      w2_c = aux_tc.temporary_3,
-      thl_var_scratch = aux_tc.temporary_4,
-      wqls_c = aux_tc.temporary_6,
-      liq_frac_c = aux_tc.temporary_4,
+        edmf,
+        state,
+        surf,
+        param_set,
+        aux_tc_f.diffusive_flux_h,
+        aux_tc_f.diffusive_flux_qt,
+        tke,
+        ℓ_mix,
+        N²,
+        Δz,
+        grid,
+        g;
+        use_tc_second_moments = use_tc_second_moments,
+        use_tc_wthird = use_tc_wthird,
+        wthl_sec_c = aux_tc.temporary_1,
+        wqw_sec_c = aux_tc.temporary_5,
+        w2_c = aux_tc.temporary_3,
+        thl_var_scratch = aux_tc.temporary_4,
+        wqls_c = aux_tc.temporary_6,
+        liq_frac_c = aux_tc.temporary_4,
     )
 
     # 13. Precipitation diffusive fluxes (fallback to standard TC formulation)
@@ -1351,9 +1520,21 @@ function compute_SHOC_fluxes!(edmf::EDMFModel, state::State, surf::SurfaceBase, 
 
     rain_advection_factor = mixing_length_params(edmf).c_KTKEqr
     snow_advection_factor = mixing_length_params(edmf).c_KTKEqs
-    @. aux_tc_f.diffusive_flux_qr += ρ_f * Ifx(a_en * min(sqrt(aux_en.tke) * rain_advection_factor, sqrt(2 * aux_en.CAPE)) * (aux_en.frac_supersat - FT(0.25)) * prog_pr.q_rai)
-    @. aux_tc_f.diffusive_flux_qs += ρ_f * Ifx(a_en * min(sqrt(aux_en.tke) * snow_advection_factor, sqrt(2 * aux_en.CAPE)) * (aux_en.frac_supersat - FT(0.25)) * prog_pr.q_sno)
-    
+    @. aux_tc_f.diffusive_flux_qr +=
+        ρ_f * Ifx(
+            a_en *
+            min(sqrt(aux_en.tke) * rain_advection_factor, sqrt(2 * aux_en.CAPE)) *
+            (aux_en.frac_supersat - FT(0.25)) *
+            prog_pr.q_rai,
+        )
+    @. aux_tc_f.diffusive_flux_qs +=
+        ρ_f * Ifx(
+            a_en *
+            min(sqrt(aux_en.tke) * snow_advection_factor, sqrt(2 * aux_en.CAPE)) *
+            (aux_en.frac_supersat - FT(0.25)) *
+            prog_pr.q_sno,
+        )
+
     return nothing
 end
 
@@ -1369,7 +1550,14 @@ end
     1. Call `compute_diffusive_fluxes` to populate standard TC diffusive fluxes.
     2. Call `apply_shoc_ql_qi_fluxes!` to overwrite only ql/qi fluxes.
   """
-function apply_shoc_ql_qi_fluxes!(edmf::EDMFModel, state::State, surf::SurfaceBase, param_set::APS; use_tc_second_moments::Bool = true, use_tc_wthird::Bool = false)
+function apply_shoc_ql_qi_fluxes!(
+    edmf::EDMFModel,
+    state::State,
+    surf::SurfaceBase,
+    param_set::APS;
+    use_tc_second_moments::Bool = true,
+    use_tc_wthird::Bool = false,
+)
     FT = float_type(state)
     grid = Grid(state)
     thermo_params = TCP.thermodynamics_params(param_set)
@@ -1386,32 +1574,32 @@ function apply_shoc_ql_qi_fluxes!(edmf::EDMFModel, state::State, surf::SurfaceBa
     ℓ_mix = aux_tc.mixing_length
     N² = aux_tc.temporary_1
     if !use_tc_wthird
-      θ_virt = aux_en.θ_virt
-      ∂θv∂z = aux_tc.∂θv∂z
-      @. N² = (g / θ_virt) * ∂θv∂z
+        θ_virt = aux_en.θ_virt
+        ∂θv∂z = aux_tc.∂θv∂z
+        @. N² = (g / θ_virt) * ∂θv∂z
     end
 
     compute_shoc_pdf_and_ql_qi_fluxes!(
-      edmf,
-      state,
-      surf,
-      param_set,
-      aux_tc_f.diffusive_flux_h,
-      aux_tc_f.diffusive_flux_qt,
-      tke,
-      ℓ_mix,
-      N²,
-      Δz,
-      grid,
-      g;
-      use_tc_second_moments = use_tc_second_moments,
-      use_tc_wthird = use_tc_wthird,
-      wthl_sec_c = aux_tc.temporary_3,
-      wqw_sec_c = aux_tc.temporary_5,
-      w2_c = aux_tc.temporary_4,
-      thl_var_scratch = aux_tc.temporary_6,
-      wqls_c = aux_tc.temporary_2,
-      liq_frac_c = aux_tc.temporary_4,
+        edmf,
+        state,
+        surf,
+        param_set,
+        aux_tc_f.diffusive_flux_h,
+        aux_tc_f.diffusive_flux_qt,
+        tke,
+        ℓ_mix,
+        N²,
+        Δz,
+        grid,
+        g;
+        use_tc_second_moments = use_tc_second_moments,
+        use_tc_wthird = use_tc_wthird,
+        wthl_sec_c = aux_tc.temporary_3,
+        wqw_sec_c = aux_tc.temporary_5,
+        w2_c = aux_tc.temporary_4,
+        thl_var_scratch = aux_tc.temporary_6,
+        wqls_c = aux_tc.temporary_2,
+        liq_frac_c = aux_tc.temporary_4,
     )
 
     return nothing
@@ -1458,19 +1646,30 @@ Note on Coupling (EDMF):
   so SHOC does not perform redundant gradient calculations.
 
 """
-function apply_shoc_diffusion!(edmf::EDMFModel, state::State, surf::SurfaceBase, param_set::APS, Δt::FT;
-                               use_tc_n2::Bool = true,
-                               use_tc_mixing_length::Bool = true,
-                               use_tc_kh_km::Bool = true,
-                               use_tc_shear::Bool = true,
-                               use_tc_second_moments::Bool = true,
-                               use_tc_wthird::Bool = false) where {FT}
-    compute_SHOC_fluxes!(edmf, state, surf, param_set;
-                         use_tc_n2=use_tc_n2,
-                         use_tc_mixing_length=use_tc_mixing_length,
-                         use_tc_kh_km=use_tc_kh_km,
-                         use_tc_shear=use_tc_shear,
-                         use_tc_second_moments=use_tc_second_moments,
-                         use_tc_wthird=use_tc_wthird)
+function apply_shoc_diffusion!(
+    edmf::EDMFModel,
+    state::State,
+    surf::SurfaceBase,
+    param_set::APS,
+    Δt::FT;
+    use_tc_n2::Bool = true,
+    use_tc_mixing_length::Bool = true,
+    use_tc_kh_km::Bool = true,
+    use_tc_shear::Bool = true,
+    use_tc_second_moments::Bool = true,
+    use_tc_wthird::Bool = false,
+) where {FT}
+    compute_SHOC_fluxes!(
+        edmf,
+        state,
+        surf,
+        param_set;
+        use_tc_n2 = use_tc_n2,
+        use_tc_mixing_length = use_tc_mixing_length,
+        use_tc_kh_km = use_tc_kh_km,
+        use_tc_shear = use_tc_shear,
+        use_tc_second_moments = use_tc_second_moments,
+        use_tc_wthird = use_tc_wthird,
+    )
     return nothing
 end

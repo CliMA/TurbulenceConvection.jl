@@ -4,7 +4,7 @@ function microphysics!(
     edmf::EDMFModel,
     Δt::Real,
     param_set::APS,
-    use_fallback_tendency_limiters::Bool
+    use_fallback_tendency_limiters::Bool,
 )
     grid = Grid(state)
     FT = float_type(state)
@@ -35,7 +35,12 @@ function microphysics!(
     snow_formation_model = edmf.snow_formation_model
     # precip_fraction_model = edmf.precip_fraction_model
 
-    if (moisture_model isa NonEquilibriumMoisture) || (cloud_sedimentation_model isa CloudSedimentationModel && !cloud_sedimentation_model.grid_mean) || ((edmf.area_partition_model isa CoreCloakAreaPartitionModel) && edmf.area_partition_model.apply_cloak_to_condensate_formation)
+    if (moisture_model isa NonEquilibriumMoisture) ||
+       (cloud_sedimentation_model isa CloudSedimentationModel && !cloud_sedimentation_model.grid_mean) ||
+       (
+           (edmf.area_partition_model isa CoreCloakAreaPartitionModel) &&
+           edmf.area_partition_model.apply_cloak_to_condensate_formation
+       )
         if (edmf.area_partition_model isa CoreCloakAreaPartitionModel)
             if edmf.area_partition_model.confine_all_downdraft_to_cloak
                 w = aux_tc.temporary_5
@@ -57,7 +62,8 @@ function microphysics!(
     if moisture_model isa NonEquilibriumMoisture
         nonequilibrium_moisture_scheme = moisture_model.scheme # my new addition
         # moisture_sources_limiter = edmf.tendency_limiters.moisture_sources_limiter
-        moisture_sources_limiter = get_tendency_limiter(edmf.tendency_limiters, Val(:moisture_sources), use_fallback_tendency_limiters)
+        moisture_sources_limiter =
+            get_tendency_limiter(edmf.tendency_limiters, Val(:moisture_sources), use_fallback_tendency_limiters)
     else
         nonequilibrium_moisture_scheme = moisture_model.scheme
     end
@@ -71,15 +77,15 @@ function microphysics!(
     # ======================================================================== # To Do: Separate sedimentation out so it can be called w/ either sgs or mean...
     # sedimentation (should this maybe be a grid mean tendency?)
     # [ do sed first bc this should happen before precip_formation so we can know sed-driven aggregatory autoconversion, and it doesnt depend on anything below. ]
-    if edmf.cloud_sedimentation_model isa CloudSedimentationModel && !edmf.cloud_sedimentation_model.grid_mean  
-        
+    if edmf.cloud_sedimentation_model isa CloudSedimentationModel && !edmf.cloud_sedimentation_model.grid_mean
+
         #= 
             TEST : The argument `doing advection and sedimentation separately bc the dispersion is good for size distribution` argument is kinda weak, in the limit we could double our condensate production
             Instead, we'll trial here calculating total advection via relative w (w_sed - w) and then subtracting a version based on only advection
 
             The advective part is usually calculated separately. For the updraft, it's in EDMF_functions.jl, but is denominated in `relative to grid mean` terms by default
             There we only store the grid mean total flux, and then take the gradient to get a tendecy for storage, but the raw sedimentation tendency then is biased and dispersive, so this should perhaps be better without relying code changes everywhere.
-            
+
             Note though that we cannot in princile guarantee that the up/env tendencies this generate sum to exactly the same as the tendency from the gradient of the grid mean fluxes (especially with our transfer heuristic)
 
             Also for the `advective only` parts, those calculate `to_other` ignoring the background w, so `advection only` should cause no `to_other` atall.
@@ -101,25 +107,29 @@ function microphysics!(
             differencing_scheme = edmf.cloud_sedimentation_model.sedimentation_differencing_scheme,
             grid_mean = false,
             use_relative_w = false,
-            scratch1 = aux_tc.temporary_3, scratch2 = aux_tc.temporary_4, scratch3 = aux_tc.temporary_5, scratch4 = aux_tc.temporary_6, scratch1F = aux_tc_f.temporary_f1, scratch2F = aux_tc_f.temporary_f2
+            scratch1 = aux_tc.temporary_3,
+            scratch2 = aux_tc.temporary_4,
+            scratch3 = aux_tc.temporary_5,
+            scratch4 = aux_tc.temporary_6,
+            scratch1F = aux_tc_f.temporary_f1,
+            scratch2F = aux_tc_f.temporary_f2,
         ) # should this be a grid mean tendency? 
 
 
         @inbounds for k in real_center_indices(grid)
             aux_en.qi_tendency_sedimentation[k] = sedimentation[k]
             aux_en.qt_tendency_sedimentation[k] = sedimentation[k]
-        
+
 
             Π_m = TD.exner(thermo_params, ts_env[k])
             c_pm = TD.cp_m(thermo_params, ts_env[k])
             L_s = TD.latent_heat_sublim(thermo_params, ts_env[k])
-            θ_liq_ice_tendency_sedimentation_ice =
-                1 / Π_m / c_pm * (L_s * aux_en.qi_tendency_sedimentation[k])
+            θ_liq_ice_tendency_sedimentation_ice = 1 / Π_m / c_pm * (L_s * aux_en.qi_tendency_sedimentation[k])
             aux_en.θ_liq_ice_tendency_sedimentation[k] += θ_liq_ice_tendency_sedimentation_ice # adapted from microphysics_coupling.jl: precipitation_formation() | (= not += caue these don't seem to get reset every iteration?
             if aux_en.area[k] < 1 # we have some updrafts
                 @inbounds for i in 1:N_up
                     qi_tendency_sedimentation_other = sedimentation_other[k] * (aux_up[i].area[k] ./ aux_bulk.area[k])
-                    θ_liq_ice_tendency_sedimentation_other =  1 / Π_m / c_pm * (L_s * qi_tendency_sedimentation_other)
+                    θ_liq_ice_tendency_sedimentation_other = 1 / Π_m / c_pm * (L_s * qi_tendency_sedimentation_other)
                     aux_up[i].qi_tendency_sedimentation[k] += qi_tendency_sedimentation_other
                     aux_up[i].qt_tendency_sedimentation[k] += qi_tendency_sedimentation_other
                     aux_up[i].θ_liq_ice_tendency_sedimentation[k] += θ_liq_ice_tendency_sedimentation_other
@@ -143,7 +153,12 @@ function microphysics!(
             differencing_scheme = edmf.cloud_sedimentation_model.sedimentation_differencing_scheme,
             grid_mean = false,
             use_relative_w = false,
-            scratch1 = aux_tc.temporary_3, scratch2 = aux_tc.temporary_4, scratch3 = aux_tc.temporary_5, scratch4 = aux_tc.temporary_6, scratch1F = aux_tc_f.temporary_f1, scratch2F = aux_tc_f.temporary_f2
+            scratch1 = aux_tc.temporary_3,
+            scratch2 = aux_tc.temporary_4,
+            scratch3 = aux_tc.temporary_5,
+            scratch4 = aux_tc.temporary_6,
+            scratch1F = aux_tc_f.temporary_f1,
+            scratch2F = aux_tc_f.temporary_f2,
         ) # should this be a grid mean tendency? 
 
         @inbounds for k in real_center_indices(grid)
@@ -153,14 +168,13 @@ function microphysics!(
             Π_m = TD.exner(thermo_params, ts_env[k])
             c_pm = TD.cp_m(thermo_params, ts_env[k])
             L_v = TD.latent_heat_vapor(thermo_params, ts_env[k])
-            θ_liq_ice_tendency_sedimentation_liq =
-                1 / Π_m / c_pm * (L_v * aux_en.ql_tendency_sedimentation[k])
+            θ_liq_ice_tendency_sedimentation_liq = 1 / Π_m / c_pm * (L_v * aux_en.ql_tendency_sedimentation[k])
             aux_en.θ_liq_ice_tendency_sedimentation[k] += θ_liq_ice_tendency_sedimentation_liq # adapted from microphysics_coupling.jl: precipitation_formation() | (= not += caue these don't seem to get reset every iteration?
 
             if aux_en.area[k] < 1 # we have some updrafts
                 @inbounds for i in 1:N_up
                     ql_tendency_sedimentation_other = sedimentation_other[k] * (aux_up[i].area[k] ./ aux_bulk.area[k])
-                    θ_liq_ice_tendency_sedimentation_other =  1 / Π_m / c_pm * (L_v * ql_tendency_sedimentation_other)
+                    θ_liq_ice_tendency_sedimentation_other = 1 / Π_m / c_pm * (L_v * ql_tendency_sedimentation_other)
                     aux_up[i].ql_tendency_sedimentation[k] += ql_tendency_sedimentation_other
                     aux_up[i].qt_tendency_sedimentation[k] += ql_tendency_sedimentation_other
                     aux_up[i].θ_liq_ice_tendency_sedimentation[k] += θ_liq_ice_tendency_sedimentation_other
@@ -198,7 +212,10 @@ function microphysics!(
 
             if en_thermo isa SGSMean
 
-                do_cloak = (edmf.area_partition_model isa CoreCloakAreaPartitionModel) && (edmf.area_partition_model.apply_cloak_to_condensate_formation) && (aux_bulk.area[k] > edmf.minimum_area)
+                do_cloak =
+                    (edmf.area_partition_model isa CoreCloakAreaPartitionModel) &&
+                    (edmf.area_partition_model.apply_cloak_to_condensate_formation) &&
+                    (aux_bulk.area[k] > edmf.minimum_area)
                 # ::: (region_area, w_region, T, ts, cloak_up) ::: #
                 if !do_cloak
                     regions = ((aux_en.area[k], w[k], aux_en.T[k], ts_env[k], Env),)
@@ -207,8 +224,14 @@ function microphysics!(
                     regions = (
                         (aux_en.a_cloak_up[k], w_cloak_up[k], aux_en.T_cloak_up[k], aux_en.ts_cloak_up[k], CloakUp),
                         (aux_en.a_cloak_dn[k], w_cloak_dn[k], aux_en.T_cloak_dn[k], aux_en.ts_cloak_dn[k], CloakDown),
-                        (aux_en.a_en_remaining[k], w_en_remaining, aux_en.T_en_remaining[k], aux_en.ts_en_remaining[k], EnvRemaining),
-                        )
+                        (
+                            aux_en.a_en_remaining[k],
+                            w_en_remaining,
+                            aux_en.T_en_remaining[k],
+                            aux_en.ts_en_remaining[k],
+                            EnvRemaining,
+                        ),
+                    )
                 end
 
                 mph_neq = null_neq_moisture
@@ -226,7 +249,7 @@ function microphysics!(
                         q_vap_sat_liq = TD.q_vap_saturation_generic(thermo_params, T, ρ, TD.Liquid())
                         q_vap_sat_ice = TD.q_vap_saturation_generic(thermo_params, T, ρ, TD.Ice())
                         p = TD.air_pressure(thermo_params, ts)
-                    end            
+                    end
 
                     q_here = TD.PhasePartition(thermo_params, ts) # we don't have it cached here but we do in updraft so calculating outside the fcn saves work
 
@@ -253,57 +276,165 @@ function microphysics!(
                     # Then based on how much qc, ql, qi we actually have we might be able to estimate condensate_qt_SD for existing condensate (and uncondensed regions)... idk.
                     if !iszero(moisture_model.condensate_qt_SD)
                         # TODO: Consider turning this off for when we are using cloaks.... also set an error in the quadrature branches
-                        qt_liq, _ = condensate_qt_SD(q_here.tot, aux_en.QTvar[k], q_vap_sat_liq, moisture_model.condensate_qt_SD) #
-                        qt_ice, _ = condensate_qt_SD(q_here.tot, aux_en.QTvar[k], q_vap_sat_ice, moisture_model.condensate_qt_SD) # technically this should probably have a smaller condensate_qt_SD but...
+                        qt_liq, _ = condensate_qt_SD(
+                            q_here.tot,
+                            aux_en.QTvar[k],
+                            q_vap_sat_liq,
+                            moisture_model.condensate_qt_SD,
+                        ) #
+                        qt_ice, _ = condensate_qt_SD(
+                            q_here.tot,
+                            aux_en.QTvar[k],
+                            q_vap_sat_ice,
+                            moisture_model.condensate_qt_SD,
+                        ) # technically this should probably have a smaller condensate_qt_SD but...
                         liq_frac = TD.liquid_fraction(thermo_params, T, typeof(ts), q_here)
                         qt = liq_frac * qt_liq + (1 - liq_frac) * qt_ice # weighted sum isn't perfect but will have to do for now.
+                        # error("This weighting prevents SGS liq formation...")
+                        # TODO: This is a hack to get the right answer for the test case. We should do this properly.
                         # qt = q_here.tot + moisture_model.condensate_qt_SD * sqrt(aux_en.QTvar[k]) # fixed assumption
                         θ = TD.liquid_ice_pottemp(thermo_params, ts)
-                        ts = (edmf.moisture_model isa NonEquilibriumMoisture) ? thermo_state_pθq(param_set, p_c[k], θ, qt, q_here.liq, q_here.ice) : thermo_state_pθq(param_set, p_c[k], θ, qt)
+                        ts =
+                            (edmf.moisture_model isa NonEquilibriumMoisture) ?
+                            thermo_state_pθq(param_set, p_c[k], θ, qt, q_here.liq, q_here.ice) :
+                            thermo_state_pθq(param_set, p_c[k], θ, qt)
 
                         if (region isa EnvDomain) && !(edmf.convective_tke_handler isa ConvectiveTKE) # if we're doing SDs, associate q with upward motion. We dont have varw, and we're not using convective tke, but at least don't let it be negative. if the mean is -w, the positive side can be
                             w_noneq = w_noneq + moisture_model.condensate_qt_SD * abs(w_noneq) # each SD moves us up in w, so 1 SD, w = 0
                         end
                     end
 
-                    (supersat_liq_fraction, q_liq_supersat, q_liq_subsat) = partition_condensate_into_sgs_fractions(thermo_params, liq_type, ts, aux_en.QTvar[k], aux_en.Hvar[k], aux_en.HQTcov[k]; supersaturated_fraction_liq = aux_en.frac_supersat_liq[k])
-                    (supersat_ice_fraction, q_ice_supersat, q_ice_subsat) = partition_condensate_into_sgs_fractions(thermo_params, ice_type, ts, aux_en.QTvar[k], aux_en.Hvar[k], aux_en.HQTcov[k]; supersaturated_fraction_ice = aux_en.frac_supersat[k])
-                    liq_frac = supersat_liq_fraction * (q_liq_supersat > zero(FT)) + (1 - supersat_liq_fraction) * (q_liq_subsat > zero(FT))
-                    ice_frac = supersat_ice_fraction * (q_ice_supersat > zero(FT)) + (1 - supersat_ice_fraction) * (q_ice_subsat > zero(FT))
+                    (supersat_liq_fraction, q_liq_supersat, q_liq_subsat) = partition_condensate_into_sgs_fractions(
+                        thermo_params,
+                        liq_type,
+                        ts,
+                        aux_en.QTvar[k],
+                        aux_en.Hvar[k],
+                        aux_en.HQTcov[k];
+                        supersaturated_fraction_liq = aux_en.frac_supersat_liq[k],
+                    )
+                    (supersat_ice_fraction, q_ice_supersat, q_ice_subsat) = partition_condensate_into_sgs_fractions(
+                        thermo_params,
+                        ice_type,
+                        ts,
+                        aux_en.QTvar[k],
+                        aux_en.Hvar[k],
+                        aux_en.HQTcov[k];
+                        supersaturated_fraction_ice = aux_en.frac_supersat[k],
+                    )
+                    liq_frac =
+                        supersat_liq_fraction * (q_liq_supersat > zero(FT)) +
+                        (1 - supersat_liq_fraction) * (q_liq_subsat > zero(FT))
+                    ice_frac =
+                        supersat_ice_fraction * (q_ice_supersat > zero(FT)) +
+                        (1 - supersat_ice_fraction) * (q_ice_subsat > zero(FT))
                     cloud_frac = max(liq_frac, ice_frac)
 
-                    # :: This loop is prolly more accurate but also more expensive... is it worth it?
-                    # if (supersat_liq_fraction > zero(FT)) && (q_here.liq > zero(FT)) && true # Use the subsplit into liquid rich and liquid poor regions to aid in WBF calculations and overlap
-                    #     q_liq_supliq = q_liq_supersat
-                    #     # q_ice is a weighted sum, in the supersat area we take ice supersat as much as possible until we run out of area, etc.
-                    #     q_ice_supliq = q_ice_supersat * min(supersat_liq_fraction, supersat_ice_fraction) + q_ice_subsat * max(zero(FT), min(supersat_liq_fraction, supersat_ice_fraction) - supersat_liq_fraction)
-                    #     _ts = thermo_state_pθq(param_set, p_c[k], θ, qt, q_liq_supliq, q_ice_supliq)
-                    #     liq_frac_here = (q_liq_supersat > zero(FT)) ? supersat_liq_fraction/supersat_liq_fraction : zero(FT)
-                    #     ice_frac_here = (q_ice_supersat > zero(FT)) ? supersat_ice_fraction/supersat_liq_fraction : zero(FT)
-                    #     cloud_frac_here = max(liq_frac_here, ice_frac_here)
-                        
-                    #     mph_neq_here = supersat_liq_fraction * noneq_moisture_sources(param_set, nonequilibrium_moisture_scheme, moisture_sources_limiter, region_area, ρ_c[k], aux_en.p[k], T, Δt + ε, _ts, w_noneq, q_vap_sat_liq, q_vap_sat_ice, dqvdt, dTdt, τ_liq_here, τ_ice_here, liq_frac_here, ice_frac_here, cloud_frac_here)
-                    #     if supersat_liq_fraction < one(FT)
-                    #         q_liq_here = q_liq_subsat
-                    #         # we take the remainder...
-                    #         q_ice_here = max(q_here.ice - supersat_liq_fraction * q_ice_supliq, zero(FT)) / (one(FT) - supersat_liq_fraction) # we take the remainder of the ice, scaled up to account for the smaller area
-                    #         qt_here = (q_here.tot - (qt*supersat_liq_fraction)) / (1 - supersat_liq_fraction) # we take the remainder of the total, scaled up to account for the smaller area
-                    #         _ts = thermo_state_pθq(param_set, p_c[k], θ, qt_here, q_liq_here, q_ice_here)
-                    #         liq_frac_here = (q_liq_subsat > zero(FT)) ? (1 - supersat_liq_fraction)/(1 - supersat_liq_fraction) : zero(FT)
-                    #         ice_frac_here = (q_ice_subsat > zero(FT)) ? (1 - supersat_ice_fraction)/(1 - supersat_liq_fraction) : zero(FT)
-                    #         cloud_frac_here = max(liq_frac_here, ice_frac_here)
-                    #         mph_neq_here += (1 - supersat_liq_fraction) * noneq_moisture_sources(param_set, nonequilibrium_moisture_scheme, moisture_sources_limiter, region_area, ρ_c[k], aux_en.p[k], T, Δt + ε, _ts, w_noneq, q_vap_sat_liq, q_vap_sat_ice, dqvdt, dTdt, τ_liq_here, τ_ice_here, liq_frac_here, ice_frac_here, cloud_frac_here)
-                    #     end
-                    # else
-                    #     mph_neq_here = noneq_moisture_sources(param_set, nonequilibrium_moisture_scheme, moisture_sources_limiter, region_area, ρ_c[k], aux_en.p[k], T, Δt + ε, ts, w_noneq, q_vap_sat_liq, q_vap_sat_ice, dqvdt, dTdt, τ_liq_here, τ_ice_here, liq_frac, ice_frac, cloud_frac)
-                    # end
-                    
-                    mph_neq_here = noneq_moisture_sources(param_set, nonequilibrium_moisture_scheme, moisture_sources_limiter, region_area, ρ_c[k], aux_en.p[k], T, Δt + ε, ts, w_noneq, q_vap_sat_liq, q_vap_sat_ice, dqvdt, dTdt, τ_liq_here, τ_ice_here, liq_frac, ice_frac, cloud_frac)
+                    #=
+                     :: This loop is prolly more accurate but also more expensive... is it worth it?
+                     Yes -- bc we can't guaranteee access to SGS sat adjust part so separate just that section out helps
+                    =#
+                    if (supersat_liq_fraction > zero(FT)) # Use the subsplit into liquid rich and liquid poor regions to aid in WBF calculations and overlap
+                        q_liq_supliq = q_liq_supersat
+                        # q_ice is a weighted sum, in the supersat area we take ice supersat as much as possible until we run out of area, etc.
+                        q_ice_supliq =
+                            q_ice_supersat * min(supersat_liq_fraction, supersat_ice_fraction) +
+                            q_ice_subsat *
+                            max(zero(FT), min(supersat_liq_fraction, supersat_ice_fraction) - supersat_liq_fraction)
+                        qt_supliq = qt_liq
+                        _ts = thermo_state_pθq(param_set, p_c[k], θ, qt_supliq, q_liq_supliq, q_ice_supliq)
+                        liq_frac_here =
+                            (q_liq_supersat > zero(FT)) ? supersat_liq_fraction / supersat_liq_fraction : zero(FT)
+                        ice_frac_here =
+                            (q_ice_supersat > zero(FT)) ? supersat_ice_fraction / supersat_liq_fraction : zero(FT)
+                        cloud_frac_here = max(liq_frac_here, ice_frac_here)
 
+                        mph_neq_here =
+                            supersat_liq_fraction * noneq_moisture_sources(
+                                param_set,
+                                nonequilibrium_moisture_scheme,
+                                moisture_sources_limiter,
+                                region_area,
+                                ρ_c[k],
+                                aux_en.p[k],
+                                T,
+                                Δt + ε,
+                                _ts,
+                                w_noneq,
+                                q_vap_sat_liq,
+                                q_vap_sat_ice,
+                                dqvdt,
+                                dTdt,
+                                τ_liq_here,
+                                τ_ice_here,
+                                liq_frac_here,
+                                ice_frac_here,
+                                cloud_frac_here,
+                            )
+                        if supersat_liq_fraction < one(FT)
+                            q_liq_here = q_liq_subsat
+                            # we take the remainder...
+                            q_ice_here =
+                                max(q_here.ice - supersat_liq_fraction * q_ice_supliq, zero(FT)) /
+                                (one(FT) - supersat_liq_fraction) # we take the remainder of the ice, scaled up to account for the smaller area
+                            qt_here = (q_here.tot - (qt_supliq * supersat_liq_fraction)) / (1 - supersat_liq_fraction) # we take the remainder of the total, scaled up to account for the smaller area
+                            _ts = thermo_state_pθq(param_set, p_c[k], θ, qt_here, q_liq_here, q_ice_here)
+                            liq_frac_here =
+                                (q_liq_subsat > zero(FT)) ? (1 - supersat_liq_fraction) / (1 - supersat_liq_fraction) :
+                                zero(FT)
+                            ice_frac_here =
+                                (q_ice_subsat > zero(FT)) ? (1 - supersat_ice_fraction) / (1 - supersat_liq_fraction) :
+                                zero(FT)
+                            cloud_frac_here = max(liq_frac_here, ice_frac_here)
+                            mph_neq_here +=
+                                (1 - supersat_liq_fraction) * noneq_moisture_sources(
+                                    param_set,
+                                    nonequilibrium_moisture_scheme,
+                                    moisture_sources_limiter,
+                                    region_area,
+                                    ρ_c[k],
+                                    aux_en.p[k],
+                                    T,
+                                    Δt + ε,
+                                    _ts,
+                                    w_noneq,
+                                    q_vap_sat_liq,
+                                    q_vap_sat_ice,
+                                    dqvdt,
+                                    dTdt,
+                                    τ_liq_here,
+                                    τ_ice_here,
+                                    liq_frac_here,
+                                    ice_frac_here,
+                                    cloud_frac_here,
+                                )
+                        end
+                    else
+                        mph_neq_here = noneq_moisture_sources(
+                            param_set,
+                            nonequilibrium_moisture_scheme,
+                            moisture_sources_limiter,
+                            region_area,
+                            ρ_c[k],
+                            aux_en.p[k],
+                            T,
+                            Δt + ε,
+                            ts,
+                            w_noneq,
+                            q_vap_sat_liq,
+                            q_vap_sat_ice,
+                            dqvdt,
+                            dTdt,
+                            τ_liq_here,
+                            τ_ice_here,
+                            liq_frac,
+                            ice_frac,
+                            cloud_frac,
+                        )
+                    end
 
-                    # if (aux_en.frac_supersat_liq[k] < eps(FT)) && ((iszero(aux_en.q_liq[k]) ? q_liq_supersat/aux_en.q_liq[k] : zero(FT)) > eps(FT))
-                    #     @error "k = $(k.i) | frac_supersat_liq = $(aux_en.frac_supersat_liq[k]) ; q_liq_supersat = $(q_liq_supersat) ; q_liq = $(aux_en.q_liq[k]) ; q_liq_supersat/q_liq = $(q_liq_supersat/aux_en.q_liq[k])"
-                    # end
+                    # This one is not as good because we lose out on some sat adjust in the distribution that would be capturd by quadrature...
+                    # mph_neq_here = noneq_moisture_sources(param_set, nonequilibrium_moisture_scheme, moisture_sources_limiter, region_area, ρ_c[k], aux_en.p[k], T, Δt + ε, ts, w_noneq, q_vap_sat_liq, q_vap_sat_ice, dqvdt, dTdt, τ_liq_here, τ_ice_here, liq_frac, ice_frac, cloud_frac)
 
                     # prevent excess losses when not using quadrature
                     # we don't want to lose ice that is supersaturated and not vulnerable to WBF. 
@@ -311,8 +442,21 @@ function microphysics!(
                         mph_neq_here = NoneqMoistureSources(
                             # max(mph_neq_here.ql_tendency, -(aux_en.q_liq[k] * (1-aux_en.frac_supersat_liq[k])) / (Δt + ε)), # cannot remove more liq than exists subsaturated
                             # max(mph_neq_here.qi_tendency, -(aux_en.q_ice[k] * min(1-aux_en.frac_supersat[k], 1-aux_en.frac_supersat_liq[k])) / (Δt + ε)), # cannot remove more ice than exists subsaturated
-                            max(mph_neq_here.ql_tendency, -(aux_en.q_liq[k] * (one(FT) - min((q_liq_supersat * supersat_liq_fraction)/aux_en.q_liq[k], one(FT) - aux_en.frac_supersat[k]))) / (Δt + ε)), # cannot remove more liq than exists subsaturated and not vulnerable to WBF
-                            max(mph_neq_here.qi_tendency, -(aux_en.q_ice[k] * (one(FT) - aux_en.frac_supersat[k])) / (Δt + ε)), # cannot remove more ice than exists subsaturated
+                            max(
+                                mph_neq_here.ql_tendency,
+                                -(
+                                    aux_en.q_liq[k] * (
+                                        one(FT) - min(
+                                            (q_liq_supersat * supersat_liq_fraction) / aux_en.q_liq[k],
+                                            one(FT) - aux_en.frac_supersat[k],
+                                        )
+                                    )
+                                ) / (Δt + ε),
+                            ), # cannot remove more liq than exists subsaturated and not vulnerable to WBF
+                            max(
+                                mph_neq_here.qi_tendency,
+                                -(aux_en.q_ice[k] * (one(FT) - aux_en.frac_supersat[k])) / (Δt + ε),
+                            ), # cannot remove more ice than exists subsaturated
                         )
                     end
 
@@ -323,7 +467,7 @@ function microphysics!(
                     elseif region isa CloakDownDomain
                         aux_en.qi_tendency_sub_dep_cloak_dn[k] = mph_neq_here.qi_tendency
                     end
-                    
+
 
 
                     # if at an extrema, we don't know where the peak is so we'll reweight based on probability of where it could be in between.
@@ -339,11 +483,29 @@ function microphysics!(
                         else
                             error("Unknown region type")
                         end
-                            
-                        mph_neq_here = reweight_noneq_moisture_sources_for_grid(k, grid, param_set, thermo_params, aux_en, aux_en_f, mph_neq, nonequilibrium_moisture_scheme, moisture_sources_limiter, Δt, ρ_c, p_c, w_region_full, aux_tc.dqvdt, aux_tc.dTdt; reweight_extrema_only = reweight_extrema_only, region = region)
+
+                        mph_neq_here = reweight_noneq_moisture_sources_for_grid(
+                            k,
+                            grid,
+                            param_set,
+                            thermo_params,
+                            aux_en,
+                            aux_en_f,
+                            mph_neq,
+                            nonequilibrium_moisture_scheme,
+                            moisture_sources_limiter,
+                            Δt,
+                            ρ_c,
+                            p_c,
+                            w_region_full,
+                            aux_tc.dqvdt,
+                            aux_tc.dTdt;
+                            reweight_extrema_only = reweight_extrema_only,
+                            region = region,
+                        )
                     end
                     mph_neq += mph_neq_here * (region_area / aux_en.area[k]) # weight by area fraction
-                    
+
                     mph_neq_other_here = other_microphysics_processes(
                         param_set,
                         moisture_model,
@@ -394,7 +556,11 @@ function microphysics!(
                         (aux_en.area[k] > FT(0)) ? aux_en.qi_tendency_sedimentation[k] / aux_en.area[k] : FT(0), # this is the sedimentation contribution to precip formation
                         precip_fraction,
                         # edmf.tendency_limiters.precipitation_tendency_limiter,
-                        get_tendency_limiter(edmf.tendency_limiters, Val(:precipitation), use_fallback_tendency_limiters),
+                        get_tendency_limiter(
+                            edmf.tendency_limiters,
+                            Val(:precipitation),
+                            use_fallback_tendency_limiters,
+                        ),
                         # aux_en_2m.tke.dissipation[k]
                         aux_en.tke[k],
                         aux_en.N_i_no_boost[k],
@@ -414,8 +580,12 @@ function microphysics!(
 
             elseif en_thermo isa SGSMeanWQuadratureAdjustedNoneqMoistureSources # Doesn't seem to do much in the end, variance is pretty small...
 
-                if edmf.area_partition_model isa CoreCloakAreaPartitionModel && (edmf.area_partition_model.apply_cloak_to_condensate_formation) && (aux_bulk.area[k] > edmf.minimum_area)
-                    error("SGSMeanWQuadratureAdjustedNoneqMoistureSources with CoreCloakAreaPartitionModel not implemented yet")
+                if edmf.area_partition_model isa CoreCloakAreaPartitionModel &&
+                   (edmf.area_partition_model.apply_cloak_to_condensate_formation) &&
+                   (aux_bulk.area[k] > edmf.minimum_area)
+                    error(
+                        "SGSMeanWQuadratureAdjustedNoneqMoistureSources with CoreCloakAreaPartitionModel not implemented yet",
+                    )
                 else
                     # use quadrature to adjust noneq moisture sources based on subgrid variability in qt and θl
                     region = Env
@@ -424,7 +594,7 @@ function microphysics!(
                 if (edmf.convective_tke_handler isa ConvectiveTKE) && (region isa EnvDomain)
                     # assume the condensate is in the tke part going up KE = 1/2 ρ w^2. critical to generating condensate
                     w_noneq = sqrt(2 * aux_en.tke[k] / ρ)
-                    
+
                     # Now, we assume liq is biased with covariance, when we add this eddy mixing so we go up and down 1SD, but assume liq is tied to +1 SD
                 else
                     w_noneq = w[k]
@@ -453,74 +623,95 @@ function microphysics!(
                 q_liq = aux_en.q_liq[k]
                 q_ice = aux_en.q_ice[k]
 
-                eps_q = (qt_mean ≈ FT(0)) ? eps(FT) : (eps(FT) * qt_mean)
-                eps_θ = eps(FT)
-                if quadrature_type isa LogNormalQuad
-                    # Lognormal parameters (ν, s) from mean and variance
-                    ν_q = log(qt_mean^2 / max(sqrt(qt_mean^2 + qt′qt′), eps_q))
-                    ν_θ = log(θl_mean^2 / sqrt(θl_mean^2 + θl′θl′))
-                    s_q = sqrt(log(qt′qt′ / max(qt_mean, eps_q)^2 + 1))
-                    s_θ = sqrt(log(θl′θl′ / θl_mean^2 + 1))
+                # Get all quadrature points in SMatrix format to avoid memory allocation inside the loop
+                (qt_quad_M, h_quad_M, ts_quad_M, T_quad_M, S_liq_M, S_ice_M, q_vap_sat_liq_M, q_vap_sat_ice_M) =
+                    get_quadrature_thermo_states_and_saturation_excess_matrix(
+                        thermo_params,
+                        quadrature_type,
+                        χ,
+                        qt_mean,
+                        qt′qt′,
+                        θl_mean,
+                        θl′θl′,
+                        θl′qt′,
+                        p_c[k],
+                        q_liq,
+                        q_ice,
+                    )
 
-                    # Enforce Cauchy-Schwarz inequality, numerically stable compute
-                    corr = θl′qt′ / max(sqrt(qt′qt′), eps_q)
-                    corr = max(min(corr / max(sqrt(θl′θl′), eps_θ), 1), -1)
-
-                    # Conditionals
-                    s2_θq = log(corr * sqrt(θl′θl′ * qt′qt′) / θl_mean / max(qt_mean, eps_q) + 1)
-                    s_c = sqrt(max(s_θ^2 - s2_θq^2 / max(s_q, eps_q)^2, 0))
-
-                elseif quadrature_type isa GaussianQuad
-                    # limit σ_q to prevent negative qt_hat
-                    σ_q_lim = -qt_mean / (sqrt2 * χ[1])
-                    σ_q = min(sqrt(qt′qt′), σ_q_lim)
-                    σ_θ = sqrt(θl′θl′)
-
-                    # Enforce Cauchy-Schwarz inequality, numerically stable compute
-                    corr = θl′qt′ / max(σ_q, eps_q)
-                    corr = max(min(corr / max(σ_θ, eps_θ), 1), -1)
-
-                    # Conditionals
-                    σ_c = sqrt(max(1 - corr * corr, 0)) * σ_θ
-                end
+                # We don't prognose ql and qi variances in EDMF, so we request 0 added variance (relies strictly on the thermodynamic phase lock)
+                q_liq_quad_M, q_ice_quad_M = partition_condensate_into_quadrature_fractions(
+                    S_liq_M,
+                    S_ice_M,
+                    weights,
+                    q_liq,
+                    q_ice,
+                    zero(FT),
+                    zero(FT),
+                    Val(:proportional),
+                )
 
                 mph_neq = null_NoneqMoistureSources(FT; fill_value = FT(0)) # initialize...
                 mph_neq_other = null_OtherMicrophysicsSources(FT; fill_value = FT(0)) # initialize...
                 @inbounds for m_q in 1:quad_order
-                    if quadrature_type isa LogNormalQuad
-                        qt_hat = exp(ν_q + sqrt2 * s_q * χ[m_q])
-                        ν_c = ν_θ + s2_θq / max(s_q, eps_q)^2 * (log(qt_hat) - ν_q)
-                    elseif quadrature_type isa GaussianQuad
-                        qt_hat = qt_mean + sqrt2 * σ_q * χ[m_q]
-                        μ_c = θl_mean + sqrt2 * corr * σ_θ * χ[m_q]
-                    end
-
                     @inbounds for m_h in 1:quad_order
-                        if quadrature_type isa LogNormalQuad
-                            h_hat = exp(ν_c + sqrt2 * s_c * χ[m_h])
-                        elseif quadrature_type isa GaussianQuad
-                            h_hat = μ_c + sqrt2 * σ_c * χ[m_h]
-                        end
-                        ts_hat = thermo_state_pθq(param_set, p_c[k], h_hat, qt_hat, aux_en.q_liq[k], aux_en.q_ice[k])
-                        T = TD.air_temperature(thermo_params, ts_hat)
+                        ts_hat = ts_quad_M[m_q, m_h]
+                        T = T_quad_M[m_q, m_h]
 
-                        q_vap_sat_liq = TD.q_vap_saturation_generic(thermo_params, T, ρ, TD.Liquid())
-                        q_vap_sat_ice = TD.q_vap_saturation_generic(thermo_params, T, ρ, TD.Ice())
-                        (supersat_liq_fraction_q, q_liq_supersat_q, q_liq_subsat_q) = partition_condensate_into_sgs_fractions(thermo_params, liq_type, ts_env[k], aux_en.QTvar[k], aux_en.Hvar[k], aux_en.HQTcov[k]; supersaturated_fraction_liq = aux_en.frac_supersat_liq[k])
-                        (supersat_ice_fraction_q, q_ice_supersat_q, q_ice_subsat_q) = partition_condensate_into_sgs_fractions(thermo_params, ice_type, ts_env[k], aux_en.QTvar[k], aux_en.Hvar[k], aux_en.HQTcov[k]; supersaturated_fraction_ice = aux_en.frac_supersat[k])
-                        liq_frac_q = supersat_liq_fraction_q * (q_liq_supersat_q > zero(FT)) + (1 - supersat_liq_fraction_q) * (q_liq_subsat_q > zero(FT))
-                        ice_frac_q = supersat_ice_fraction_q * (q_ice_supersat_q > zero(FT)) + (1 - supersat_ice_fraction_q) * (q_ice_subsat_q > zero(FT))
+                        q_vap_sat_liq = q_vap_sat_liq_M[m_q, m_h]
+                        q_vap_sat_ice = q_vap_sat_ice_M[m_q, m_h]
+
+                        # Quadrature points are deterministic points, so their fraction is strictly 1 or 0 for the point itself
+                        liq_frac_q = q_liq_quad_M[m_q, m_h] > zero(FT) ? one(FT) : zero(FT)
+                        ice_frac_q = q_ice_quad_M[m_q, m_h] > zero(FT) ? one(FT) : zero(FT)
                         cloud_frac_q = max(liq_frac_q, ice_frac_q)
 
-                        mph_neq_quad = noneq_moisture_sources(param_set, nonequilibrium_moisture_scheme, moisture_sources_limiter, aux_en.area[k], ρ_c[k], aux_en.p[k], T, Δt + ε, ts_hat, w_noneq, q_vap_sat_liq, q_vap_sat_ice, dqvdt, dTdt, aux_en.τ_liq[k], aux_en.τ_ice[k], liq_frac_q, ice_frac_q, cloud_frac_q)
+                        mph_neq_quad = noneq_moisture_sources(
+                            param_set,
+                            nonequilibrium_moisture_scheme,
+                            moisture_sources_limiter,
+                            aux_en.area[k],
+                            ρ_c[k],
+                            aux_en.p[k],
+                            T,
+                            Δt + ε,
+                            ts_hat,
+                            w_noneq,
+                            q_vap_sat_liq,
+                            q_vap_sat_ice,
+                            dqvdt,
+                            dTdt,
+                            aux_en.τ_liq[k],
+                            aux_en.τ_ice[k],
+                            liq_frac_q,
+                            ice_frac_q,
+                            cloud_frac_q,
+                        )
 
                         # if at an extrema, we don't know where the peak is so we'll reweight based on probability of where it could be in between.
                         if reweight_processes_for_grid
-                            mph_neq_quad = reweight_noneq_moisture_sources_for_grid(k, grid, param_set, thermo_params, aux_en, aux_en_f, mph_neq, nonequilibrium_moisture_scheme, moisture_sources_limiter, Δt, ρ_c, p_c, w, aux_tc.dqvdt, aux_tc.dTdt; reweight_extrema_only = reweight_extrema_only)
+                            mph_neq_quad = reweight_noneq_moisture_sources_for_grid(
+                                k,
+                                grid,
+                                param_set,
+                                thermo_params,
+                                aux_en,
+                                aux_en_f,
+                                mph_neq,
+                                nonequilibrium_moisture_scheme,
+                                moisture_sources_limiter,
+                                Δt,
+                                ρ_c,
+                                p_c,
+                                w,
+                                aux_tc.dqvdt,
+                                aux_tc.dTdt;
+                                reweight_extrema_only = reweight_extrema_only,
+                            )
                         end
 
                         mph_neq += mph_neq_quad * weights[m_h] * sqpi_inv * weights[m_q] * sqpi_inv
-                        
+
 
                         #                         
                         mph_neq_other_quad = other_microphysics_processes(
@@ -643,18 +834,21 @@ function microphysics!(
                     aux_en.latent_heating_neg[k] -= candidate # Liq --> Ice
                 end
             end
-            
+
             if any(!isfinite, (mph_neq_other.ql_tendency, mph_neq_other.qi_tendency))
                 @error "Other microphysics processes returned non-finite values: $mph_neq_other; from inputs ts = $ts; w = $w[k]; mph_neq.ql_tendency = $(mph_neq.ql_tendency); mph_neq.qi_tendency = $(mph_neq.qi_tendency); ρ_c = $(ρ_c[k]); aux_en.area = $(aux_en.area[k])"
                 error("Other microphysics processes returned non-finite values")
             end
-            
+
         else # EquilibriumMoisture
 
             # Now way to use partition_condensate_into_sgs_fractions right now since sat-adjust forces the overlap, could go into other microphysics but not implemented yet.
 
 
-            do_cloak = (edmf.area_partition_model isa CoreCloakAreaPartitionModel) && (edmf.area_partition_model.apply_cloak_to_condensate_formation) && (aux_bulk.area[k] > edmf.minimum_area)
+            do_cloak =
+                (edmf.area_partition_model isa CoreCloakAreaPartitionModel) &&
+                (edmf.area_partition_model.apply_cloak_to_condensate_formation) &&
+                (aux_bulk.area[k] > edmf.minimum_area)
             # (region_area, T, ts, cloak_up) 
             if !do_cloak
                 regions = ((aux_en.area[k], aux_en.T[k], ts_env[k]),)
@@ -663,7 +857,7 @@ function microphysics!(
                     (aux_en.a_cloak_up[k], aux_en.T_cloak_up[k], aux_en.ts_cloak_up[k]),
                     (aux_en.a_cloak_dn[k], aux_en.T_cloak_dn[k], aux_en.ts_cloak_dn[k]),
                     (aux_en.a_en_remaining[k], aux_en.T[k], ts_env[k]),
-                    )
+                )
             end
 
 
@@ -703,10 +897,10 @@ function microphysics!(
                     # edmf.tendency_limiters.precipitation_tendency_limiter,
                     get_tendency_limiter(edmf.tendency_limiters, Val(:precipitation), use_fallback_tendency_limiters),
                     # aux_en_2m.tke.dissipation[k],
-                    aux_en.tke[k]
-                    ;
+                    aux_en.tke[k];
                     N_i_no_boost = aux_en.N_i_no_boost[k],
-                    qi_tendency_sed = (aux_en.area[k] > FT(0)) ? aux_en.qi_tendency_sedimentation[k] / aux_en.area[k] : FT(0), # this is the sedimentation contribution to precip formation
+                    qi_tendency_sed = (aux_en.area[k] > FT(0)) ?
+                                      aux_en.qi_tendency_sedimentation[k] / aux_en.area[k] : FT(0), # this is the sedimentation contribution to precip formation
                     S_i = S_i,
                     τ_sub_dep = FT(NaN),
                     dN_i_dz = aux_en.dN_i_dz[k],
@@ -725,20 +919,31 @@ function microphysics!(
         # Update cloud fraction, q_liq, q_ice
         if moisture_model isa EquilibriumMoisture
             if (edmf.area_partition_model isa CoreCloakAreaPartitionModel)
-                for (region_area,  ts, region) in (
+                for (region_area, ts, region) in (
                     (aux_en.a_cloak_up[k], aux_en.ts_cloak_up[k], CloakUp),
                     (aux_en.a_cloak_dn[k], aux_en.ts_cloak_dn[k], CloakDown),
-                    (aux_en.a_en_remaining[k], aux_en.ts[k], EnvRemaining)
+                    (aux_en.a_en_remaining[k], aux_en.ts[k], EnvRemaining),
                 )
 
                     aux_en.q_liq[k] = FT(0)
                     aux_en.q_ice[k] = FT(0)
                     if region_area > FT(0) # can be zero for a_en_remaining
                         if reweight_processes_for_grid
-                            q_liq, q_ice = reweight_equilibrium_saturation_adjustment_for_grid(k, grid, param_set, thermo_params, aux_en, q, p_c; reweight_extrema_only = reweight_extrema_only, region = region)
+                            q_liq, q_ice = reweight_equilibrium_saturation_adjustment_for_grid(
+                                k,
+                                grid,
+                                param_set,
+                                thermo_params,
+                                aux_en,
+                                q,
+                                p_c;
+                                reweight_extrema_only = reweight_extrema_only,
+                                region = region,
+                            )
                             aux_en.q_liq[k] += q_liq * (region_area / aux_en.area[k])
                             aux_en.q_ice[k] += q_ice * (region_area / aux_en.area[k])
-                            aux_en.cloud_fraction[k] += ((q_liq > 0) || (q_ice > 0)) ? (region_area / aux_en.area[k]) : 0 
+                            aux_en.cloud_fraction[k] +=
+                                ((q_liq > 0) || (q_ice > 0)) ? (region_area / aux_en.area[k]) : 0
                         else
                             if TD.has_condensate(thermo_params, ts)
                                 q_liq = TD.liquid_specific_humidity(thermo_params, ts)
@@ -754,10 +959,19 @@ function microphysics!(
                 ts = ts_env[k]
                 if reweight_processes_for_grid
                     q = TD.PhasePartition(thermo_params, ts) # we don't have q cached here but we do in updraft so calculating outside the fcn saves work
-                    q_liq, q_ice = reweight_equilibrium_saturation_adjustment_for_grid(k, grid, param_set, thermo_params, aux_en, q, p_c; reweight_extrema_only = reweight_extrema_only)
+                    q_liq, q_ice = reweight_equilibrium_saturation_adjustment_for_grid(
+                        k,
+                        grid,
+                        param_set,
+                        thermo_params,
+                        aux_en,
+                        q,
+                        p_c;
+                        reweight_extrema_only = reweight_extrema_only,
+                    )
                     aux_en.q_liq[k] = q_liq
                     aux_en.q_ice[k] = q_ice
-                    aux_en.cloud_fraction[k] = ((q_liq > 0) || (q_ice > 0)) ? 1 : 0 
+                    aux_en.cloud_fraction[k] = ((q_liq > 0) || (q_ice > 0)) ? 1 : 0
                 else
                     if TD.has_condensate(thermo_params, ts)
                         aux_en.cloud_fraction[k] = 1
@@ -924,7 +1138,20 @@ const QuadratureVarsType{FT} = @NamedTuple{
 
 # doesnt really support NonEq yet
 # function quad_loop(en_thermo::SGSQuadrature, grid, edmf, moisture_model, precip_model, cloud_sedimentation_model, rain_formation_model, snow_formation_model, tendency_limiters, vars, param_set, Δt::Real, use_fallback_tendency_limiters::Bool)
-function quad_loop(en_thermo::SGSQuadrature, grid::Grid, edmf::EDMFModel, moisture_model::AbstractMoistureModel, precip_model::AbstractPrecipitationModel, cloud_sedimentation_model::AbstractCloudSedimentationModel, rain_formation_model::AbstractRainFormationModel, snow_formation_model::AbstractSnowFormationModel, Δt::FT, param_set::APS, use_fallback_tendency_limiters::Bool, vars::QuadratureVarsType{FT}) where {FT} # vars is a named_tuple
+function quad_loop(
+    en_thermo::SGSQuadrature,
+    grid::Grid,
+    edmf::EDMFModel,
+    moisture_model::AbstractMoistureModel,
+    precip_model::AbstractPrecipitationModel,
+    cloud_sedimentation_model::AbstractCloudSedimentationModel,
+    rain_formation_model::AbstractRainFormationModel,
+    snow_formation_model::AbstractSnowFormationModel,
+    Δt::FT,
+    param_set::APS,
+    use_fallback_tendency_limiters::Bool,
+    vars::QuadratureVarsType{FT},
+) where {FT} # vars is a named_tuple
 
     env_len = 8
     src_len = 8
@@ -950,14 +1177,20 @@ function quad_loop(en_thermo::SGSQuadrature, grid::Grid, edmf::EDMFModel, moistu
         raw_sourcenames...,
         (Symbol(:NoneqMoistureSources_, name) for name in fieldnames(NoneqMoistureSources))...,
         (Symbol(:OtherMicrophysicsSources_, name) for name in fieldnames(OtherMicrophysicsSources))...,
-        (Symbol(:PrecipFormation_, name) for name in fieldnames(PrecipFormation))...
+        (Symbol(:PrecipFormation_, name) for name in fieldnames(PrecipFormation))...,
     )
     i_src = NamedTuple{all_names, NTuple{all_src_len, Int}}(Tuple(1:length(all_names)))
 
 
-    i_NoneqMoistureSources = NamedTuple{fieldnames(NoneqMoistureSources), NTuple{src_mph_neq_len, Int}}(Tuple(i_src[Symbol(:NoneqMoistureSources_, name)] for name in fieldnames(NoneqMoistureSources)))
-    i_OtherMicrophysicsSources = NamedTuple{fieldnames(OtherMicrophysicsSources), NTuple{src_mph_neq_other_len, Int}}(Tuple(i_src[Symbol(:OtherMicrophysicsSources_, name)] for name in fieldnames(OtherMicrophysicsSources)))
-    i_PrecipFormation = NamedTuple{fieldnames(PrecipFormation), NTuple{src_mph_precip_len, Int}}(Tuple(i_src[Symbol(:PrecipFormation_, name)] for name in fieldnames(PrecipFormation)))
+    i_NoneqMoistureSources = NamedTuple{fieldnames(NoneqMoistureSources), NTuple{src_mph_neq_len, Int}}(
+        Tuple(i_src[Symbol(:NoneqMoistureSources_, name)] for name in fieldnames(NoneqMoistureSources)),
+    )
+    i_OtherMicrophysicsSources = NamedTuple{fieldnames(OtherMicrophysicsSources), NTuple{src_mph_neq_other_len, Int}}(
+        Tuple(i_src[Symbol(:OtherMicrophysicsSources_, name)] for name in fieldnames(OtherMicrophysicsSources)),
+    )
+    i_PrecipFormation = NamedTuple{fieldnames(PrecipFormation), NTuple{src_mph_precip_len, Int}}(
+        Tuple(i_src[Symbol(:PrecipFormation_, name)] for name in fieldnames(PrecipFormation)),
+    )
 
 
     # additions to tendencies... Smph
@@ -1027,11 +1260,11 @@ function quad_loop(en_thermo::SGSQuadrature, grid::Grid, edmf::EDMFModel, moistu
     for idx in 1:all_src_len
         outer_src[idx] = 0
     end
-    
+
 
     # calculate saturation exceses for partitinoning ql, qi
     if moisture_model isa NonEquilibriumMoisture
-        (;q_liq, q_ice) = vars # unpack
+        (; q_liq, q_ice) = vars # unpack
         saturation_excesses_liq = SA.MArray{Tuple{quad_order, quad_order}, FT}(undef)
         saturation_excesses_ice = SA.MArray{Tuple{quad_order, quad_order}, FT}(undef)
 
@@ -1058,15 +1291,17 @@ function quad_loop(en_thermo::SGSQuadrature, grid::Grid, edmf::EDMFModel, moistu
                     h_hat = exp(ν_c + sqrt2 * s_c * χ[m_h])
                 elseif quadrature_type isa GaussianQuad
                     h_hat = μ_c + sqrt2 * σ_c * χ[m_h]
-                end      
+                end
 
                 ts = thermo_state_pθq(param_set, p_c, h_hat, qt_hat, q_liq, q_ice)
                 T = TD.air_temperature(thermo_params, ts)
-                p = TD.air_pressure(thermo_params, ts)  
+                p = TD.air_pressure(thermo_params, ts)
                 ρ = TD.air_density(thermo_params, ts)
                 q = TD.PhasePartition(thermo_params, ts)
-                saturation_excesses_liq[m_q, m_h] = TD.vapor_specific_humidity(q) -  TD.q_vap_saturation_generic(thermo_params, T, ρ, TD.Liquid())
-                saturation_excesses_ice[m_q, m_h] = TD.vapor_specific_humidity(q) -  TD.q_vap_saturation_generic(thermo_params, T, ρ, TD.Ice())
+                saturation_excesses_liq[m_q, m_h] =
+                    TD.vapor_specific_humidity(q) - TD.q_vap_saturation_generic(thermo_params, T, ρ, TD.Liquid())
+                saturation_excesses_ice[m_q, m_h] =
+                    TD.vapor_specific_humidity(q) - TD.q_vap_saturation_generic(thermo_params, T, ρ, TD.Ice())
 
                 # saturation_excesses_liq[m_q, m_h] = TD.vapor_specific_humidity(thermo_params, ts)
                 # saturation_excesses_ice[m_q, m_h] = TD.vapor_specific_humidity(thermo_params, ts)
@@ -1107,23 +1342,35 @@ function quad_loop(en_thermo::SGSQuadrature, grid::Grid, edmf::EDMFModel, moistu
 
         if (q_liq > 2eps(FT)) && (var_S_liq > eps(FT))
             q′S′ = FT(1) * var_S_liq
-            q_liq_ens .= get_qs_from_saturation_excesses(saturation_excesses_liq, weights .* sqpi_inv, q_liq; q′S′ = q′S′, q′q′ = nothing) # for liquid we'll go 1:1 cause it's fast, though supersat struggles to exceed 1. so it might be skewed idk...
-            # q_liq_ens .= q_liq
+            q_liq_ens .= get_qs_from_saturation_excesses(
+                saturation_excesses_liq,
+                weights .* sqpi_inv,
+                q_liq;
+                q′S′ = q′S′,
+                q′q′ = nothing,
+            ) # for liquid we'll go 1:1 cause it's fast, though supersat struggles to exceed 1. so it might be skewed idk...
+        # q_liq_ens .= q_liq
         else
             q_liq_ens .= q_liq
         end
         if (q_ice > 2eps(FT)) && (var_S_ice > eps(FT))
             q′S′ = FT(1e-3) * var_S_ice
-            q_ice_ens .= get_qs_from_saturation_excesses(saturation_excesses_ice, weights .* sqpi_inv, q_ice; q′S′ = q′S′, q′q′ = nothing) # for ice we'll go 1:10 because it's slow but vapor excess can be is much higher relative to the ice amount..., and then subimation is slow....
-            # q_ice_ens .= q_ice
+            q_ice_ens .= get_qs_from_saturation_excesses(
+                saturation_excesses_ice,
+                weights .* sqpi_inv,
+                q_ice;
+                q′S′ = q′S′,
+                q′q′ = nothing,
+            ) # for ice we'll go 1:10 because it's slow but vapor excess can be is much higher relative to the ice amount..., and then subimation is slow....
+        # q_ice_ens .= q_ice
         else
             q_ice_ens .= q_ice
         end
-       
+
 
         # total_saturation_excess_liq = sum(saturation_excesses_liq)
         # total_saturation_excess_ice = sum(saturation_excesses_ice)
-    end 
+    end
 
 
 
@@ -1150,7 +1397,7 @@ function quad_loop(en_thermo::SGSQuadrature, grid::Grid, edmf::EDMFModel, moistu
 
 
 
-            
+
 
             # We want to try assigning q_l and q_i based on the fraction of total vapor above supersaturation we have. `TD.saturation_excess()`
 
@@ -1158,7 +1405,38 @@ function quad_loop(en_thermo::SGSQuadrature, grid::Grid, edmf::EDMFModel, moistu
             if moisture_model isa NonEquilibriumMoisture # Here we do noneqmoisture sources. We assume the same ql, qi everywhere w/ no quadrature though...
 
                 # assume q_liq and q_en do not change and have no variance... ( do not participate in quadrature )
-                (; use_fallback_tendency_limiters, aux_en, aux_en_f, k, q_liq, q_ice, N_l, N_i, N_i_no_boost, term_vel_liq, term_vel_ice, term_vel_rain, term_vel_snow, w, tke, ql_tendency_sedimentation, ql_tendency_sedimentation_other, qi_tendency_sedimentation, qi_tendency_sedimentation_other, dqvdt, dTdt, S_i, N_INP, τ_liq, τ_ice, dN_i_dz, dqidz, massflux, ∂b∂z, ∂qt∂z) = vars # unpack
+                (;
+                    use_fallback_tendency_limiters,
+                    aux_en,
+                    aux_en_f,
+                    k,
+                    q_liq,
+                    q_ice,
+                    N_l,
+                    N_i,
+                    N_i_no_boost,
+                    term_vel_liq,
+                    term_vel_ice,
+                    term_vel_rain,
+                    term_vel_snow,
+                    w,
+                    tke,
+                    ql_tendency_sedimentation,
+                    ql_tendency_sedimentation_other,
+                    qi_tendency_sedimentation,
+                    qi_tendency_sedimentation_other,
+                    dqvdt,
+                    dTdt,
+                    S_i,
+                    N_INP,
+                    τ_liq,
+                    τ_ice,
+                    dN_i_dz,
+                    dqidz,
+                    massflux,
+                    ∂b∂z,
+                    ∂qt∂z,
+                ) = vars # unpack
 
                 ts = thermo_state_pθq(param_set, p_c, h_hat, qt_hat, q_liq, q_ice)
                 T = TD.air_temperature(thermo_params, ts)
@@ -1173,12 +1451,76 @@ function quad_loop(en_thermo::SGSQuadrature, grid::Grid, edmf::EDMFModel, moistu
                 q_liq_en = q_liq_ens[m_q, m_h]
                 q_ice_en = q_ice_ens[m_q, m_h]
 
-                (; mph_neq, mph_neq_other, mph_precip) = microphysics_helper(grid, edmf, Δt, param_set, use_fallback_tendency_limiters, aux_en, aux_en_f, k,
-                    subdomain_area, h_hat, qt_hat, q_liq_en, q_ice_en, q_rai, q_sno, N_l, N_i, N_i_no_boost, term_vel_liq, term_vel_ice, term_vel_rain, term_vel_snow, ρ_c, p_c, T, ts, precip_frac,
-                    ql_tendency_sedimentation, ql_tendency_sedimentation_other, qi_tendency_sedimentation, qi_tendency_sedimentation_other;
-                    q_vap_sat_liq = q_vap_sat_liq, q_vap_sat_ice = q_vap_sat_ice, dqvdt = dqvdt, dTdt = dTdt, w=w, tke = tke, S_i = S_i, τ_liq = τ_liq, τ_ice = τ_ice, dN_i_dz = dN_i_dz, dqidz = dqidz, N_INP = N_INP, massflux = massflux, ∂b∂z = ∂b∂z, ∂qt∂z = ∂qt∂z, frac_supersat_liq = aux_en.frac_supersat_liq[k], frac_supersat = aux_en.frac_supersat[k])
+                (; mph_neq, mph_neq_other, mph_precip) = microphysics_helper(
+                    grid,
+                    edmf,
+                    Δt,
+                    param_set,
+                    use_fallback_tendency_limiters,
+                    aux_en,
+                    aux_en_f,
+                    k,
+                    subdomain_area,
+                    h_hat,
+                    qt_hat,
+                    q_liq_en,
+                    q_ice_en,
+                    q_rai,
+                    q_sno,
+                    N_l,
+                    N_i,
+                    N_i_no_boost,
+                    term_vel_liq,
+                    term_vel_ice,
+                    term_vel_rain,
+                    term_vel_snow,
+                    ρ_c,
+                    p_c,
+                    T,
+                    ts,
+                    precip_frac,
+                    ql_tendency_sedimentation,
+                    ql_tendency_sedimentation_other,
+                    qi_tendency_sedimentation,
+                    qi_tendency_sedimentation_other;
+                    q_vap_sat_liq = q_vap_sat_liq,
+                    q_vap_sat_ice = q_vap_sat_ice,
+                    dqvdt = dqvdt,
+                    dTdt = dTdt,
+                    w = w,
+                    tke = tke,
+                    S_i = S_i,
+                    τ_liq = τ_liq,
+                    τ_ice = τ_ice,
+                    dN_i_dz = dN_i_dz,
+                    dqidz = dqidz,
+                    N_INP = N_INP,
+                    massflux = massflux,
+                    ∂b∂z = ∂b∂z,
+                    ∂qt∂z = ∂qt∂z,
+                    frac_supersat_liq = aux_en.frac_supersat_liq[k],
+                    frac_supersat = aux_en.frac_supersat[k],
+                )
             else
-                (; use_fallback_tendency_limiters, aux_en, aux_en_f, k, N_l, N_i, N_i_no_boost, term_vel_liq, term_vel_ice, term_vel_rain, term_vel_snow, w, tke, ql_tendency_sedimentation, ql_tendency_sedimentation_other, qi_tendency_sedimentation, qi_tendency_sedimentation_other) = vars # unpack
+                (;
+                    use_fallback_tendency_limiters,
+                    aux_en,
+                    aux_en_f,
+                    k,
+                    N_l,
+                    N_i,
+                    N_i_no_boost,
+                    term_vel_liq,
+                    term_vel_ice,
+                    term_vel_rain,
+                    term_vel_snow,
+                    w,
+                    tke,
+                    ql_tendency_sedimentation,
+                    ql_tendency_sedimentation_other,
+                    qi_tendency_sedimentation,
+                    qi_tendency_sedimentation_other,
+                ) = vars # unpack
 
                 ts = thermo_state_pθq(param_set, p_c, h_hat, qt_hat)
                 q_liq_en = TD.liquid_specific_humidity(thermo_params, ts)
@@ -1186,9 +1528,39 @@ function quad_loop(en_thermo::SGSQuadrature, grid::Grid, edmf::EDMFModel, moistu
                 T = TD.air_temperature(thermo_params, ts)
                 p = TD.air_pressure(thermo_params, ts)
 
-                (; mph_neq, mph_neq_other, mph_precip) = microphysics_helper(grid, edmf, Δt, param_set, use_fallback_tendency_limiters, aux_en, aux_en_f, k,
-                    subdomain_area, h_hat, qt_hat, q_liq_en, q_ice_en, q_rai, q_sno, N_l, N_i, N_i_no_boost, term_vel_liq, term_vel_ice, term_vel_rain, term_vel_snow, ρ_c, p_c, T, ts, precip_frac,
-                    ql_tendency_sedimentation, ql_tendency_sedimentation_other, qi_tendency_sedimentation, qi_tendency_sedimentation_other)
+                (; mph_neq, mph_neq_other, mph_precip) = microphysics_helper(
+                    grid,
+                    edmf,
+                    Δt,
+                    param_set,
+                    use_fallback_tendency_limiters,
+                    aux_en,
+                    aux_en_f,
+                    k,
+                    subdomain_area,
+                    h_hat,
+                    qt_hat,
+                    q_liq_en,
+                    q_ice_en,
+                    q_rai,
+                    q_sno,
+                    N_l,
+                    N_i,
+                    N_i_no_boost,
+                    term_vel_liq,
+                    term_vel_ice,
+                    term_vel_rain,
+                    term_vel_snow,
+                    ρ_c,
+                    p_c,
+                    T,
+                    ts,
+                    precip_frac,
+                    ql_tendency_sedimentation,
+                    ql_tendency_sedimentation_other,
+                    qi_tendency_sedimentation,
+                    qi_tendency_sedimentation_other,
+                )
             end
 
             # environmental variables
@@ -1204,7 +1576,7 @@ function quad_loop(en_thermo::SGSQuadrature, grid::Grid, edmf::EDMFModel, moistu
                 elseif moisture_model isa NonEquilibriumMoisture # for NonEq, having condensate or not doesn't map to sat/unsat
                     inner_env[i_cf] += weights[m_h] * sqpi_inv
                     inner_env[i_qt_sat] += qt_hat * weights[m_h] * sqpi_inv
-                    inner_env[i_T_sat] += T * weights[m_h] * sqpi_inv   
+                    inner_env[i_T_sat] += T * weights[m_h] * sqpi_inv
                 else
                     error("moisture_model not recognized")
                 end
@@ -1257,9 +1629,15 @@ function quad_loop(en_thermo::SGSQuadrature, grid::Grid, edmf::EDMFModel, moistu
         end
     end
 
-    outer_src_nt_Noneq = NamedTuple{keys(i_NoneqMoistureSources), NTuple{src_mph_neq_len, FT}}(map(i -> outer_src[i], values(i_NoneqMoistureSources)))
-    outer_src_nt_Noneq_other = NamedTuple{keys(i_OtherMicrophysicsSources), NTuple{src_mph_neq_other_len, FT}}(map(i -> outer_src[i], values(i_OtherMicrophysicsSources)))
-    outer_src_nt_Precip = NamedTuple{keys(i_PrecipFormation), NTuple{src_mph_precip_len, FT}}(map(i -> outer_src[i], values(i_PrecipFormation)))
+    outer_src_nt_Noneq = NamedTuple{keys(i_NoneqMoistureSources), NTuple{src_mph_neq_len, FT}}(
+        map(i -> outer_src[i], values(i_NoneqMoistureSources)),
+    )
+    outer_src_nt_Noneq_other = NamedTuple{keys(i_OtherMicrophysicsSources), NTuple{src_mph_neq_other_len, FT}}(
+        map(i -> outer_src[i], values(i_OtherMicrophysicsSources)),
+    )
+    outer_src_nt_Precip = NamedTuple{keys(i_PrecipFormation), NTuple{src_mph_precip_len, FT}}(
+        map(i -> outer_src[i], values(i_PrecipFormation)),
+    )
 
     outer_src_nt = (;
         SH_qt = outer_src[i_SH_qt],
@@ -1307,7 +1685,7 @@ function microphysics!(
     # N_up::Int,
     Δt::Real,
     param_set::APS,
-    use_fallback_tendency_limiters::Bool
+    use_fallback_tendency_limiters::Bool,
 )
     grid = Grid(state)
     FT = float_type(state)
@@ -1335,7 +1713,7 @@ function microphysics!(
     cloud_sedimentation_model = edmf.cloud_sedimentation_model
     rain_formation_model = edmf.rain_formation_model
     snow_formation_model = edmf.snow_formation_model
-    
+
     # TODO - if we start using eos_smpl for the updrafts calculations
     #       we can get rid of the two categories for outer and inner quad. points
 
@@ -1344,7 +1722,12 @@ function microphysics!(
 
     epsilon = FT(1e-14) # eps(float)
 
-     if (moisture_model isa NonEquilibriumMoisture) || (edmf.cloud_sedimentation_model isa CloudSedimentationModel && !edmf.cloud_sedimentation_model.grid_mean) || ((edmf.area_partition_model isa CoreCloakAreaPartitionModel) && edmf.area_partition_model.apply_cloak_to_condensate_formation)
+    if (moisture_model isa NonEquilibriumMoisture) ||
+       (edmf.cloud_sedimentation_model isa CloudSedimentationModel && !edmf.cloud_sedimentation_model.grid_mean) ||
+       (
+           (edmf.area_partition_model isa CoreCloakAreaPartitionModel) &&
+           edmf.area_partition_model.apply_cloak_to_condensate_formation
+       )
         if (edmf.area_partition_model isa CoreCloakAreaPartitionModel)
             if edmf.area_partition_model.confine_all_downdraft_to_cloak
                 w = aux_tc.temporary_1
@@ -1363,7 +1746,7 @@ function microphysics!(
 
     # ======================================================================================================================================================================================== #
     # Calculate Sedimentation
-    if edmf.cloud_sedimentation_model isa CloudSedimentationModel && !edmf.cloud_sedimentation_model.grid_mean  
+    if edmf.cloud_sedimentation_model isa CloudSedimentationModel && !edmf.cloud_sedimentation_model.grid_mean
 
         sedimentation = aux_tc.temporary_1
         sedimentation_other = aux_tc.temporary_2
@@ -1381,26 +1764,30 @@ function microphysics!(
             differencing_scheme = edmf.cloud_sedimentation_model.sedimentation_differencing_scheme,
             grid_mean = false,
             use_relative_w = false,
-            scratch1 = aux_tc.temporary_3, scratch2 = aux_tc.temporary_4, scratch3 = aux_tc.temporary_5, scratch4 = aux_tc.temporary_6, scratch1F = aux_tc_f.temporary_f1, scratch2F = aux_tc_f.temporary_f2
+            scratch1 = aux_tc.temporary_3,
+            scratch2 = aux_tc.temporary_4,
+            scratch3 = aux_tc.temporary_5,
+            scratch4 = aux_tc.temporary_6,
+            scratch1F = aux_tc_f.temporary_f1,
+            scratch2F = aux_tc_f.temporary_f2,
         ) # should this be a grid mean tendency? 
 
         @inbounds for k in real_center_indices(grid)
             aux_en.qi_tendency_sedimentation[k] = sedimentation[k]
             aux_en.qt_tendency_sedimentation[k] = sedimentation[k]
-        
+
 
             Π_m = TD.exner(thermo_params, ts_env[k])
             c_pm = TD.cp_m(thermo_params, ts_env[k])
             L_s = TD.latent_heat_sublim(thermo_params, ts_env[k])
-            θ_liq_ice_tendency_sedimentation_ice =
-                1 / Π_m / c_pm * (L_s * aux_en.qi_tendency_sedimentation[k])
+            θ_liq_ice_tendency_sedimentation_ice = 1 / Π_m / c_pm * (L_s * aux_en.qi_tendency_sedimentation[k])
             aux_en.θ_liq_ice_tendency_sedimentation[k] += θ_liq_ice_tendency_sedimentation_ice # adapted from microphysics_coupling.jl: precipitation_formation() | (= not += caue these don't seem to get reset every iteration?
             if aux_en.area[k] < 1 # we have some updrafts
                 N_up = n_updrafts(edmf)
                 @inbounds for i in 1:N_up
                     qi_tendency_sedimentation_other = sedimentation_other[k] * (aux_up[i].area[k] ./ aux_bulk.area[k])
-                    qt_liq_ice_tendency_sedimentation_other =  qi_tendency_sedimentation_other
-                    θ_liq_ice_tendency_sedimentation_other =  1 / Π_m / c_pm * (L_s * qi_tendency_sedimentation_other)
+                    qt_liq_ice_tendency_sedimentation_other = qi_tendency_sedimentation_other
+                    θ_liq_ice_tendency_sedimentation_other = 1 / Π_m / c_pm * (L_s * qi_tendency_sedimentation_other)
                     aux_up[i].qi_tendency_sedimentation[k] += qi_tendency_sedimentation_other
                     aux_up[i].qt_tendency_sedimentation[k] += qi_tendency_sedimentation_other
                     aux_up[i].θ_liq_ice_tendency_sedimentation[k] += θ_liq_ice_tendency_sedimentation_other
@@ -1426,7 +1813,12 @@ function microphysics!(
             differencing_scheme = edmf.cloud_sedimentation_model.sedimentation_differencing_scheme,
             grid_mean = false,
             use_relative_w = false,
-            scratch1 = aux_tc.temporary_3, scratch2 = aux_tc.temporary_4, scratch3 = aux_tc.temporary_5, scratch4 = aux_tc.temporary_6, scratch1F = aux_tc_f.temporary_f1, scratch2F = aux_tc_f.temporary_f2
+            scratch1 = aux_tc.temporary_3,
+            scratch2 = aux_tc.temporary_4,
+            scratch3 = aux_tc.temporary_5,
+            scratch4 = aux_tc.temporary_6,
+            scratch1F = aux_tc_f.temporary_f1,
+            scratch2F = aux_tc_f.temporary_f2,
         ) # should this be a grid mean tendency? 
 
         @inbounds for k in real_center_indices(grid)
@@ -1436,15 +1828,14 @@ function microphysics!(
             Π_m = TD.exner(thermo_params, ts_env[k])
             c_pm = TD.cp_m(thermo_params, ts_env[k])
             L_v = TD.latent_heat_vapor(thermo_params, ts_env[k])
-            θ_liq_ice_tendency_sedimentation_liq =
-                1 / Π_m / c_pm * (L_v * aux_en.ql_tendency_sedimentation[k])
+            θ_liq_ice_tendency_sedimentation_liq = 1 / Π_m / c_pm * (L_v * aux_en.ql_tendency_sedimentation[k])
             aux_en.θ_liq_ice_tendency_sedimentation[k] += θ_liq_ice_tendency_sedimentation_liq # adapted from microphysics_coupling.jl: precipitation_formation() | (= not += caue these don't seem to get reset every iteration?
 
             if aux_en.area[k] < 1 # we have some updrafts
                 N_up = n_updrafts(edmf)
                 @inbounds for i in 1:N_up
                     ql_tendency_sedimentation_other = sedimentation_other[k] * (aux_up[i].area[k] ./ aux_bulk.area[k])
-                    θ_liq_ice_tendency_sedimentation_other =  1 / Π_m / c_pm * (L_v * ql_tendency_sedimentation_other)
+                    θ_liq_ice_tendency_sedimentation_other = 1 / Π_m / c_pm * (L_v * ql_tendency_sedimentation_other)
                     aux_up[i].ql_tendency_sedimentation[k] += ql_tendency_sedimentation_other
                     aux_up[i].qt_tendency_sedimentation[k] += ql_tendency_sedimentation_other
                     aux_up[i].θ_liq_ice_tendency_sedimentation[k] += θ_liq_ice_tendency_sedimentation_other
@@ -1499,7 +1890,7 @@ function microphysics!(
                 #
                 # My Additions
                 #
-                use_fallback_tendency_limiters = use_fallback_tendency_limiters, 
+                use_fallback_tendency_limiters = use_fallback_tendency_limiters,
                 #
                 aux_en = aux_en, # pass aux_en for access to ts etc
                 aux_en_f = aux_en_f,
@@ -1508,26 +1899,36 @@ function microphysics!(
                 q_liq = aux_en.q_liq[k],
                 q_ice = aux_en.q_ice[k],
                 #
-                N_l = aux_en.N_l[k], 
+                N_l = aux_en.N_l[k],
                 N_i = aux_en.N_i[k],
                 N_i_no_boost = aux_en.N_i_no_boost[k],
-                term_vel_liq = (edmf.cloud_sedimentation_model isa CloudSedimentationModel) ? aux_en.term_vel_liq[k] : FT(0),
-                term_vel_ice = (edmf.cloud_sedimentation_model isa CloudSedimentationModel) ? aux_en.term_vel_ice[k] : FT(0),
+                term_vel_liq = (edmf.cloud_sedimentation_model isa CloudSedimentationModel) ?
+                               aux_en.term_vel_liq[k] : FT(0),
+                term_vel_ice = (edmf.cloud_sedimentation_model isa CloudSedimentationModel) ?
+                               aux_en.term_vel_ice[k] : FT(0),
                 term_vel_rain = aux_tc.term_vel_rain[k],
                 term_vel_snow = aux_tc.term_vel_snow[k],
                 #
                 w = (moisture_model isa NonEquilibriumMoisture) ? w[k] : FT(NaN), # only needed for NonEq
                 #
                 tke = aux_en.tke[k],
-                ql_tendency_sedimentation = (aux_en.area[k] > FT(0)) ? aux_en.ql_tendency_sedimentation[k] / aux_en.area[k] : FT(0),
-                ql_tendency_sedimentation_other = (aux_en.area[k] > FT(0)) ? aux_en.ql_tendency_sedimentation_other[k] / aux_en.area[k] : FT(0),
-                qi_tendency_sedimentation = (aux_en.area[k] > FT(0)) ? aux_en.qi_tendency_sedimentation[k] / aux_en.area[k] : FT(0),
-                qi_tendency_sedimentation_other = (aux_en.area[k] > FT(0)) ? aux_en.qi_tendency_sedimentation_other[k] / aux_en.area[k] : FT(0),
+                ql_tendency_sedimentation = (aux_en.area[k] > FT(0)) ?
+                                            aux_en.ql_tendency_sedimentation[k] / aux_en.area[k] : FT(0),
+                ql_tendency_sedimentation_other = (aux_en.area[k] > FT(0)) ?
+                                                  aux_en.ql_tendency_sedimentation_other[k] / aux_en.area[k] :
+                                                  FT(0),
+                qi_tendency_sedimentation = (aux_en.area[k] > FT(0)) ?
+                                            aux_en.qi_tendency_sedimentation[k] / aux_en.area[k] : FT(0),
+                qi_tendency_sedimentation_other = (aux_en.area[k] > FT(0)) ?
+                                                  aux_en.qi_tendency_sedimentation_other[k] / aux_en.area[k] :
+                                                  FT(0),
                 dqvdt = aux_tc.dqvdt[k],
                 dTdt = aux_tc.dTdt[k],
                 #
                 S_i = (moisture_model isa NonEquilibriumMoisture) ? S_i : FT(NaN), # only needed for NonEq
-                N_INP = (moisture_model isa NonEquilibriumMoisture) ? get_INP_concentration(param_set, moisture_model.scheme, q, aux_en.T[k], ρ, w[k], S_i) : FT(NaN), # only needed for NonEq
+                N_INP = (moisture_model isa NonEquilibriumMoisture) ?
+                        get_INP_concentration(param_set, moisture_model.scheme, q, aux_en.T[k], ρ, w[k], S_i) :
+                        FT(NaN), # only needed for NonEq
                 τ_liq = aux_en.τ_liq[k], # only needed for NonEq
                 τ_ice = aux_en.τ_ice[k], # only needed for NonEq
                 dN_i_dz = aux_en.dN_i_dz[k], # only needed for NonEq
@@ -1536,11 +1937,24 @@ function microphysics!(
                 ∂b∂z = aux_tc.∂b∂z[k], # only needed for NonEq
                 ∂qt∂z = aux_tc.∂qt∂z[k], # only needed for NonEq
             )
-            
+
             # outer_env, outer_src = quad_loop(en_thermo, grid, moisture_model, precip_model, cloud_sedimentation_model, rain_formation_model, snow_formation_model, edmf.tendency_limiters, vars, param_set, Δt, use_fallback_tendency_limiters)
             # function quad_loop(en_thermo::SGSQuadrature, grid::Grid, edmf::EDMFModel, moisture_model::AbstractMoistureModel, precip_model::AbstractPrecipitationModel, cloud_sedimentation_model::AbstractCloudSedimentationModel, rain_formation_model::AbstractRainFormationModel, snow_formation_model::AbstractSnowFormationModel, Δt::FT, param_set::APS, use_fallback_tendency_limiters::Bool, aux_en::CC.Fields.Field, aux_en_f::CC.Fields.Field, vars) where {FT} # vars is a named_tuple
-            outer_env, outer_src = quad_loop(en_thermo, grid, edmf, moisture_model, precip_model, cloud_sedimentation_model, rain_formation_model, snow_formation_model, Δt, param_set, use_fallback_tendency_limiters, vars)
-            
+            outer_env, outer_src = quad_loop(
+                en_thermo,
+                grid,
+                edmf,
+                moisture_model,
+                precip_model,
+                cloud_sedimentation_model,
+                rain_formation_model,
+                snow_formation_model,
+                Δt,
+                param_set,
+                use_fallback_tendency_limiters,
+                vars,
+            )
+
             # update environmental cloudy/dry variables for buoyancy in TKE
             # update_env_precip_tendencies
             qt_tendency = outer_src.Sqt # should be the same as outer_src.PrecipFormation.qt_tendency
@@ -1621,7 +2035,8 @@ function microphysics!(
             # update var/covar rain sources
             aux_en.Hvar_rain_dt[k] = outer_src.SH_H - outer_src.SH * aux_en.θ_liq_ice[k]
             aux_en.QTvar_rain_dt[k] = outer_src.Sqt_qt - outer_src.Sqt * aux_en.q_tot[k]
-            aux_en.HQTcov_rain_dt[k] = outer_src.SH_qt - outer_src.SH * aux_en.q_tot[k] + outer_src.Sqt_H - outer_src.Sqt * aux_en.θ_liq_ice[k]
+            aux_en.HQTcov_rain_dt[k] =
+                outer_src.SH_qt - outer_src.SH * aux_en.q_tot[k] + outer_src.Sqt_H - outer_src.Sqt * aux_en.θ_liq_ice[k]
 
             # ---------------------------------------------------------------------------------- #
             # Storage [w/ quadrature]
@@ -1632,14 +2047,21 @@ function microphysics!(
                     aux_en.ql_tendency_cond_evap[k] = outer_src.NoneqMoistureSources.ql_tendency * aux_en.area[k]
                     aux_en.qi_tendency_sub_dep[k] = outer_src.NoneqMoistureSources.qi_tendency * aux_en.area[k]
                     # OtherMicrophysicsSources
-                    aux_en.qi_tendency_hom_frz[k] = outer_src.OtherMicrophysicsSources.qi_tendency_homogeneous_freezing * aux_en.area[k]
-                    aux_en.qi_tendency_het_frz[k] = outer_src.OtherMicrophysicsSources.qi_tendency_heterogeneous_freezing * aux_en.area[k]
-                    aux_en.qi_tendency_het_nuc[k] = outer_src.OtherMicrophysicsSources.qi_tendency_heterogeneous_icenuc * aux_en.area[k]
+                    aux_en.qi_tendency_hom_frz[k] =
+                        outer_src.OtherMicrophysicsSources.qi_tendency_homogeneous_freezing * aux_en.area[k]
+                    aux_en.qi_tendency_het_frz[k] =
+                        outer_src.OtherMicrophysicsSources.qi_tendency_heterogeneous_freezing * aux_en.area[k]
+                    aux_en.qi_tendency_het_nuc[k] =
+                        outer_src.OtherMicrophysicsSources.qi_tendency_heterogeneous_icenuc * aux_en.area[k]
                     aux_en.qi_tendency_melt[k] = outer_src.OtherMicrophysicsSources.qi_tendency_melting * aux_en.area[k]
                 end
                 # NoneqMoistureSources + OtherMicrophysicsSources
-                aux_en.ql_tendency_noneq[k] = outer_src.NoneqMoistureSources.ql_tendency * aux_en.area[k] + outer_src.OtherMicrophysicsSources.ql_tendency * aux_en.area[k]
-                aux_en.qi_tendency_noneq[k] = outer_src.NoneqMoistureSources.qi_tendency * aux_en.area[k] + outer_src.OtherMicrophysicsSources.qi_tendency * aux_en.area[k]
+                aux_en.ql_tendency_noneq[k] =
+                    outer_src.NoneqMoistureSources.ql_tendency * aux_en.area[k] +
+                    outer_src.OtherMicrophysicsSources.ql_tendency * aux_en.area[k]
+                aux_en.qi_tendency_noneq[k] =
+                    outer_src.NoneqMoistureSources.qi_tendency * aux_en.area[k] +
+                    outer_src.OtherMicrophysicsSources.qi_tendency * aux_en.area[k]
                 # PrecipFormation
                 aux_en.ql_tendency_precip_formation[k] = outer_src.PrecipFormation.ql_tendency * aux_en.area[k]
                 aux_en.qi_tendency_precip_formation[k] = outer_src.PrecipFormation.qi_tendency * aux_en.area[k]
@@ -1654,7 +2076,8 @@ function microphysics!(
                 aux_en.qi_tendency_acnv[k] = outer_src.PrecipFormation.qi_tendency_acnv * aux_en.area[k]
                 aux_en.qi_tendency_acnv_dep[k] = outer_src.PrecipFormation.qi_tendency_acnv_dep * aux_en.area[k]
                 aux_en.qi_tendency_acnv_dep_is[k] = outer_src.PrecipFormation.qi_tendency_acnv_dep_is * aux_en.area[k]
-                aux_en.qi_tendency_acnv_dep_above[k] = outer_src.PrecipFormation.qi_tendency_acnv_dep_above * aux_en.area[k]
+                aux_en.qi_tendency_acnv_dep_above[k] =
+                    outer_src.PrecipFormation.qi_tendency_acnv_dep_above * aux_en.area[k]
                 aux_en.qi_tendency_acnv_agg_mix[k] = outer_src.PrecipFormation.qi_tendency_acnv_agg_mix * aux_en.area[k] # this shoud have already been set but
                 aux_en.qi_tendency_acnv_thresh[k] = outer_src.PrecipFormation.qi_tendency_acnv_thresh * aux_en.area[k] # this shoud have already been set but
                 aux_en.ql_tendency_accr_liq_rai[k] = outer_src.PrecipFormation.ql_tendency_accr_liq_rai * aux_en.area[k]
@@ -1664,11 +2087,12 @@ function microphysics!(
                 aux_en.qi_tendency_accr_ice_rai[k] = outer_src.PrecipFormation.qi_tendency_accr_ice_rai * aux_en.area[k]
                 aux_en.qi_tendency_accr_ice_sno[k] = outer_src.PrecipFormation.qi_tendency_accr_ice_sno * aux_en.area[k]
                 #
-                aux_tc.qs_tendency_accr_rai_sno[k] += outer_src.PrecipFormation.qs_tendency_accr_rai_sno * aux_en.area[k] # we calculate in aux/en for the temperature dependence but store a combined output
+                aux_tc.qs_tendency_accr_rai_sno[k] +=
+                    outer_src.PrecipFormation.qs_tendency_accr_rai_sno * aux_en.area[k] # we calculate in aux/en for the temperature dependence but store a combined output
             end
             # ---------------------------------------------------------------------------------- #
 
-        else 
+        else
             # if variance and covariance are zero do the same as in SA_mean
             # microphysics!(SGSMean(), state, edmf, Δt, param_set, use_fallback_tendency_limiters) # this won't work bc microphysics() goes over all k... rippity lipstick. # # whoops, this is just 1000% wrong... we need to do what microphysics() does, but only for this k...  maybe if we broke out the part that writes as a helper fcn of k we could just call that and then have the sedimentation outside... idk.
 
@@ -1682,21 +2106,89 @@ function microphysics!(
                 w_l = (edmf.cloud_sedimentation_model isa CloudSedimentationModel) ? aux_en.term_vel_liq[k] : FT(0)
                 w_i = (edmf.cloud_sedimentation_model isa CloudSedimentationModel) ? aux_en.term_vel_ice[k] : FT(0)
 
-                (; mph_neq, mph_neq_other, mph_precip) = microphysics_helper(grid, edmf, Δt, param_set, use_fallback_tendency_limiters, aux_en, aux_en_f, k,
-                    aux_en.area[k], aux_en.θ_liq_ice[k], aux_en.q_tot[k], aux_en.q_liq[k], aux_en.q_ice[k], prog_pr.q_rai[k], prog_pr.q_sno[k], aux_en.N_l[k], aux_en.N_i[k], aux_en.N_i_no_boost[k], w_l, w_i, aux_tc.term_vel_rain[k], aux_tc.term_vel_snow[k], ρ_c[k], p_c[k], aux_en.T[k], ts, precip_fraction,
+                (; mph_neq, mph_neq_other, mph_precip) = microphysics_helper(
+                    grid,
+                    edmf,
+                    Δt,
+                    param_set,
+                    use_fallback_tendency_limiters,
+                    aux_en,
+                    aux_en_f,
+                    k,
+                    aux_en.area[k],
+                    aux_en.θ_liq_ice[k],
+                    aux_en.q_tot[k],
+                    aux_en.q_liq[k],
+                    aux_en.q_ice[k],
+                    prog_pr.q_rai[k],
+                    prog_pr.q_sno[k],
+                    aux_en.N_l[k],
+                    aux_en.N_i[k],
+                    aux_en.N_i_no_boost[k],
+                    w_l,
+                    w_i,
+                    aux_tc.term_vel_rain[k],
+                    aux_tc.term_vel_snow[k],
+                    ρ_c[k],
+                    p_c[k],
+                    aux_en.T[k],
+                    ts,
+                    precip_fraction,
                     (aux_en.area[k] > FT(0)) ? aux_en.ql_tendency_sedimentation[k] / aux_en.area[k] : FT(0),
                     (aux_en.area[k] > FT(0)) ? aux_en.ql_tendency_sedimentation_other[k] / aux_en.area[k] : FT(0),
                     (aux_en.area[k] > FT(0)) ? aux_en.qi_tendency_sedimentation[k] / aux_en.area[k] : FT(0),
-                    (aux_en.area[k] > FT(0)) ? aux_en.qi_tendency_sedimentation_other[k] / aux_en.area[k] : FT(0)
-                    ;
-                    q_vap_sat_liq = aux_en.q_vap_sat_liq[k], q_vap_sat_ice = aux_en.q_vap_sat_ice[k], dqvdt = aux_tc.dqvdt[k], dTdt = aux_tc.dTdt[k], w=w[k], tke = aux_en.tke[k], S_i = S_i, τ_liq = aux_en.τ_liq[k], τ_ice = aux_en.τ_ice[k], dN_i_dz = aux_en.dN_i_dz[k], dqidz = aux_en.dqidz[k], N_INP = N_INP, massflux = aux_tc.massflux[k], ∂b∂z = aux_tc.∂b∂z[k], ∂qt∂z = aux_tc.∂qt∂z[k], frac_supersat_liq = aux_en.frac_supersat_liq[k], frac_supersat = aux_en.frac_supersat[k])
-            else                
-                (; mph_neq, mph_neq_other, mph_precip) = microphysics_helper(grid, edmf, Δt, param_set, use_fallback_tendency_limiters, aux_en, aux_en_f, k,
-                    aux_en.area[k], aux_en.θ_liq_ice[k], aux_en.q_tot[k], aux_en.q_liq[k], aux_en.q_ice[k], prog_pr.q_rai[k], prog_pr.q_sno[k], aux_en.N_l[k], aux_en.N_i[k], aux_en.N_i_no_boost[k], w_l, w_i, aux_tc.term_vel_rain[k], aux_tc.term_vel_snow[k], ρ_c[k], p_c[k], aux_en.T[k], ts, precip_fraction,
+                    (aux_en.area[k] > FT(0)) ? aux_en.qi_tendency_sedimentation_other[k] / aux_en.area[k] : FT(0);
+                    q_vap_sat_liq = aux_en.q_vap_sat_liq[k],
+                    q_vap_sat_ice = aux_en.q_vap_sat_ice[k],
+                    dqvdt = aux_tc.dqvdt[k],
+                    dTdt = aux_tc.dTdt[k],
+                    w = w[k],
+                    tke = aux_en.tke[k],
+                    S_i = S_i,
+                    τ_liq = aux_en.τ_liq[k],
+                    τ_ice = aux_en.τ_ice[k],
+                    dN_i_dz = aux_en.dN_i_dz[k],
+                    dqidz = aux_en.dqidz[k],
+                    N_INP = N_INP,
+                    massflux = aux_tc.massflux[k],
+                    ∂b∂z = aux_tc.∂b∂z[k],
+                    ∂qt∂z = aux_tc.∂qt∂z[k],
+                    frac_supersat_liq = aux_en.frac_supersat_liq[k],
+                    frac_supersat = aux_en.frac_supersat[k],
+                )
+            else
+                (; mph_neq, mph_neq_other, mph_precip) = microphysics_helper(
+                    grid,
+                    edmf,
+                    Δt,
+                    param_set,
+                    use_fallback_tendency_limiters,
+                    aux_en,
+                    aux_en_f,
+                    k,
+                    aux_en.area[k],
+                    aux_en.θ_liq_ice[k],
+                    aux_en.q_tot[k],
+                    aux_en.q_liq[k],
+                    aux_en.q_ice[k],
+                    prog_pr.q_rai[k],
+                    prog_pr.q_sno[k],
+                    aux_en.N_l[k],
+                    aux_en.N_i[k],
+                    aux_en.N_i_no_boost[k],
+                    w_l,
+                    w_i,
+                    aux_tc.term_vel_rain[k],
+                    aux_tc.term_vel_snow[k],
+                    ρ_c[k],
+                    p_c[k],
+                    aux_en.T[k],
+                    ts,
+                    precip_fraction,
                     (aux_en.area[k] > FT(0)) ? aux_en.ql_tendency_sedimentation[k] / aux_en.area[k] : FT(0),
                     (aux_en.area[k] > FT(0)) ? aux_en.ql_tendency_sedimentation_other[k] / aux_en.area[k] : FT(0),
                     (aux_en.area[k] > FT(0)) ? aux_en.qi_tendency_sedimentation[k] / aux_en.area[k] : FT(0),
-                    (aux_en.area[k] > FT(0)) ? aux_en.qi_tendency_sedimentation_other[k] / aux_en.area[k] : FT(0)
+                    (aux_en.area[k] > FT(0)) ? aux_en.qi_tendency_sedimentation_other[k] / aux_en.area[k] : FT(0),
                 )
             end
 
@@ -1738,7 +2230,16 @@ function microphysics!(
 
                     if reweight_processes_for_grid  # Equivalent call for updraft is in update_aux.jl. This probably shouldn't rely on  
                         q = TD.PhasePartition(thermo_params, ts_env[k]) # we don't have it cached here but we do in updraft so calculating outside the fcn saves work
-                        q_liq, q_ice = reweight_equilibrium_saturation_adjustment_for_grid(k, grid, param_set, thermo_params, aux_en, q, p_c; reweight_extrema_only = reweight_extrema_only)
+                        q_liq, q_ice = reweight_equilibrium_saturation_adjustment_for_grid(
+                            k,
+                            grid,
+                            param_set,
+                            thermo_params,
+                            aux_en,
+                            q,
+                            p_c;
+                            reweight_extrema_only = reweight_extrema_only,
+                        )
                         aux_en.q_liq[k] = q_liq
                         aux_en.q_ice[k] = q_ice
                     end
@@ -1753,14 +2254,24 @@ function microphysics!(
                 # technically we should still check the edges of the domain since they could be sat even if center is unsat
                 if reweight_processes_for_grid && (moisture_model isa EquilibriumMoisture)
                     q = TD.PhasePartition(thermo_params, ts_env[k]) # we don't have q cached here but we do in updraft so calculating outside the fcn saves work
-                    q_liq, q_ice = reweight_equilibrium_saturation_adjustment_for_grid(k, grid, param_set, thermo_params, aux_en, q, p_c; reweight_extrema_only = reweight_extrema_only)
+                    q_liq, q_ice = reweight_equilibrium_saturation_adjustment_for_grid(
+                        k,
+                        grid,
+                        param_set,
+                        thermo_params,
+                        aux_en,
+                        q,
+                        p_c;
+                        reweight_extrema_only = reweight_extrema_only,
+                    )
                     aux_en.q_liq[k] = q_liq
                     aux_en.q_ice[k] = q_ice
                 end
 
                 aux_en_sat.T[k] = aux_en.T[k]
                 if moisture_model isa NonEquilibriumMoisture # In noneq, not having condensate doesn't guarantee unsat
-                    aux_en_sat.q_vap[k] = min(TD.q_vap_saturation(thermo_params, ts), TD.vapor_specific_humidity(thermo_params, ts)) # having condensate is no guarantee of saturation in noneq
+                    aux_en_sat.q_vap[k] =
+                        min(TD.q_vap_saturation(thermo_params, ts), TD.vapor_specific_humidity(thermo_params, ts)) # having condensate is no guarantee of saturation in noneq
                 else
                     aux_en_sat.q_vap[k] = FT(0) #  i think this is wrong...
                     # aux_en_sat.q_vap[k] = TD.vapor_specific_humidity(thermo_params, ts)
@@ -1805,7 +2316,7 @@ function microphysics!(
             aux_en.qi_tendency_accr_ice_sno[k] = mph_precip.qi_tendency_accr_ice_sno * aux_en.area[k]
             #
             aux_tc.qs_tendency_accr_rai_sno[k] += mph_precip.qs_tendency_accr_rai_sno * aux_en.area[k] # we calculate in aux/en for the temperature dependence but store a combined output
-    
+
 
             aux_en.Hvar_rain_dt[k] = 0
             aux_en.QTvar_rain_dt[k] = 0
@@ -1821,8 +2332,15 @@ end
 Helper function to abstract out sat_adjust and noneq_moisture_sources(), and precipitation_formation() to simplify implementation.
      calculate_sedimentation_sources!() has to be precomputed because it's not clear how it works otherwise, because it depends on vertical gradients which are weird with quadrature...
 """
-function microphysics_helper(grid::Grid, edmf::EDMFModel, Δt::FT, param_set::APS, use_fallback_tendency_limiters::Bool,
-    aux_en::CC.Fields.Field, aux_en_f::CC.Fields.Field, k::Cent{Int64},
+function microphysics_helper(
+    grid::Grid,
+    edmf::EDMFModel,
+    Δt::FT,
+    param_set::APS,
+    use_fallback_tendency_limiters::Bool,
+    aux_en::CC.Fields.Field,
+    aux_en_f::CC.Fields.Field,
+    k::Cent{Int64},
     # vars::NamedTuple{(:qt′qt′, :qt_mean, :θl′θl′, :θl_mean, :θl′qt′, :subdomain_area, :q_rai, :q_sno, :q_liq, :q_ice, :N_i, :term_vel_ice, :term_vel_rain, :term_vel_snow, :ρ_c, :p_c, :precip_frac, :tke), T} where T,
     area::FT,
     θ_liq_ice::FT,
@@ -1888,137 +2406,175 @@ function microphysics_helper(grid::Grid, edmf::EDMFModel, Δt::FT, param_set::AP
     if moisture_model isa NonEquilibriumMoisture
         nonequilibrium_moisture_scheme = moisture_model.scheme # my new addition
         # moisture_sources_limiter = edmf.tendency_limiters.moisture_sources_limiter
-        moisture_sources_limiter = get_tendency_limiter(edmf.tendency_limiters, Val(:moisture_sources), use_fallback_tendency_limiters)
+        moisture_sources_limiter =
+            get_tendency_limiter(edmf.tendency_limiters, Val(:moisture_sources), use_fallback_tendency_limiters)
     else
-        moisture_sources_limiter = get_tendency_limiter(edmf.tendency_limiters, Val(:moisture_sources), use_fallback_tendency_limiters)
+        moisture_sources_limiter =
+            get_tendency_limiter(edmf.tendency_limiters, Val(:moisture_sources), use_fallback_tendency_limiters)
     end
 
 
 
 
     if moisture_model isa NonEquilibriumMoisture
-        mph_neq = noneq_moisture_sources(param_set, nonequilibrium_moisture_scheme, moisture_sources_limiter, area, ρ_c, p, T, Δt + ε, ts, w, q_vap_sat_liq, q_vap_sat_ice, dqvdt, dTdt, τ_liq, τ_ice, aux_en.cloud_fraction[k], aux_en.cloud_fraction[k], aux_en.cloud_fraction[k])
+        mph_neq = noneq_moisture_sources(
+            param_set,
+            nonequilibrium_moisture_scheme,
+            moisture_sources_limiter,
+            area,
+            ρ_c,
+            p,
+            T,
+            Δt + ε,
+            ts,
+            w,
+            q_vap_sat_liq,
+            q_vap_sat_ice,
+            dqvdt,
+            dTdt,
+            τ_liq,
+            τ_ice,
+            aux_en.cloud_fraction[k],
+            aux_en.cloud_fraction[k],
+            aux_en.cloud_fraction[k],
+        )
 
         # if at an extrema, we don't know where the peak is so we'll reweight based on probability of where it could be in between.
         if reweight_processes_for_grid
             error("This won't work because it takes full vector inputs rn... we're only passing in the local scalar")
-            mph_neq = reweight_noneq_moisture_sources_for_grid(k, grid, param_set, thermo_params, aux_en, aux_en_f, mph_neq, nonequilibrium_moisture_scheme, moisture_sources_limiter, Δt, ρ_c, p, w, dqvdt, dTdt; reweight_extrema_only = reweight_extrema_only)
+            mph_neq = reweight_noneq_moisture_sources_for_grid(
+                k,
+                grid,
+                param_set,
+                thermo_params,
+                aux_en,
+                aux_en_f,
+                mph_neq,
+                nonequilibrium_moisture_scheme,
+                moisture_sources_limiter,
+                Δt,
+                ρ_c,
+                p,
+                w,
+                dqvdt,
+                dTdt;
+                reweight_extrema_only = reweight_extrema_only,
+            )
         end
         #
 
 
         # Other microphysics processes (autoconversion, accretion, aggregation, nucleation, etc)
         mph_neq_other = other_microphysics_processes(
-                param_set,
-                moisture_model,
-                nonequilibrium_moisture_scheme,
-                moisture_sources_limiter,
-                area,
-                ρ,
-                p,
-                T,
-                Δt,
-                ts,
-                w,
-                mph_neq.ql_tendency,
-                mph_neq.qi_tendency;
-                N_l = N_l,
-                N_i = N_i
-            )
+            param_set,
+            moisture_model,
+            nonequilibrium_moisture_scheme,
+            moisture_sources_limiter,
+            area,
+            ρ,
+            p,
+            T,
+            Δt,
+            ts,
+            w,
+            mph_neq.ql_tendency,
+            mph_neq.qi_tendency;
+            N_l = N_l,
+            N_i = N_i,
+        )
 
-            q = TD.PhasePartition(thermo_params, ts) # we don't have it cached here but we do in updraft so calculating outside the fcn saves work
-            S_i = TD.supersaturation(thermo_params, q, ρ, T, TD.Ice())
-            N_INP = get_INP_concentration(param_set, moisture_model.scheme, q, T, ρ, w, S_i)
-            
-            # autoconversion and accretion
-            mph_precip = precipitation_formation(
-                param_set,
-                moisture_model,
-                precip_model,
-                cloud_sedimentation_model,
-                rain_formation_model,
-                snow_formation_model,
-                edmf.area_partition_model,
-                q_rai,
-                q_sno,
-                q_liq,
-                q_ice,
-                N_i,
-                term_vel_ice,
-                term_vel_rain,
-                term_vel_snow,
-                area,
-                ρ,
-                p,
-                T,
-                Δt,
-                ts,
-                mph_neq.ql_tendency, # this is the sub-deposition contribution to precip formation
-                mph_neq.qi_tendency, # this is the sub-deposition contribution to precip formation
-                (area > FT(0)) ? qi_tendency_sedimentation : FT(0), # this is the sedimentation contribution to precip formation
-                precip_fraction,
-                get_tendency_limiter(edmf.tendency_limiters, Val(:precipitation), use_fallback_tendency_limiters),
-                tke,
-                N_i_no_boost,
-                S_i,
-                τ_ice,
-                dN_i_dz,
-                dqidz,
-                N_INP,
-                massflux,
-                domain,
-                aux_en.QTvar[k],
-                ∂qt∂z,
-            )
+        q = TD.PhasePartition(thermo_params, ts) # we don't have it cached here but we do in updraft so calculating outside the fcn saves work
+        S_i = TD.supersaturation(thermo_params, q, ρ, T, TD.Ice())
+        N_INP = get_INP_concentration(param_set, moisture_model.scheme, q, T, ρ, w, S_i)
+
+        # autoconversion and accretion
+        mph_precip = precipitation_formation(
+            param_set,
+            moisture_model,
+            precip_model,
+            cloud_sedimentation_model,
+            rain_formation_model,
+            snow_formation_model,
+            edmf.area_partition_model,
+            q_rai,
+            q_sno,
+            q_liq,
+            q_ice,
+            N_i,
+            term_vel_ice,
+            term_vel_rain,
+            term_vel_snow,
+            area,
+            ρ,
+            p,
+            T,
+            Δt,
+            ts,
+            mph_neq.ql_tendency, # this is the sub-deposition contribution to precip formation
+            mph_neq.qi_tendency, # this is the sub-deposition contribution to precip formation
+            (area > FT(0)) ? qi_tendency_sedimentation : FT(0), # this is the sedimentation contribution to precip formation
+            precip_fraction,
+            get_tendency_limiter(edmf.tendency_limiters, Val(:precipitation), use_fallback_tendency_limiters),
+            tke,
+            N_i_no_boost,
+            S_i,
+            τ_ice,
+            dN_i_dz,
+            dqidz,
+            N_INP,
+            massflux,
+            domain,
+            aux_en.QTvar[k],
+            ∂qt∂z,
+        )
     else
 
-            mph_neq = null_NoneqMoistureSources(FT; fill_value = FT(NaN))
-            mph_neq_other = null_OtherMicrophysicsSources(FT; fill_value = FT(NaN))
+        mph_neq = null_NoneqMoistureSources(FT; fill_value = FT(NaN))
+        mph_neq_other = null_OtherMicrophysicsSources(FT; fill_value = FT(NaN))
 
-            q = TD.PhasePartition(thermo_params, ts) # we don't have it cached here but we do in updraft so calculating outside the fcn saves work
-            S_i = TD.supersaturation(thermo_params, q, ρ, T, TD.Ice())
-            N_INP = get_INP_concentration(param_set, moisture_model.scheme, q, T, ρ, w, S_i)
+        q = TD.PhasePartition(thermo_params, ts) # we don't have it cached here but we do in updraft so calculating outside the fcn saves work
+        S_i = TD.supersaturation(thermo_params, q, ρ, T, TD.Ice())
+        N_INP = get_INP_concentration(param_set, moisture_model.scheme, q, T, ρ, w, S_i)
 
 
 
-            mph_precip = precipitation_formation(
-                param_set,
-                moisture_model,
-                precip_model,
-                cloud_sedimentation_model,
-                rain_formation_model,
-                snow_formation_model,
-                edmf.area_partition_model,
-                q_rai,
-                q_sno,
-                q_liq,
-                q_ice,
-                N_i,
-                term_vel_ice,
-                term_vel_rain,
-                term_vel_snow,
-                area,
-                ρ,
-                p,
-                T,
-                Δt,
-                ts,
-                precip_fraction,
-                get_tendency_limiter(edmf.tendency_limiters, Val(:precipitation), use_fallback_tendency_limiters),
-                aux_en.tke
-                ;
-                N_i_no_boost = N_i_no_boost,
-                qi_tendency_sed = qi_tendency_sedimentation,
-                S_i = S_i,
-                τ_sub_dep = τ_ice,
-                dN_i_dz = dN_i_dz,
-                dqidz = dqidz,
-                N_INP = N_INP,
-                massflux = massflux,
-                domain = domain,
-                qt_var = aux_en.QTvar[k],
-                dqtdz = ∂qt∂z,
-            )
+        mph_precip = precipitation_formation(
+            param_set,
+            moisture_model,
+            precip_model,
+            cloud_sedimentation_model,
+            rain_formation_model,
+            snow_formation_model,
+            edmf.area_partition_model,
+            q_rai,
+            q_sno,
+            q_liq,
+            q_ice,
+            N_i,
+            term_vel_ice,
+            term_vel_rain,
+            term_vel_snow,
+            area,
+            ρ,
+            p,
+            T,
+            Δt,
+            ts,
+            precip_fraction,
+            get_tendency_limiter(edmf.tendency_limiters, Val(:precipitation), use_fallback_tendency_limiters),
+            aux_en.tke;
+            N_i_no_boost = N_i_no_boost,
+            qi_tendency_sed = qi_tendency_sedimentation,
+            S_i = S_i,
+            τ_sub_dep = τ_ice,
+            dN_i_dz = dN_i_dz,
+            dqidz = dqidz,
+            N_INP = N_INP,
+            massflux = massflux,
+            domain = domain,
+            qt_var = aux_en.QTvar[k],
+            dqtdz = ∂qt∂z,
+        )
 
     end
 
@@ -2032,13 +2588,19 @@ end
     For future-proofing and ease of maintenance it might be good to be able to take mph_neq, mph_neq_other, mph_precip and just update tendency fields in a separate eqn.
     Note, this does not update sedimentation tendencies (I guess it could though? idk)
 """
-function sgs_mean_update_tendencies!(aux_en::CC.Fields.Field, aux_tc::CC.Fields.Field, k::Cent{Int64}, param_set::APS,
-    mph_neq::NoneqMoistureSources, mph_neq_other::OtherMicrophysicsSources, mph_precip::PrecipFormation,
+function sgs_mean_update_tendencies!(
+    aux_en::CC.Fields.Field,
+    aux_tc::CC.Fields.Field,
+    k::Cent{Int64},
+    param_set::APS,
+    mph_neq::NoneqMoistureSources,
+    mph_neq_other::OtherMicrophysicsSources,
+    mph_precip::PrecipFormation,
     ts::TD.ThermodynamicState,
-    )
+)
 
     error("Not yet implemented")
-    
+
     # Storage
     aux_en.ql_tendency_noneq[k] = mph_neq.ql_tendency * aux_en.area[k]
     aux_en.qi_tendency_noneq[k] = mph_neq.qi_tendency * aux_en.area[k] # add in the sub-deposition conribution to precip formation
@@ -2140,6 +2702,6 @@ function sgs_mean_update_tendencies!(aux_en::CC.Fields.Field, aux_tc::CC.Fields.
     aux_en.qi_tendency_accr_ice_sno[k] = mph_precip.qi_tendency_accr_ice_sno * aux_en.area[k]
     #
     aux_tc.qs_tendency_accr_rai_sno[k] += mph_precip.qs_tendency_accr_rai_sno * aux_en.area[k] # we calculate in aux/en for the temperature dependence but store a combined output
-    
+
     return nothing
 end

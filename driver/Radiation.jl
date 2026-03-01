@@ -133,4 +133,3 @@ function update_radiation(radiation::RadiationBase{RadiationSOCRATES}, state, t:
     end
     return nothing
 end
-    

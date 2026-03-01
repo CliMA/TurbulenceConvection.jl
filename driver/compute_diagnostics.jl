@@ -205,7 +205,7 @@ function compute_diagnostics!(
     # TODO: write this in a mutating-free way using findfirst/findlast/map
 
     if !calibrate_io
-        
+
         wvec = TC.wvec
         aeKHs_bc = -surf.ρs_flux / aux_tc_f.ρ_ae_KH[kf_surf]
 
@@ -218,7 +218,8 @@ function compute_diagnostics!(
         @inbounds for i in 1:N_up
             w_up_i = aux_up_f[i].w
             a_up = aux_up[i].area
-            @. massflux_s += ρ_f * (TC.ᶠinterp_a(a_up) * (w_up_i - TC.toscalar(w_gm)) * (If(aux_up[i].s) - If(aux_gm.s)))
+            @. massflux_s +=
+                ρ_f * (TC.ᶠinterp_a(a_up) * (w_up_i - TC.toscalar(w_gm)) * (If(aux_up[i].s) - If(aux_gm.s)))
         end
         @. aux_gm_f.diffusive_flux_s = -aux_tc_f.ρ_ae_KH * ∇f_en(wvec(aux_en.s))
 

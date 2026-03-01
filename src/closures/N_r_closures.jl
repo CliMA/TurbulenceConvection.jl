@@ -280,7 +280,7 @@ function get_r_cond_precip(param_set::APS, q_type::CMTWaterTypes)
         error("Unknown water type for r_threshold: $q_type")
     end
 end
-get_r_cond_precip(microphys_params::ACMP, q_type::Union{CMT.IceType,CMT.SnowType}) = CMP.r_ice_snow(microphys_params)
+get_r_cond_precip(microphys_params::ACMP, q_type::Union{CMT.IceType, CMT.SnowType}) = CMP.r_ice_snow(microphys_params)
 
 function get_autoconversion_timescale(microphys_params::ACMP, q_type::CMTWaterTypes)
     # FT = eltype(microphys_params)
@@ -292,7 +292,8 @@ function get_autoconversion_timescale(microphys_params::ACMP, q_type::CMTWaterTy
         error("Unknown water type for autoconversion timescale: $q_type")
     end
 end
-get_autoconversion_timescale(param_set::APS, q_type::CMTWaterTypes) = get_autoconversion_timescale(TCP.microphysics_params(param_set), q_type)
+get_autoconversion_timescale(param_set::APS, q_type::CMTWaterTypes) =
+    get_autoconversion_timescale(TCP.microphysics_params(param_set), q_type)
 
 function get_χm(param_set::APS, q_type::CMTWaterTypes)
     FT = eltype(param_set)
@@ -304,7 +305,7 @@ function get_χm(param_set::APS, q_type::CMTWaterTypes)
         return FT(CM1.χm(microphys_params, q_type))
     end
 end
-get_χm(microphys_params::ACMP, q_type::Union{CMT.IceType,CMT.AbstractPrecipType}) = χm(microphys_params, q_type)
+get_χm(microphys_params::ACMP, q_type::Union{CMT.IceType, CMT.AbstractPrecipType}) = χm(microphys_params, q_type)
 
 function get_χa(param_set::APS, q_type::CMTWaterTypes)
     microphys_params = TCP.microphysics_params(param_set)
@@ -313,7 +314,7 @@ end
 get_χa(microphys_params::ACMP, q_type::Union{CMT.AbstractPrecipType}) = χa(microphys_params, q_type)
 
 # ------------------------------- #
-function particle_mass(microphys_params::ACMP, q_type::CMTWaterTypes, r::FT, χm::FT) where FT
+function particle_mass(microphys_params::ACMP, q_type::CMTWaterTypes, r::FT, χm::FT) where {FT}
     """
     Mass of a single droplet.
     Not defined in CM1 for liquid
@@ -324,16 +325,34 @@ function particle_mass(microphys_params::ACMP, q_type::CMTWaterTypes, r::FT, χm
     _Δm::FT = Δm(microphys_params, q_type)
     return χm * _m0 * (r / _r0)^(_me + _Δm)
 end
-particle_mass(microphys_params::ACMP, q_type::Union{CMT.IceType,CMT.AbstractPrecipType}, r::FT) where FT = particle_mass(microphys_params, q_type, r, CM1.χm(microphys_params, q_type))
-particle_mass(param_set::APS, q_type::CMTWaterTypes, r::FT) where FT = particle_mass(TCP.microphysics_params(param_set), q_type, r, get_χm(param_set, q_type))
+particle_mass(microphys_params::ACMP, q_type::Union{CMT.IceType, CMT.AbstractPrecipType}, r::FT) where {FT} =
+    particle_mass(microphys_params, q_type, r, CM1.χm(microphys_params, q_type))
+particle_mass(param_set::APS, q_type::CMTWaterTypes, r::FT) where {FT} =
+    particle_mass(TCP.microphysics_params(param_set), q_type, r, get_χm(param_set, q_type))
 
 # multiple droplets
-mass(microphys_params::ACMP, q_type::CMTWaterTypes, r::FT, N::FT, χm::FT; monodisperse::Bool=true) where FT = monodisperse ? N * particle_mass(microphys_params, q_type, r, χm) : error("Without making assumptions about the distribution, we cannot calculate the mass. If you mean to use gamma distribution, needs param_set, use q_from_rN")
-mass(microphys_params::ACMP, q_type::Union{CMT.IceType,CMT.AbstractPrecipType}, r::FT, N::FT; monodisperse::Bool=true) where FT = monodisperse ? N * particle_mass(microphys_params, q_type, r, CM1.χm(microphys_params, q_type)) : error("Without making assumptions about the distribution, we cannot calculate the mass. If you mean to use gamma distribution, needs param_set, use q_from_rN")
-mass(param_set::APS, q_type::CMTWaterTypes, r::FT, N::FT; monodisperse::Bool=true) where FT = monodisperse ? N * particle_mass(TCP.microphysics_params(param_set), q_type, r, get_χm(param_set, q_type)) : q_from_rN(param_set, q_type, r, N; monodisperse=false, ρ=FT(1), μ=FT(0))
+mass(microphys_params::ACMP, q_type::CMTWaterTypes, r::FT, N::FT, χm::FT; monodisperse::Bool = true) where {FT} =
+    monodisperse ? N * particle_mass(microphys_params, q_type, r, χm) :
+    error(
+        "Without making assumptions about the distribution, we cannot calculate the mass. If you mean to use gamma distribution, needs param_set, use q_from_rN",
+    )
+mass(
+    microphys_params::ACMP,
+    q_type::Union{CMT.IceType, CMT.AbstractPrecipType},
+    r::FT,
+    N::FT;
+    monodisperse::Bool = true,
+) where {FT} =
+    monodisperse ? N * particle_mass(microphys_params, q_type, r, CM1.χm(microphys_params, q_type)) :
+    error(
+        "Without making assumptions about the distribution, we cannot calculate the mass. If you mean to use gamma distribution, needs param_set, use q_from_rN",
+    )
+mass(param_set::APS, q_type::CMTWaterTypes, r::FT, N::FT; monodisperse::Bool = true) where {FT} =
+    monodisperse ? N * particle_mass(TCP.microphysics_params(param_set), q_type, r, get_χm(param_set, q_type)) :
+    q_from_rN(param_set, q_type, r, N; monodisperse = false, ρ = FT(1), μ = FT(0))
 
 # ------------------------------- #
-function particle_radius_from_mass(microphys_params::ACMP, q_type::CMTWaterTypes, m::FT, χm::FT;) where FT
+function particle_radius_from_mass(microphys_params::ACMP, q_type::CMTWaterTypes, m::FT, χm::FT;) where {FT}
     """
     Radius of a single droplet given its mass.
     m(r) = χm * m0 * (r/r0)^(me + Δm) --> r(m) = r0 * (m / (χm * m0))^(1 / (me + Δm))
@@ -347,11 +366,27 @@ function particle_radius_from_mass(microphys_params::ACMP, q_type::CMTWaterTypes
 
     return _r0 * (m / (χm * _m0))^(1 / (_me + _Δm))
 end
-particle_radius_from_mass(microphys_params::ACMP, q_type::Union{CMT.IceType,CMT.AbstractPrecipType}, m::FT;) where FT = particle_radius_from_mass(microphys_params, q_type, m, CM1.χm(microphys_params, q_type))
-particle_radius_from_mass(param_set::APS, q_type::CMTWaterTypes, m::FT;) where FT = particle_radius_from_mass(TCP.microphysics_params(param_set), q_type, m, get_χm(param_set, q_type))
+particle_radius_from_mass(
+    microphys_params::ACMP,
+    q_type::Union{CMT.IceType, CMT.AbstractPrecipType},
+    m::FT;
+) where {FT} = particle_radius_from_mass(microphys_params, q_type, m, CM1.χm(microphys_params, q_type))
+particle_radius_from_mass(param_set::APS, q_type::CMTWaterTypes, m::FT;) where {FT} =
+    particle_radius_from_mass(TCP.microphysics_params(param_set), q_type, m, get_χm(param_set, q_type))
 
 # multiple droplets
-function radius_from_mass(microphys_params::ACMP, q_type::CMTWaterTypes, q::FT, N::FT, χm::FT; monodisperse::Bool=true, ρ::FT=FT(1), Dmin::FT=FT(0), Dmax::FT=FT(Inf), μ::FT=FT(0)) where FT
+function radius_from_mass(
+    microphys_params::ACMP,
+    q_type::CMTWaterTypes,
+    q::FT,
+    N::FT,
+    χm::FT;
+    monodisperse::Bool = true,
+    ρ::FT = FT(1),
+    Dmin::FT = FT(0),
+    Dmax::FT = FT(Inf),
+    μ::FT = FT(0),
+) where {FT}
     if monodisperse
         return particle_radius_from_mass(microphys_params, q_type, q / N, χm)
     else
@@ -369,18 +404,23 @@ function radius_from_mass(microphys_params::ACMP, q_type::CMTWaterTypes, q::FT, 
             λ = (factor * G_num / G_den / (q / N))^(1 / (_me + _Δm))
 
             return (μ + 1) / λ
-            error("haven't implemented this yet. Need to find the closed form sol'n for q, then solve for n0, λ, then <r>")
+            error(
+                "haven't implemented this yet. Need to find the closed form sol'n for q, then solve for n0, λ, then <r>",
+            )
         else
             error("Without making assumptions about the distribution, we cannot calculate the mass of a single droplet")
         end
     end
 end
-radius_from_mass(microphys_params::ACMP, q::FT, N::FT, χm::FT; monodisperse::Bool=true) where FT = monodisperse ? particle_radius_from_mass(microphys_params, CMT.LiquidType(), q / N, χm) : error("Without making assumptions about the distribution, we cannot calculate the mass of a single droplet")
-radius_from_mass(param_set::APS, q_type::CMTWaterTypes, q::FT, N::FT; monodisperse::Bool=true) where FT = particle_radius_from_mass(TCP.microphysics_params(param_set), q_type, q / N, get_χm(param_set, q_type))
+radius_from_mass(microphys_params::ACMP, q::FT, N::FT, χm::FT; monodisperse::Bool = true) where {FT} =
+    monodisperse ? particle_radius_from_mass(microphys_params, CMT.LiquidType(), q / N, χm) :
+    error("Without making assumptions about the distribution, we cannot calculate the mass of a single droplet")
+radius_from_mass(param_set::APS, q_type::CMTWaterTypes, q::FT, N::FT; monodisperse::Bool = true) where {FT} =
+    particle_radius_from_mass(TCP.microphysics_params(param_set), q_type, q / N, get_χm(param_set, q_type))
 # ------------------------------- #
 
 
-function particle_area(microphys_params::ACMP, q_type::CMTWaterTypes, r::FT, χa::FT) where FT
+function particle_area(microphys_params::ACMP, q_type::CMTWaterTypes, r::FT, χa::FT) where {FT}
     """
     Area of a single droplet.
     Not defined in CM1 for liquid or ice
@@ -392,10 +432,23 @@ function particle_area(microphys_params::ACMP, q_type::CMTWaterTypes, r::FT, χa
     _Δa::FT = Δa(microphys_params, q_type)
     return χa * _a0 * (r / _r0)^(_Δa + _ae)
 end
-particle_area(microphys_params::ACMP, q_type::CMT.AbstractPrecipType, r::FT) where FT = particle_area(microphys_params, q_type, r, CM1.χa(microphys_params, q_type))
-particle_area(param_set::APS, q_type::CMTWaterTypes, r::FT) where FT = particle_area(TCP.microphysics_params(param_set), q_type, r, get_χa(param_set, q_type))
+particle_area(microphys_params::ACMP, q_type::CMT.AbstractPrecipType, r::FT) where {FT} =
+    particle_area(microphys_params, q_type, r, CM1.χa(microphys_params, q_type))
+particle_area(param_set::APS, q_type::CMTWaterTypes, r::FT) where {FT} =
+    particle_area(TCP.microphysics_params(param_set), q_type, r, get_χa(param_set, q_type))
 
-function area(microphys_params::ACMP, q_type::CMTWaterTypes, r::FT, N::FT, χa::FT; ρ::FT=FT(1), Dmin::FT=FT(0), Dmax::FT=FT(Inf), μ::FT=FT(0), monodisperse::Bool=true) where FT
+function area(
+    microphys_params::ACMP,
+    q_type::CMTWaterTypes,
+    r::FT,
+    N::FT,
+    χa::FT;
+    ρ::FT = FT(1),
+    Dmin::FT = FT(0),
+    Dmax::FT = FT(Inf),
+    μ::FT = FT(0),
+    monodisperse::Bool = true,
+) where {FT}
     """
     Integrates the distribution ∫ n(r) a(r) dr
     """
@@ -411,7 +464,7 @@ function area(microphys_params::ACMP, q_type::CMTWaterTypes, r::FT, N::FT, χa::
             # using <r> = (μ+1)/(λ)
             λ = (μ + 1) / r
             n0 = N * λ # N = n0 / λ
-            q = int_nm_dr(microphys_params, q_type, n0, λ, ρ, μ; Dmin=Dmin, Dmax=Dmax)
+            q = int_nm_dr(microphys_params, q_type, n0, λ, ρ, μ; Dmin = Dmin, Dmax = Dmax)
 
         else
             # If Dmin or Dmax are not 0 or Inf, we cannot calculate the area without more information about the distribution.
@@ -420,8 +473,10 @@ function area(microphys_params::ACMP, q_type::CMTWaterTypes, r::FT, N::FT, χa::
         end
     end
 end
-area(microphys_params::ACMP, q_type::CMT.AbstractPrecipType, r::FT, N::FT; monodisperse::Bool=true) where FT = area(microphys_params, q_type, r, N, CM1.χa(microphys_params, q_type); monodisperse=monodisperse)
-area(param_set::APS, q_type::CMTWaterTypes, r::FT, N::FT; monodisperse::Bool=true) where FT = area(TCP.microphysics_params(param_set), q_type, r, N, get_χa(param_set, q_type); monodisperse=monodisperse)
+area(microphys_params::ACMP, q_type::CMT.AbstractPrecipType, r::FT, N::FT; monodisperse::Bool = true) where {FT} =
+    area(microphys_params, q_type, r, N, CM1.χa(microphys_params, q_type); monodisperse = monodisperse)
+area(param_set::APS, q_type::CMTWaterTypes, r::FT, N::FT; monodisperse::Bool = true) where {FT} =
+    area(TCP.microphysics_params(param_set), q_type, r, N, get_χa(param_set, q_type); monodisperse = monodisperse)
 
 # TODO: area(microphys_params::ACMP, q_type::CMTWaterTypes, r::FT, q::FT, χa::FT) which can be non-monodisperse...
 
@@ -432,10 +487,7 @@ area(param_set::APS, q_type::CMTWaterTypes, r::FT, N::FT; monodisperse::Bool=tru
 
 # ======================================================================================================================== #
 
-function q_is(
-    param_set::APS,
-    q_type::CMT.IceType,
-)
+function q_is(param_set::APS, q_type::CMT.IceType)
     """
     The mass of a droplet of the ice/snow threshold radius
     """
@@ -445,10 +497,7 @@ function q_is(
 end
 
 
-function q_lr(
-    param_set::APS,
-    q_type::CMT.LiquidType,
-)
+function q_lr(param_set::APS, q_type::CMT.LiquidType)
     """
     No trivial equivalent for liquid because r_lr is in user_params, and we kind of added it ourselves.
     """
@@ -458,24 +507,20 @@ function q_lr(
 
 end
 
-function r_ice_acnv(
-    param_set::APS,
-    r_acnv_scaling_factor=eltype(param_set)(NaN),
-)
+function r_ice_acnv(param_set::APS, r_acnv_scaling_factor = eltype(param_set)(NaN))
     """
     r_ice_acnv = r_is * r_acnv_scaling_factor
     """
     FT = eltype(param_set)
     particle_min_radius::FT = param_set.user_params.particle_min_radius
-    r_acnv_scaling_factor = isnan(r_acnv_scaling_factor) ? FT(param_set.user_params.r_ice_acnv_scaling_factor) : r_acnv_scaling_factor
+    r_acnv_scaling_factor =
+        isnan(r_acnv_scaling_factor) ? FT(param_set.user_params.r_ice_acnv_scaling_factor) : r_acnv_scaling_factor
     # return CMP.r_ice_snow(microphys_params) * FT(r_acnv_scaling_factor) # r_acnv_scaling_factor can become small enough that it's not allowed
-    return particle_min_radius + (CMP.r_ice_snow(TCP.microphysics_params(param_set)) - particle_min_radius) * FT(r_acnv_scaling_factor)
+    return particle_min_radius +
+           (CMP.r_ice_snow(TCP.microphysics_params(param_set)) - particle_min_radius) * FT(r_acnv_scaling_factor)
 end
 
-function r_liq_acnv(
-    param_set::APS,
-    r_acnv_scaling_factor=eltype(param_set)(1),
-)
+function r_liq_acnv(param_set::APS, r_acnv_scaling_factor = eltype(param_set)(1))
     """
     r_liq_acnv = r_lr * r_acnv_scaling_factor
     """
@@ -485,18 +530,16 @@ function r_liq_acnv(
     return particle_min_radius + (param_set.user_params.r_liq_rain - particle_min_radius) * FT(r_acnv_scaling_factor)
 end
 
-function r_acnv(
-    param_set::APS,
-    q_type::CMTWaterTypes,
-    r_acnv_scaling_factor=eltype(param_set)(NaN),
-)
+function r_acnv(param_set::APS, q_type::CMTWaterTypes, r_acnv_scaling_factor = eltype(param_set)(NaN))
     """
     The acnv radius for the given q_type
     """
     FT = eltype(param_set)
     # microphys_params::ACMP = TCP.microphysics_params(param_set)
     if q_type isa CMT.IceType
-        r_acnv_scaling_factor::FT = isnan(r_acnv_scaling_factor) ? FT(param_set.user_params.r_ice_acnv_scaling_factor) : FT(r_acnv_scaling_factor)
+        r_acnv_scaling_factor::FT =
+            isnan(r_acnv_scaling_factor) ? FT(param_set.user_params.r_ice_acnv_scaling_factor) :
+            FT(r_acnv_scaling_factor)
         return r_ice_acnv(param_set, FT(r_acnv_scaling_factor))
     elseif q_type isa CMT.LiquidType
         r_acnv_scaling_factor = isnan(r_acnv_scaling_factor) ? FT(1) : FT(r_acnv_scaling_factor)
@@ -508,11 +551,7 @@ end
 
 
 
-function q_acnv_0(
-    param_set::APS,
-    ice_type::CMT.IceType,
-    r_acnv_scaling_factor=1,
-)
+function q_acnv_0(param_set::APS, ice_type::CMT.IceType, r_acnv_scaling_factor = 1)
     """
     The mass of a droplet of the acnv radius
     """
@@ -523,11 +562,7 @@ function q_acnv_0(
 end
 
 
-function q_acnv_0(
-    param_set::APS,
-    liq_type::CMT.LiquidType,
-    r_acnv_scaling_factor=1,
-)
+function q_acnv_0(param_set::APS, liq_type::CMT.LiquidType, r_acnv_scaling_factor = 1)
     """
     The mass of a droplet of the acnv radius
     """
@@ -546,7 +581,7 @@ function get_N_threshold(
     param_set::APS, # consider changing to just microphys_params since we're not using user_params anymore
     q_type::CMT.IceType,
     ;
-    N=eltype(param_set)(NaN),
+    N = eltype(param_set)(NaN),
 )
     FT = eltype(param_set)
     if isnan(N)
@@ -566,7 +601,7 @@ function get_q_threshold( # symmetric method for ice
     param_set::APS,  # consider changing to just microphys_params since we're not using user_params anymore
     ::CMT.LiquidType,
     ;
-    N=eltype(param_set)(NaN),
+    N = eltype(param_set)(NaN),
 )
     # right now we don't have the threshold dependent on N, we just use relaxatin to a fixed thresh. We don't even have r_liq_rai so his is really just a fallback method 
     FT = eltype(param_set)
@@ -586,7 +621,7 @@ function get_q_threshold(
     param_set::APS,  # consider changing to just microphys_params since we're not using user_params anymore
     q_type::CMT.IceType,
     ;
-    N=eltype(param_set)(NaN),
+    N = eltype(param_set)(NaN),
 )
 
     FT = eltype(param_set)
@@ -595,7 +630,7 @@ function get_q_threshold(
     if isnan(N)
         return CMP.q_ice_threshold(microphys_params)::FT
     else
-        N_thresh::FT = get_N_threshold(param_set, q_type; N=FT(N)) # if N was nothing, get_N_threshold() makes N_thresh * q_is = q_threshold (we could add an if block check for that to save fcn calls...)
+        N_thresh::FT = get_N_threshold(param_set, q_type; N = FT(N)) # if N was nothing, get_N_threshold() makes N_thresh * q_is = q_threshold (we could add an if block check for that to save fcn calls...)
         q_is_here::FT = q_is(param_set, q_type)
         return N_thresh * q_is_here  # q_is is the volume of a single ice crystal, so N * q_is = q_threshold
     end
@@ -610,9 +645,9 @@ function get_q_threshold_acnv(
     param_set::APS,  # consider changing to just microphys_params since we're not using user_params anymore
     q_type::CMT.IceType,
     ;
-    N=eltype(param_set)(NaN),
-    assume_N_is::Bool=true,
-    r_acnv_scaling_factor=eltype(param_set)(1.0),
+    N = eltype(param_set)(NaN),
+    assume_N_is::Bool = true,
+    r_acnv_scaling_factor = eltype(param_set)(1.0),
 )
 
     FT = eltype(param_set)
@@ -628,7 +663,7 @@ function get_q_threshold_acnv(
 
     else
         # We can't use `ice_dep_acnv_scaling_factor`  bc we allow for an r_min that impacts N, we have a separate scaling factor here.
-        N_thresh::FT = get_N_threshold(param_set, q_type; N=FT(N)) # either take the given N or use the threshold N that assumes we're already at r_is
+        N_thresh::FT = get_N_threshold(param_set, q_type; N = FT(N)) # either take the given N or use the threshold N that assumes we're already at r_is
         q_acnv_0_here::FT = q_acnv_0(param_set, q_type, FT(r_acnv_scaling_factor)) # this is the q_acnv_0 at the given r_is * r_acnv_scaling_factor
         q_thresh_acnv::FT = N_thresh * q_acnv_0_here # q_is is the volume of a single ice crystal, so N * q_is = q_threshold
     end
@@ -642,38 +677,59 @@ end
 function my_conv_q_liq_to_q_rai(
     param_set::APS,   # consider changing to just microphys_params since we're not using user_params anymore
     q::TD.PhasePartition{FT};
-    N::FT=FT(NaN),
+    N::FT = FT(NaN),
 ) where {FT}
     microphys_params::ACMP = TCP.microphysics_params(param_set)
-    return max(0, q.liq - get_q_threshold(param_set, CMT.LiquidType(); N=N)) / CMP.τ_acnv_rai(microphys_params)
+    return max(0, q.liq - get_q_threshold(param_set, CMT.LiquidType(); N = N)) / CMP.τ_acnv_rai(microphys_params)
 end
 
 # copy of CM1.conv_q_ice_to_q_sno_no_supersat that uses our local get_q_threshold if we supply N otherwise just uses the default q_ice_threshold
 function my_conv_q_ice_to_q_sno_no_supersat(
     param_set::APS,  # consider changing to just microphys_params since we're not using user_params anymore
-    qi::FT
-    ;
-    N::FT=FT(NaN),
-    τ::FT=FT(NaN),
-    assume_N_is::Bool=true,
-    r_acnv_scaling_factor::FT=FT(1)
+    qi::FT;
+    N::FT = FT(NaN),
+    τ::FT = FT(NaN),
+    assume_N_is::Bool = true,
+    r_acnv_scaling_factor::FT = FT(1),
 ) where {FT}
     microphys_params::ACMP = TCP.microphysics_params(param_set)
     if isnan(τ)
         τ = CMP.τ_acnv_sno(microphys_params)
     end
-    return max(0, qi - get_q_threshold_acnv(param_set, CMT.IceType(); N=N, assume_N_is=assume_N_is, r_acnv_scaling_factor=r_acnv_scaling_factor)) / τ
+    return max(
+        0,
+        qi - get_q_threshold_acnv(
+            param_set,
+            CMT.IceType();
+            N = N,
+            assume_N_is = assume_N_is,
+            r_acnv_scaling_factor = r_acnv_scaling_factor,
+        ),
+    ) / τ
 end
 
-my_conv_q_ice_to_q_sno_no_supersat(param_set::APS, q::TD.PhasePartition{FT}; N=FT(NaN), τ=FT(NaN), assume_N_is=true, r_acnv_scaling_factor=FT(1)) where {FT} =
-    my_conv_q_ice_to_q_sno_no_supersat(param_set, q.ice; N=FT(N), τ=FT(τ), assume_N_is=assume_N_is, r_acnv_scaling_factor=FT(r_acnv_scaling_factor))
+my_conv_q_ice_to_q_sno_no_supersat(
+    param_set::APS,
+    q::TD.PhasePartition{FT};
+    N = FT(NaN),
+    τ = FT(NaN),
+    assume_N_is = true,
+    r_acnv_scaling_factor = FT(1),
+) where {FT} = my_conv_q_ice_to_q_sno_no_supersat(
+    param_set,
+    q.ice;
+    N = FT(N),
+    τ = FT(τ),
+    assume_N_is = assume_N_is,
+    r_acnv_scaling_factor = FT(r_acnv_scaling_factor),
+)
 
 
 function my_conv_q_ice_to_q_sno_no_supersat_simple(
     param_set::APS,  # consider changing to just microphys_params since we're not using user_params anymore
     qi::FT,
     qi_threshold::FT,
-    τ::FT=FT(NaN),
+    τ::FT = FT(NaN),
 ) where {FT}
     microphys_params::ACMP = TCP.microphysics_params(param_set)
     if isnan(τ)
@@ -682,7 +738,12 @@ function my_conv_q_ice_to_q_sno_no_supersat_simple(
     return max(0, qi - qi_threshold) / τ
 end
 
-my_conv_q_ice_to_q_sno_no_supersat_simple(param_set::APS, q::TD.PhasePartition{FT}, qi_threshold::FT, τ::FT=FT(NaN)) where {FT} = my_conv_q_ice_to_q_sno_no_supersat_simple(param_set, q.ice, qi_threshold, τ)
+my_conv_q_ice_to_q_sno_no_supersat_simple(
+    param_set::APS,
+    q::TD.PhasePartition{FT},
+    qi_threshold::FT,
+    τ::FT = FT(NaN),
+) where {FT} = my_conv_q_ice_to_q_sno_no_supersat_simple(param_set, q.ice, qi_threshold, τ)
 
 
 """
@@ -697,12 +758,12 @@ function my_conv_q_ice_to_q_sno(
     q::TD.PhasePartition{FT},
     T::FT,
     p::FT;
-    N::FT=FT(NaN),
+    N::FT = FT(NaN),
     # τ::FT = FT(NaN), # This doesn't get used, if we have N we just use that...
-    Dmin::FT=FT(0),
-    Dmax::FT=FT(Inf),
-    μ::FT=FT(NaN),
-    thresh_only::Bool=false
+    Dmin::FT = FT(0),
+    Dmax::FT = FT(Inf),
+    μ::FT = FT(NaN),
+    thresh_only::Bool = false,
 ) where {FT}
 
     acnv_rate = FT(0)
@@ -716,7 +777,7 @@ function my_conv_q_ice_to_q_sno(
     if (q.ice > FT(0) && _S > FT(0))
 
         if isnan(μ)
-            μ = μ_from_qN(param_set, ice_type, q.ice, N; ρ=ρ)
+            μ = μ_from_qN(param_set, ice_type, q.ice, N; ρ = ρ)
         end
 
         _G::FT = CM.Common.G_func(microphys_params, T, TD.Ice())
@@ -724,19 +785,17 @@ function my_conv_q_ice_to_q_sno(
 
         _r_ice_snow::FT = CMP.r_ice_snow(microphys_params)
         # _n0::FT = n0(microphys_params, FT(0), ρ, ice_type)
-        _n0::FT = isnan(N) ? n0(microphys_params, q.ice, ρ, ice_type) : n0(param_set, q.ice, ρ, ice_type, N; μ=μ, Dmin=Dmin, Dmax=Dmax) # use wanted N If given
+        _n0::FT =
+            isnan(N) ? n0(microphys_params, q.ice, ρ, ice_type) :
+            n0(param_set, q.ice, ρ, ice_type, N; μ = μ, Dmin = Dmin, Dmax = Dmax) # use wanted N If given
         _me::FT = me(microphys_params, ice_type)
         _Δm::FT = Δm(microphys_params, ice_type)
         # _λ::FT = lambda(microphys_params, CT.IceType(), q.ice, ρ)
-        _λ::FT = lambda(param_set, ice_type, q.ice, ρ, N, Dmin, Dmax; μ=μ, _n0=_n0)
+        _λ::FT = lambda(param_set, ice_type, q.ice, ρ, N, Dmin, Dmax; μ = μ, _n0 = _n0)
 
         # note term 1 is particles exactly at r_ice_snow, crossing over. term 2 is particles already larger than r_ice_snow.
         if thresh_only # only particles that are growing past r_ice_snow, not particles that were already larger.
-            acnv_rate =
-                4 * FT(π) * _S * _G * _n0 / ρ *
-                (
-                    _r_ice_snow^(μ + FT(2)) * exp(-_λ * _r_ice_snow) / (_me + _Δm)
-                )
+            acnv_rate = 4 * FT(π) * _S * _G * _n0 / ρ * (_r_ice_snow^(μ + FT(2)) * exp(-_λ * _r_ice_snow) / (_me + _Δm))
         else  # our default... include everything
             # acnv_rate =
             #     4 * FT(π) * _S * _G * _n0 / ρ *
@@ -748,8 +807,7 @@ function my_conv_q_ice_to_q_sno(
 
             # updated μ aware version
             acnv_rate =
-                4 * FT(π) * _S * _G * _n0 / ρ *
-                (
+                4 * FT(π) * _S * _G * _n0 / ρ * (
                     _r_ice_snow^(μ + FT(2)) * exp(-_λ * _r_ice_snow) / (_me + _Δm) +
                     CM1.SF.gamma(μ + FT(2), _λ * _r_ice_snow) / _λ^(μ + FT(2))
                 )
@@ -914,26 +972,26 @@ function get_process_threshold_fraction(
     N::FT,
     ρ_a::FT,
     r_th::FT;
-    k::Int=Int(1), # default to radius weighting... for something like deposition which goes as dm/dt = S/τ where τ = (4πDr)⁻¹ ∝ r, so the mass contribution is linear in r. Then it's just a matter of doing the integral r^k n(r) and getting the fraction out.
-    Dmax=FT(Inf),
-    return_below::Bool=false, # default to returning fraction above.
-    μ=FT(NaN),
-    add_dry_aerosol_mass::Bool=false, # if true, add the dry aerosol mass to q when calculating λ and n0
+    k::Int = Int(1), # default to radius weighting... for something like deposition which goes as dm/dt = S/τ where τ = (4πDr)⁻¹ ∝ r, so the mass contribution is linear in r. Then it's just a matter of doing the integral r^k n(r) and getting the fraction out.
+    Dmax = FT(Inf),
+    return_below::Bool = false, # default to returning fraction above.
+    μ = FT(NaN),
+    add_dry_aerosol_mass::Bool = false, # if true, add the dry aerosol mass to q when calculating λ and n0
 ) where {FT}
 
     microphys_params = TCP.microphysics_params(param_set)
 
     # μ is the shape parameter of the gamma distribution
     if isnan(μ)
-        μ = μ_from_qN(param_set, q_type, q, N; ρ=ρ_a)
+        μ = μ_from_qN(param_set, q_type, q, N; ρ = ρ_a)
     end
 
     if add_dry_aerosol_mass
-        q += mass(param_set, q_type, param_set.user_params.particle_min_radius, N; monodisperse=true) / ρ_a # add the dry aerosol mass to q when calculating λ and n0
+        q += mass(param_set, q_type, param_set.user_params.particle_min_radius, N; monodisperse = true) / ρ_a # add the dry aerosol mass to q when calculating λ and n0
     end
 
     # get the number distribution parameters
-    _, λ = get_n0_lambda(microphys_params, q_type, q, ρ_a, N, μ; Dmax=Dmax, add_dry_aerosol_mass=false)
+    _, λ = get_n0_lambda(microphys_params, q_type, q, ρ_a, N, μ; Dmax = Dmax, add_dry_aerosol_mass = false)
 
     ξ = λ * r_th
 
@@ -978,13 +1036,23 @@ function my_conv_q_ice_to_q_sno_by_fraction(
     q::FT,
     N::FT,
     ρ_a::FT,
-    add_dry_aerosol_mass::Bool=true,
+    add_dry_aerosol_mass::Bool = true,
 ) where {FT}
     acnv_rate = FT(0)
     if qi_tendency_sub_dep > FT(0)
         microphys_params = TCP.microphysics_params(param_set)
         r_is = CMP.r_ice_snow(microphys_params)
-        fraction_to_snow = get_process_threshold_fraction(param_set, ice_type, q, N, ρ_a, r_is; k=1, return_below=false, add_dry_aerosol_mass=add_dry_aerosol_mass) # radius weighting for deposition
+        fraction_to_snow = get_process_threshold_fraction(
+            param_set,
+            ice_type,
+            q,
+            N,
+            ρ_a,
+            r_is;
+            k = 1,
+            return_below = false,
+            add_dry_aerosol_mass = add_dry_aerosol_mass,
+        ) # radius weighting for deposition
         acnv_rate = fraction_to_snow * qi_tendency_sub_dep
     end
     return resolve_nan(acnv_rate, FT(0)) # if we get a NaN, just return 0... (n0 and lambda can blow up for very small q which map to no conv)
@@ -1050,11 +1118,11 @@ function get_fraction_below_or_above_thresh_from_qN(
     N::FT,
     ρ_a::FT,
     r_th::FT;
-    return_N::Bool=false,
-    below_thresh::Bool=true,
-    return_fraction::Bool=true,
-    μ::FT=FT(NaN),
-    Dmax::FT=FT(Inf)
+    return_N::Bool = false,
+    below_thresh::Bool = true,
+    return_fraction::Bool = true,
+    μ::FT = FT(NaN),
+    Dmax::FT = FT(Inf),
 ) where {FT}
 
     if !isfinite(q) || !isfinite(N)
@@ -1065,11 +1133,11 @@ function get_fraction_below_or_above_thresh_from_qN(
 
     # Determine μ if not provided
     if isnan(μ)
-        μ = μ_from_qN(param_set, q_type, q, N; ρ=ρ_a)
+        μ = μ_from_qN(param_set, q_type, q, N; ρ = ρ_a)
     end
 
     # Get number distribution parameter λ
-    _, λ = get_n0_lambda(microphys_params, q_type, q, ρ_a, N, μ; Dmax=Dmax)
+    _, λ = get_n0_lambda(microphys_params, q_type, q, ρ_a, N, μ; Dmax = Dmax)
 
     # Exponent k: number fraction -> 0, mass fraction -> me + Δm
     _me = me(microphys_params, q_type)
@@ -1174,8 +1242,8 @@ function my_conv_q_ice_to_q_sno_at_r_is_given_qi_tendency_sub_dep_old(
     q::FT,
     N::FT,
     ρ_a::FT;
-    Dmax::FT=FT(Inf),
-    μ::FT=FT(NaN)
+    Dmax::FT = FT(Inf),
+    μ::FT = FT(NaN),
 ) where {FT}
 
     # condensed mass per unit volume
@@ -1185,11 +1253,11 @@ function my_conv_q_ice_to_q_sno_at_r_is_given_qi_tendency_sub_dep_old(
     if (q > FT(0)) && (qi_tendency_sub_dep > FT(0))
         microphys_params = TCP.microphysics_params(param_set)
         if isnan(μ)
-            μ = μ_from_qN(param_set, ice_type, q, N; ρ=ρ_a)
+            μ = μ_from_qN(param_set, ice_type, q, N; ρ = ρ_a)
         end
 
         # get the number distribution parameters
-        n0, λ = get_n0_lambda(microphys_params, ice_type, q, ρ_a, N, μ; Dmax=Dmax)
+        n0, λ = get_n0_lambda(microphys_params, ice_type, q, ρ_a, N, μ; Dmax = Dmax)
 
 
         _r0::FT = r0(microphys_params, ice_type)
@@ -1253,8 +1321,8 @@ function my_conv_q_ice_to_q_sno_at_r_is_given_qi_tendency_sub_dep(
     q::FT,
     N::FT,
     ρ_a::FT;
-    Dmax::FT=FT(Inf),
-    μ::FT=FT(NaN)
+    Dmax::FT = FT(Inf),
+    μ::FT = FT(NaN),
 ) where {FT}
 
     acnv_rate = zero(FT)
@@ -1265,11 +1333,11 @@ function my_conv_q_ice_to_q_sno_at_r_is_given_qi_tendency_sub_dep(
 
         # shape parameter
         if isnan(μ)
-            μ = μ_from_qN(param_set, ice_type, q, N; ρ=ρ_a)
+            μ = μ_from_qN(param_set, ice_type, q, N; ρ = ρ_a)
         end
 
         # get gamma distribution parameters
-        _, λ = get_n0_lambda(microphys_params, ice_type, q, ρ_a, N, μ; Dmax=Dmax)
+        _, λ = get_n0_lambda(microphys_params, ice_type, q, ρ_a, N, μ; Dmax = Dmax)
 
         # mass–radius law parameters
         _me = me(microphys_params, ice_type)
@@ -1298,12 +1366,14 @@ function invert__my_conv_q_ice_to_q_sno_at_r_is_given_qi_tendency_sub_dep__to_N(
     acnv_rate::FT,
     q::FT,
     ρ_a::FT;
-    Dmax::FT=FT(Inf),
-    μ::FT=FT(0),
-    branch::Int=0
+    Dmax::FT = FT(Inf),
+    μ::FT = FT(0),
+    branch::Int = 0,
 ) where {FT}
 
-    error("I'm not sure if this form is completely up to date -- see the python version for fully correct form - it's not really usable though except for exact inversion because the range of valid acnv_rates is so small")
+    error(
+        "I'm not sure if this form is completely up to date -- see the python version for fully correct form - it's not really usable though except for exact inversion because the range of valid acnv_rates is so small",
+    )
 
     N = FT(NaN)
 
@@ -1389,18 +1459,18 @@ function get_thresh_and_my_conv_q_ice_to_q_sno_thresh(
     param_set::APS,  # consider changing to just microphys_params since we're not using user_params anymore
     qi::FT,
     p::FT;
-    N::FT=FT(NaN),
-    τ::FT=FT(NaN),  # consider making this just one timestep?
-    Dmin::FT=FT(0),
-    Dmax::FT=FT(Inf),
+    N::FT = FT(NaN),
+    τ::FT = FT(NaN),  # consider making this just one timestep?
+    Dmin::FT = FT(0),
+    Dmax::FT = FT(Inf),
     # v_ice::FT = FT(0),
     # v_snow::FT = FT(0),
-    ice_acnv_power::FT=FT(2),
-    r_acnv_scaling_factor::FT=FT(1),
-    w::FT=FT(0), # this is the updraft speed, if we have it, we can use it to adjust the source term
-    dwdz::FT=FT(0), # this is the sedimentation rate of ice, if we have it, we can use it to adjust the source term
-    use_sed::Bool=false, # if true, we use dqidt_sed to adjust the source term, otherwise we just use the source term as is
-    ice_type::CMT.IceType=ice_type,
+    ice_acnv_power::FT = FT(2),
+    r_acnv_scaling_factor::FT = FT(1),
+    w::FT = FT(0), # this is the updraft speed, if we have it, we can use it to adjust the source term
+    dwdz::FT = FT(0), # this is the sedimentation rate of ice, if we have it, we can use it to adjust the source term
+    use_sed::Bool = false, # if true, we use dqidt_sed to adjust the source term, otherwise we just use the source term as is
+    ice_type::CMT.IceType = ice_type,
 ) where {FT}
 
     # if r_acnv_scaling_factor = 1, we will just get q_thresh = q at most, in any case where N is calculated from q (adjust_ice_N = true), unless q_ice_threshold is not 0.
@@ -1431,10 +1501,22 @@ function get_thresh_and_my_conv_q_ice_to_q_sno_thresh(
             # we could also use r_acnv here w/
             # [ assume_N_is means we're always at r_is which means q_thresh is just q but we use q_acnv here... (maybe look at switching that idk, might be out of date now) ]
             # [ not assuming N_is means q_thresh is just q_ice_threshold ]
-            q_thresh = get_q_threshold_acnv(param_set, ice_type; N=N, assume_N_is=false, r_acnv_scaling_factor=r_acnv_scaling_factor)
+            q_thresh = get_q_threshold_acnv(
+                param_set,
+                ice_type;
+                N = N,
+                assume_N_is = false,
+                r_acnv_scaling_factor = r_acnv_scaling_factor,
+            )
             S_qs = my_conv_q_ice_to_q_sno_no_supersat_simple(param_set, qi, q_thresh, τ) # this is the rate of change of q_ice with respect to N, so we need to divide by τ to get the rate of change of N
         else
-            q_thresh = get_q_threshold_acnv(param_set, ice_type; N=N, assume_N_is=false, r_acnv_scaling_factor=r_acnv_scaling_factor)
+            q_thresh = get_q_threshold_acnv(
+                param_set,
+                ice_type;
+                N = N,
+                assume_N_is = false,
+                r_acnv_scaling_factor = r_acnv_scaling_factor,
+            )
             S_qs = my_conv_q_ice_to_q_sno_no_supersat_simple(param_set, qi, q_thresh, τ) # this is the rate of change of q_ice with respect to N, so we need to divide by τ to get the rate of change of N
         end
 
@@ -1455,8 +1537,31 @@ function get_thresh_and_my_conv_q_ice_to_q_sno_thresh(
     return S_qs, q_thresh # return the source term and the threshold
 end
 
-get_thresh_and_my_conv_q_ice_to_q_sno_thresh(param_set::APS, q::TD.PhasePartition{FT}; N::FT=FT(NaN), τ::FT=FT(NaN), Dmin::FT=FT(0), Dmax::FT=FT(Inf), ice_acnv_power::FT=FT(2), r_acnv_scaling_factor::FT=FT(1), w::FT=FT(0), dwdz::FT=FT(0), use_sed::Bool=false) where {FT} =
-    get_thresh_and_my_conv_q_ice_to_q_sno_thresh(param_set, q.ice; N=N, τ=τ, Dmin=Dmin, Dmax=Dmax, ice_acnv_power=ice_acnv_power, r_acnv_scaling_factor=r_acnv_scaling_factor, w=w, dwdz=dwdz, use_sed=use_sed)
+get_thresh_and_my_conv_q_ice_to_q_sno_thresh(
+    param_set::APS,
+    q::TD.PhasePartition{FT};
+    N::FT = FT(NaN),
+    τ::FT = FT(NaN),
+    Dmin::FT = FT(0),
+    Dmax::FT = FT(Inf),
+    ice_acnv_power::FT = FT(2),
+    r_acnv_scaling_factor::FT = FT(1),
+    w::FT = FT(0),
+    dwdz::FT = FT(0),
+    use_sed::Bool = false,
+) where {FT} = get_thresh_and_my_conv_q_ice_to_q_sno_thresh(
+    param_set,
+    q.ice;
+    N = N,
+    τ = τ,
+    Dmin = Dmin,
+    Dmax = Dmax,
+    ice_acnv_power = ice_acnv_power,
+    r_acnv_scaling_factor = r_acnv_scaling_factor,
+    w = w,
+    dwdz = dwdz,
+    use_sed = use_sed,
+)
 
 
 """
@@ -1467,22 +1572,48 @@ get_thresh_and_my_conv_q_ice_to_q_sno_thresh(param_set::APS, q::TD.PhasePartitio
 function my_conv_q_ice_to_q_sno_thresh(
     param_set::APS,  # consider changing to just microphys_params since we're not using user_params anymore
     qi::FT,
-    N::FT=FT(NaN),
-    τ::FT=FT(NaN),  # consider making this just one timestep?
-    Dmin::FT=FT(0),
-    Dmax::FT=FT(Inf),
+    N::FT = FT(NaN),
+    τ::FT = FT(NaN),  # consider making this just one timestep?
+    Dmin::FT = FT(0),
+    Dmax::FT = FT(Inf),
     # v_ice::FT = FT(0),
     # v_snow::FT = FT(0),
-    ice_acnv_power::FT=FT(2),
-    r_acnv_scaling_factor::FT=FT(1),
+    ice_acnv_power::FT = FT(2),
+    r_acnv_scaling_factor::FT = FT(1),
 ) where {FT}
 
-    S_qs, _ = get_thresh_and_my_conv_q_ice_to_q_sno_thresh(param_set, qi; N=N, τ=τ, Dmin=Dmin, Dmax=Dmax, ice_acnv_power=ice_acnv_power, r_acnv_scaling_factor=r_acnv_scaling_factor)
+    S_qs, _ = get_thresh_and_my_conv_q_ice_to_q_sno_thresh(
+        param_set,
+        qi;
+        N = N,
+        τ = τ,
+        Dmin = Dmin,
+        Dmax = Dmax,
+        ice_acnv_power = ice_acnv_power,
+        r_acnv_scaling_factor = r_acnv_scaling_factor,
+    )
     return S_qs
 end
 
-my_conv_q_ice_to_q_sno_thresh(param_set::APS, q::TD.PhasePartition{FT}; N::FT=FT(NaN), τ::FT=FT(NaN), Dmin::FT=FT(0), Dmax::FT=FT(Inf), ice_acnv_power::FT=FT(2), r_acnv_scaling_factor::FT=FT(1)) where {FT} =
-    my_conv_q_ice_to_q_sno_thresh(param_set, q.ice; N=N, τ=τ, Dmin=Dmin, Dmax=Dmax, ice_acnv_power=ice_acnv_power, r_acnv_scaling_factor=r_acnv_scaling_factor)
+my_conv_q_ice_to_q_sno_thresh(
+    param_set::APS,
+    q::TD.PhasePartition{FT};
+    N::FT = FT(NaN),
+    τ::FT = FT(NaN),
+    Dmin::FT = FT(0),
+    Dmax::FT = FT(Inf),
+    ice_acnv_power::FT = FT(2),
+    r_acnv_scaling_factor::FT = FT(1),
+) where {FT} = my_conv_q_ice_to_q_sno_thresh(
+    param_set,
+    q.ice;
+    N = N,
+    τ = τ,
+    Dmin = Dmin,
+    Dmax = Dmax,
+    ice_acnv_power = ice_acnv_power,
+    r_acnv_scaling_factor = r_acnv_scaling_factor,
+)
 
 
 radius_scaling_factor_from_mass_scaling_factor(χm::FT) where {FT} = inv(cbrt(χm)) # 1/f_r^3 = χm --> f_r = 1 / cbrt(χm) # this is the factor by which we scale the mean radius to get the mean radius for the ice crystals, so that we can use it in the N_i and N_l calculations
@@ -1504,11 +1635,11 @@ function μ_from_qN(
     q_type::CMT.IceType,
     q_i::FT,
     N_i::FT;
-    ρ::FT=FT(1),
-    ice_type::CMT.IceType=ice_type,
-    max_μ::FT=FT(3.0), # this is the maximum μ we allow, if we get a larger one, we just return max_μ
-    Dmin::FT=FT(0),
-    Dmax::FT=FT(Inf),
+    ρ::FT = FT(1),
+    ice_type::CMT.IceType = ice_type,
+    max_μ::FT = FT(3.0), # this is the maximum μ we allow, if we get a larger one, we just return max_μ
+    Dmin::FT = FT(0),
+    Dmax::FT = FT(Inf),
     # S::FT = FT(1) # supersaturation boost factor, default to 1 (no boost)
 ) where {FT}
 
@@ -1545,11 +1676,11 @@ function μ_from_qN(
     q_type::CMT.LiquidType,
     q_l::FT,
     N_l::FT;
-    ρ::FT=FT(1),
-    ice_type::CMT.IceType=ice_type,
-    Dmin::FT=FT(0),
-    Dmax::FT=FT(Inf),
-    ηmax::FT=FT(0.577), # from MG08
+    ρ::FT = FT(1),
+    ice_type::CMT.IceType = ice_type,
+    Dmin::FT = FT(0),
+    Dmax::FT = FT(Inf),
+    ηmax::FT = FT(0.577), # from MG08
 ) where {FT}
 
     if !isfinite(N_l)
@@ -1580,10 +1711,10 @@ function μ_from_qN(
     q_type::CMT.SnowType,
     q_i::FT,
     N_i::FT;
-    ρ::FT=FT(1),
-    ice_type::CMT.IceType=ice_type,
-    Dmin::FT=FT(0),
-    Dmax::FT=FT(Inf),
+    ρ::FT = FT(1),
+    ice_type::CMT.IceType = ice_type,
+    Dmin::FT = FT(0),
+    Dmax::FT = FT(Inf),
 ) where {FT}
     # return FT(NaN) # for type completenes, but these are not defined
     # return FT(0) # I think 0 is the same as not defined bc it adds nothing... snow has it's own mu thingy wrapped up in n0 or m0, afaik rain has nothing
@@ -1598,15 +1729,15 @@ function μ_from_qN(
     q_type::CMT.RainType,
     q_l::FT,
     N_l::FT;
-    ρ::FT=FT(1),
-    ice_type::CMT.IceType=ice_type,
-    liq_type::CMT.LiquidType=liq_type,
-    Dmin::FT=FT(0),
-    Dmax::FT=FT(Inf),
+    ρ::FT = FT(1),
+    ice_type::CMT.IceType = ice_type,
+    liq_type::CMT.LiquidType = liq_type,
+    Dmin::FT = FT(0),
+    Dmax::FT = FT(Inf),
 ) where {FT}
     # return FT(NaN) # for type completenes, but these are not defined
     # return FT(0) # I think 0 is the same as not defined bc it adds nothing... snow has it's own mu thingy wrapped up in n0 or m0, afaik rain has nothing
-    return μ_from_qN(param_set, liq_type, q_l, N_l; ρ=ρ, ice_type=ice_type, Dmin=Dmin, Dmax=Dmax) # we could defer to the liquid one but it does crazy things... idk why...
+    return μ_from_qN(param_set, liq_type, q_l, N_l; ρ = ρ, ice_type = ice_type, Dmin = Dmin, Dmax = Dmax) # we could defer to the liquid one but it does crazy things... idk why...
 end
 
 
@@ -1615,8 +1746,8 @@ function get_T_top_from_N_i(
     relaxation_timescale::AbstractRelaxationTimescaleType,
     q_i::FT,
     N_i::FT;
-    ρ::FT=FT(1),
-    ice_type::CMT.IceType=ice_type,
+    ρ::FT = FT(1),
+    ice_type::CMT.IceType = ice_type,
 ) where {FT}
     return FT(NaN)
 end
@@ -1625,10 +1756,10 @@ function get_T_top_from_N_i(
     param_set::APS,
     relaxation_timescale::INP_Aware_Timescale,
     q_i::FT;
-    ρ::FT=FT(1),
-    ice_type::CMT.IceType=ice_type,
-    μ::FT=FT(0),
-    monodisperse::Bool=false,
+    ρ::FT = FT(1),
+    ice_type::CMT.IceType = ice_type,
+    μ::FT = FT(0),
+    monodisperse::Bool = false,
 ) where {FT}
 
     if iszero(q_i)
@@ -1652,7 +1783,14 @@ function get_T_top_from_N_i(
         _r0::FT = r0(microphys_params, ice_type) # this is the radius of the ice crystal at the acnv radius
         _me::FT = me(microphys_params, ice_type) # this is the exponent for the mass of the ice crystal
         _Δm::FT = Δm(microphys_params, ice_type) # this is the exponent for the mass of the ice crystal
-        N_top = (q_i * ρ) / (_χm * _m0 * _r0^(-(_me + _Δm)) * (CM1.SF.gamma(μ + _me + _Δm + FT(1)) / CM1.SF.gamma(μ + FT(1))) * λ^(-(_me + _Δm))) # this is the number concentration of ice crystals at the acnv radius
+        N_top =
+            (q_i * ρ) / (
+                _χm *
+                _m0 *
+                _r0^(-(_me + _Δm)) *
+                (CM1.SF.gamma(μ + _me + _Δm + FT(1)) / CM1.SF.gamma(μ + FT(1))) *
+                λ^(-(_me + _Δm))
+            ) # this is the number concentration of ice crystals at the acnv radius
     end
     # Now we would just need to get T_top. For the exponential and powerlaw T-scalings it's easy... otherwise it's hard.
     T = get_T_from_N_i(param_set, relaxation_timescale, N_top)
@@ -1660,8 +1798,9 @@ function get_T_top_from_N_i(
     return isnan(T) ? get_T_top_from_N_i_Cooper_curve(N_top) : T
 end
 
-get_T_top_from_N_i_Cooper_curve(N::FT) where {FT} = FT(273.15) - (FT(1.0) / FT(0.304)) * log(N / (FT(0.005) * FT(1000.0))) # technically cooper is clamped but idk that it matters so much...
-function get_N_i_Cooper_curve(T::FT; clamp_N::Bool=false) where {FT} # see https://github.com/DOI-USGS/COAWST/blob/6419fc46d737b9703f31206112ff5fba65be400d/WRF/phys/module_mp_morr_two_moment.F#L2348, they also have fletcher, we should prolly just pick one...
+get_T_top_from_N_i_Cooper_curve(N::FT) where {FT} =
+    FT(273.15) - (FT(1.0) / FT(0.304)) * log(N / (FT(0.005) * FT(1000.0))) # technically cooper is clamped but idk that it matters so much...
+function get_N_i_Cooper_curve(T::FT; clamp_N::Bool = false) where {FT} # see https://github.com/DOI-USGS/COAWST/blob/6419fc46d737b9703f31206112ff5fba65be400d/WRF/phys/module_mp_morr_two_moment.F#L2348, they also have fletcher, we should prolly just pick one...
     N = FT(0.005) * exp(FT(0.304) * (FT(273.15) - T)) * FT(1000.0)  # L⁻¹ → m⁻³
     if clamp_N
         N = clamp(N, FT(0), FT(500e3)) # why did we divide by ρ here? (maybe it's a density depending concentration? idk.. this way goes up at lower ρ though...)
@@ -1678,7 +1817,15 @@ function get_d_N_i_Cooper_curve_dT(T::FT) where {FT}
 end
 get_d_N_i_Cooper_curve_dz(T::FT, dTdz::FT) where {FT} = get_d_N_i_Cooper_curve_dT(T) * dTdz
 
-function get_T_from_N_i(param_set::APS, relaxation_timescale::Union{ExponentialTScalingIceRelaxationTimescale,ExponentialTScalingIceRawRelaxationTimescale,GeometricLiqExponentialTScalingIceRelaxationTimescale}, N::FT) where {FT}
+function get_T_from_N_i(
+    param_set::APS,
+    relaxation_timescale::Union{
+        ExponentialTScalingIceRelaxationTimescale,
+        ExponentialTScalingIceRawRelaxationTimescale,
+        GeometricLiqExponentialTScalingIceRelaxationTimescale,
+    },
+    N::FT,
+) where {FT}
     if iszero(N)
         return FT(NaN)
     end
@@ -1688,7 +1835,11 @@ function get_T_from_N_i(param_set::APS, relaxation_timescale::Union{ExponentialT
     # N = FT(c_1 * exp(c_2 * (T - T_fr))), so we invert this to solve for T
     return T_fr + (1 / c_2) * log(N / c_1)
 end
-function get_T_from_N_i(param_set::APS, relaxation_timescale::GeometricLiqExponentialTScalingAndGeometricIceRelaxationTimescale, N::FT) where {FT}
+function get_T_from_N_i(
+    param_set::APS,
+    relaxation_timescale::GeometricLiqExponentialTScalingAndGeometricIceRelaxationTimescale,
+    N::FT,
+) where {FT}
     if iszero(N)
         return FT(NaN)
     end
@@ -1699,7 +1850,14 @@ function get_T_from_N_i(param_set::APS, relaxation_timescale::GeometricLiqExpone
     return T_fr + (1 / c_2) * log(N / c_1)
 end
 
-function get_T_from_N_i(param_set::APS, relaxation_timescale::Union{PowerlawTScalingIceRelaxationTimescale,GeometricLiqPowerlawTScalingIceRelaxationTimescale}, N::FT) where {FT}
+function get_T_from_N_i(
+    param_set::APS,
+    relaxation_timescale::Union{
+        PowerlawTScalingIceRelaxationTimescale,
+        GeometricLiqPowerlawTScalingIceRelaxationTimescale,
+    },
+    N::FT,
+) where {FT}
     if iszero(N)
         return FT(NaN)
     end
@@ -1786,7 +1944,18 @@ Let `s1 = μ+1`, `s2 = μ+s_m+1`, `x = λ * r_min`.
 
 Numerically, this is evaluated with `loggamma` to avoid overflow/underflow.
 """
-function N_from_qr(param_set::APS, q_type::CMTWaterTypes, q::FT, r::FT; monodisperse::Bool=true, μ::FT=FT(0), ρ::FT=FT(1), Dmin::FT=FT(0), Dmax::FT=FT(Inf), add_dry_aerosol_mass::Bool=false) where {FT}
+function N_from_qr(
+    param_set::APS,
+    q_type::CMTWaterTypes,
+    q::FT,
+    r::FT;
+    monodisperse::Bool = true,
+    μ::FT = FT(0),
+    ρ::FT = FT(1),
+    Dmin::FT = FT(0),
+    Dmax::FT = FT(Inf),
+    add_dry_aerosol_mass::Bool = false,
+) where {FT}
     microphys_params = TCP.microphysics_params(param_set)
     if monodisperse
         # For monodisperse case, we can directly use the formulas
@@ -1836,12 +2005,12 @@ function f_boost_MF(
     param_set::APS,  # consider changing to just microphys_params since we're not using user_params anymore
     dNINP_dz::FT,
     ;
-    ρ::FT=FT(1.0), # density of the air, if we have it, we can use it to adjust the source term
-    S_i::FT=FT(0), # supersaturation
-    massflux::FT=FT(0), # if we have a massflux, we can use it to adjust the source term, (combines area and velocity, velocity is prolly more important for penetration and downdraft generation but area matters.
-    NINP_top_over_N_INP::FT=FT(1),
-    massflux_min::FT=FT(0.05),
-    massflux_0::FT=FT(0.05),
+    ρ::FT = FT(1.0), # density of the air, if we have it, we can use it to adjust the source term
+    S_i::FT = FT(0), # supersaturation
+    massflux::FT = FT(0), # if we have a massflux, we can use it to adjust the source term, (combines area and velocity, velocity is prolly more important for penetration and downdraft generation but area matters.
+    NINP_top_over_N_INP::FT = FT(1),
+    massflux_min::FT = FT(0.05),
+    massflux_0::FT = FT(0.05),
 ) where {FT}
 
 
@@ -1959,11 +2128,11 @@ function get_Ni_from_INP_qi_qs(
     N_INP::FT,
     q_i::FT,
     q_s::FT;
-    ρ::FT=FT(1.0),
-    ice_type::CMT.IceType=ice_type,
-    monodisperse::Bool=true,
-    μ::FT=FT(NaN),
-    add_dry_aerosol_mass::Bool=false,
+    ρ::FT = FT(1.0),
+    ice_type::CMT.IceType = ice_type,
+    monodisperse::Bool = true,
+    μ::FT = FT(NaN),
+    add_dry_aerosol_mass::Bool = false,
 ) where {FT}
 
     monodisperse && error("monodisperse not implemented")
@@ -1975,12 +2144,12 @@ function get_Ni_from_INP_qi_qs(
     # Add aerosol mass contribution if requested
     if add_dry_aerosol_mass
         r_min = param_set.user_params.particle_min_radius
-        q_i += mass(param_set, ice_type, r_min, N_INP; monodisperse=true)
+        q_i += mass(param_set, ice_type, r_min, N_INP; monodisperse = true)
     end
 
     # Compute size distribution shape parameter if not provided
     if isnan(μ)
-        μ = μ_from_qN(param_set, ice_type, q_i, N_i; ρ=ρ, Dmin=0, Dmax=FT(Inf))
+        μ = μ_from_qN(param_set, ice_type, q_i, N_i; ρ = ρ, Dmin = 0, Dmax = FT(Inf))
     end
 
     # Define critical radii
@@ -1988,7 +2157,7 @@ function get_Ni_from_INP_qi_qs(
     r_thresh = get_r_cond_precip(param_set, ice_type) * FT(param_set.user_params.r_ice_snow_threshold_scaling_factor)
 
     # Minimum ice number from autoconversion radius constraint
-    N_i_acnv = N_from_qr(param_set, ice_type, q_i, r_i_acnv; monodisperse=false, μ=μ, ρ=ρ)
+    N_i_acnv = N_from_qr(param_set, ice_type, q_i, r_i_acnv; monodisperse = false, μ = μ, ρ = ρ)
 
     if q_s ≤ zero(FT)
         return min(N_INP, N_i_acnv)
@@ -1996,12 +2165,21 @@ function get_Ni_from_INP_qi_qs(
 
     # Partition ice/snow: use gamma distribution to analytically calculate
     # what fraction of INP-derived particles are large enough to classify as snow (r ≥ r_thresh)
-    q_here = min(q_i + q_s, q_from_rN(param_set, ice_type, r_thresh, N_INP; monodisperse=monodisperse, μ=μ, ρ=ρ))
+    q_here = min(q_i + q_s, q_from_rN(param_set, ice_type, r_thresh, N_INP; monodisperse = monodisperse, μ = μ, ρ = ρ))
 
     # Count total number of particles with radius > r_thresh (these are classified as "snow-sized")
     N_above_r_is = get_fraction_below_or_above_thresh_from_qN(
-        param_set, ice_type, q_here, N_INP, ρ, r_thresh;
-        return_N=true, below_thresh=false, return_fraction=false, μ=μ, Dmax=FT(Inf)
+        param_set,
+        ice_type,
+        q_here,
+        N_INP,
+        ρ,
+        r_thresh;
+        return_N = true,
+        below_thresh = false,
+        return_fraction = false,
+        μ = μ,
+        Dmax = FT(Inf),
     )
 
     # Particles remaining below threshold radius (still cloud ice, not precipitating yet)
@@ -2009,7 +2187,7 @@ function get_Ni_from_INP_qi_qs(
 
     # Estimate snow particle properties and capacity
     # First, compute mean radius of ice particles remaining below threshold
-    r_i = r_from_qN(param_set, ice_type, q_i, NI_below_r_is; monodisperse=false, μ=μ, ρ=ρ)
+    r_i = r_from_qN(param_set, ice_type, q_i, NI_below_r_is; monodisperse = false, μ = μ, ρ = ρ)
     if !isfinite(r_i)
         @warn "Non-finite r_i = $r_i from q_i = $q_i, NI_below_r_is = $NI_below_r_is, N_INP = $N_INP, μ = $μ, ρ = $ρ"
     end
@@ -2019,7 +2197,7 @@ function get_Ni_from_INP_qi_qs(
     r_s_i = clamp(FT(2.5) * r_i, r_thresh, FT(3) * r_thresh)
 
     # Estimate how many snow particles can fit with current q_s and estimated size r_s_i
-    Ns_est = N_from_qr(param_set, ice_type, q_s, r_s_i; monodisperse=false, μ=μ, ρ=ρ)
+    Ns_est = N_from_qr(param_set, ice_type, q_s, r_s_i; monodisperse = false, μ = μ, ρ = ρ)
 
     # Remaining capacity: if snow doesn't consume all INP particles, the remainder can exist as small ice
     NI_below_r_is = NI_below_r_is + max((N_INP - NI_below_r_is) - Ns_est, FT(0))
@@ -2143,20 +2321,20 @@ function adjust_ice_N(
     N_INP::FT,
     q_i::FT,
     ;
-    ρ::FT=FT(1.0),
-    S_i::FT=FT(1),
-    q_l::FT=FT(0),
-    q_s::FT=FT(0),
-    monodisperse::Bool=true,
-    ice_type::CMT.IceType=ice_type,
-    decrease_N_if_subsaturated::Bool=false,
-    N_INP_top::FT=FT(NaN),
-    massflux::FT=FT(0),
-    dNINP_dz::FT=FT(0),
-    w_i::FT=FT(0),
-    N_i_from_INP::Bool=false,
-    apply_massflux_boost::Bool=false,
-    apply_sedimentation_boost::Bool=false,
+    ρ::FT = FT(1.0),
+    S_i::FT = FT(1),
+    q_l::FT = FT(0),
+    q_s::FT = FT(0),
+    monodisperse::Bool = true,
+    ice_type::CMT.IceType = ice_type,
+    decrease_N_if_subsaturated::Bool = false,
+    N_INP_top::FT = FT(NaN),
+    massflux::FT = FT(0),
+    dNINP_dz::FT = FT(0),
+    w_i::FT = FT(0),
+    N_i_from_INP::Bool = false,
+    apply_massflux_boost::Bool = false,
+    apply_sedimentation_boost::Bool = false,
 ) where {FT}
 
     # Early exits for trivial cases
@@ -2188,9 +2366,9 @@ function adjust_ice_N(
         N_thresh = (q_i * ρ) / q_thresh
     else
         r_i_acnv = r_ice_acnv(param_set, r_acnv_scaling)
-        μ = μ_from_qN(param_set, ice_type, q_i, N_i; ρ=ρ)
-        N_i_acnv = N_from_qr(param_set, ice_type, q_i, r_i_acnv; monodisperse=false, μ=μ, ρ=ρ)
-        N_thresh = N_from_qr(param_set, ice_type, q_i, r_thresh; monodisperse=false, μ=μ, ρ=ρ)
+        μ = μ_from_qN(param_set, ice_type, q_i, N_i; ρ = ρ)
+        N_i_acnv = N_from_qr(param_set, ice_type, q_i, r_i_acnv; monodisperse = false, μ = μ, ρ = ρ)
+        N_thresh = N_from_qr(param_set, ice_type, q_i, r_thresh; monodisperse = false, μ = μ, ρ = ρ)
     end
 
     # Enforce minimum N_INP_top if provided
@@ -2203,7 +2381,14 @@ function adjust_ice_N(
         # Apply mass flux boost to INP if enabled
         # Downward mass flux with dNINP_dz > 0 (more INP below) increases local INP availability
         if apply_massflux_boost
-            mf_boost = f_boost_MF(param_set, dNINP_dz, ρ=ρ, S_i=S_i, massflux=massflux, NINP_top_over_N_INP=(N_INP_top / N_INP))
+            mf_boost = f_boost_MF(
+                param_set,
+                dNINP_dz,
+                ρ = ρ,
+                S_i = S_i,
+                massflux = massflux,
+                NINP_top_over_N_INP = (N_INP_top / N_INP),
+            )
             N_INP_adjusted = N_INP * mf_boost
             N_i = N_i_from_INP ? N_INP_adjusted : N_i * mf_boost
         else
@@ -2212,7 +2397,18 @@ function adjust_ice_N(
 
         # Partition ice/snow using get_Ni_from_INP_qi_qs
         # This ensures N_i remains consistent with INP and prevents all particles from being classified as precipitation
-        N_below_r_is = get_Ni_from_INP_qi_qs(param_set, N_i, N_INP_adjusted, q_i, q_s; ρ=ρ, ice_type=ice_type, μ=μ, monodisperse=monodisperse, add_dry_aerosol_mass=true)
+        N_below_r_is = get_Ni_from_INP_qi_qs(
+            param_set,
+            N_i,
+            N_INP_adjusted,
+            q_i,
+            q_s;
+            ρ = ρ,
+            ice_type = ice_type,
+            μ = μ,
+            monodisperse = monodisperse,
+            add_dry_aerosol_mass = true,
+        )
         N_i = N_i_from_INP ? N_below_r_is : N_i * (N_below_r_is / N_INP_adjusted)
         N_INP_adjusted = N_below_r_is
 
@@ -2222,15 +2418,19 @@ function adjust_ice_N(
         # - At -5% subsat: grow to ~1.08 r_thresh
         # - At -25% subsat: grow to ~1.2 r_thresh (slower PITOSN, more coarsening time)
         if S_i < FT(0)
-            r_thresh_adjusted = 1.08 * r_thresh + (1.2 * r_thresh - 1.08 * r_thresh) * (1 - clamp(N_INP_adjusted / N_thresh, FT(0), FT(1)))
-            N_thresh_adjusted = N_from_qr(param_set, ice_type, q_i, r_thresh_adjusted; monodisperse=false, μ=μ, ρ=ρ)
+            r_thresh_adjusted =
+                1.08 * r_thresh +
+                (1.2 * r_thresh - 1.08 * r_thresh) * (1 - clamp(N_INP_adjusted / N_thresh, FT(0), FT(1)))
+            N_thresh_adjusted =
+                N_from_qr(param_set, ice_type, q_i, r_thresh_adjusted; monodisperse = false, μ = μ, ρ = ρ)
 
             if N_INP_adjusted < N_thresh
                 # Low-INP regime: all available particles are activating, size growing
                 if N_INP_adjusted < N_thresh_adjusted
                     # Insufficient INP to reach even the lower-bound adjusted threshold
                     # Gradually increase N toward N_thresh as supersaturation drops from 0% to -5%
-                    N_INP_adjusted_here = N_thresh + (N_thresh_adjusted - N_thresh) * (-clamp(S_i, FT(-0.05), FT(0)) / FT(0.05))
+                    N_INP_adjusted_here =
+                        N_thresh + (N_thresh_adjusted - N_thresh) * (-clamp(S_i, FT(-0.05), FT(0)) / FT(0.05))
                     N_INP_adjusted_here = min(N_INP_adjusted_here, 10 * N_INP)
                     N_i = N_i_from_INP ? N_INP_adjusted_here : N_i * (N_INP_adjusted_here / N_INP_adjusted)
                     N_INP_adjusted = N_INP_adjusted_here
@@ -2239,9 +2439,12 @@ function adjust_ice_N(
                 # High-INP regime: more INP than needed to saturate; size controlled by mass/available INP
                 # Conservative reduction: don't let N drop too far even in strong subsat
                 if S_i > FT(-0.125)
-                    N_INP_adjusted_here = N_INP_adjusted + (N_thresh - N_INP_adjusted) * (-clamp(S_i, FT(-0.125), FT(0)) / FT(0.125))
+                    N_INP_adjusted_here =
+                        N_INP_adjusted + (N_thresh - N_INP_adjusted) * (-clamp(S_i, FT(-0.125), FT(0)) / FT(0.125))
                 else
-                    N_INP_adjusted_here = N_thresh + (N_thresh_adjusted - N_thresh) * ((-clamp(S_i, FT(-0.25), FT(-0.125)) - FT(0.125)) / FT(0.125))
+                    N_INP_adjusted_here =
+                        N_thresh +
+                        (N_thresh_adjusted - N_thresh) * ((-clamp(S_i, FT(-0.25), FT(-0.125)) - FT(0.125)) / FT(0.125))
                 end
 
                 # Gradual enforcement: stronger constraint at cloud top (N_INP_top) transitioning to no constraint below
@@ -2299,11 +2502,23 @@ function adjust_ice_N(
 
         # Additional constraint: prevent unbounded growth when q_i is high
         q_top = q_i
-        N_thresh_adjusted = N_from_qr(param_set, ice_type, q_top, 1.3 * r_thresh; monodisperse=monodisperse, ρ=ρ, μ=μ)
+        N_thresh_adjusted =
+            N_from_qr(param_set, ice_type, q_top, 1.3 * r_thresh; monodisperse = monodisperse, ρ = ρ, μ = μ)
         N_bounds = max.(N_bounds, max(N_thresh_adjusted, min(N_i_acnv, N_INP_adjusted)))
 
         # Absolute limit using cloud-top INP partitioning
-        N_below_r_is_top = get_Ni_from_INP_qi_qs(param_set, N_i, N_INP_top, q_i, q_s; ρ=ρ, ice_type=ice_type, μ=μ, monodisperse=monodisperse, add_dry_aerosol_mass=true)
+        N_below_r_is_top = get_Ni_from_INP_qi_qs(
+            param_set,
+            N_i,
+            N_INP_top,
+            q_i,
+            q_s;
+            ρ = ρ,
+            ice_type = ice_type,
+            μ = μ,
+            monodisperse = monodisperse,
+            add_dry_aerosol_mass = true,
+        )
         N_below_r_is_top = max(N_below_r_is_top, N_thresh / 8)
         sedimentation_factor = (S_i < FT(0)) ? FT(8) : FT(2)  # More lenient in subsat (less rapid coarsening)
         N_bounds = min.(N_bounds, N_below_r_is_top, sedimentation_factor * N_INP_adjusted)
@@ -2314,7 +2529,8 @@ function adjust_ice_N(
 
         # Lower bound enforcement: cannot go below what local q and N_INP demand
         q_top = q_i
-        N_thresh_adjusted = N_from_qr(param_set, ice_type, q_top, 2 * r_thresh; monodisperse=monodisperse, ρ=ρ, μ=μ)
+        N_thresh_adjusted =
+            N_from_qr(param_set, ice_type, q_top, 2 * r_thresh; monodisperse = monodisperse, ρ = ρ, μ = μ)
         N_raw_min = max(N_thresh_adjusted, min(N_i_acnv, N_INP_adjusted))
         N_bounds = max.(N_bounds, N_raw_min)
 
@@ -2331,7 +2547,37 @@ function adjust_ice_N(
 
     return N_i
 end
-adjust_ice_N(param_set::APS, N_i::FT, N_INP::FT, q::TD.PhasePartition{FT}; ρ::FT=FT(1.0), S::FT=FT(1), monodisperse::Bool=true, ice_type::CMT.IceType=ice_type, decrease_N_if_subsaturated::Bool=true, N_INP_top::FT=FT(NaN), q_s::FT=FT(0), massflux::FT=FT(0), w_i::FT=FT(0), N_i_from_INP::Bool=false) where {FT} = adjust_ice_N(param_set, N_i, N_INP, q.ice; ρ=ρ, S=S, monodisperse=monodisperse, ice_type=ice_type, decrease_N_if_subsaturated=decrease_N_if_subsaturated, N_INP_top=N_INP_top, q_s=q_s, massflux=massflux, w_i=w_i, N_i_from_INP=N_i_from_INP)
+adjust_ice_N(
+    param_set::APS,
+    N_i::FT,
+    N_INP::FT,
+    q::TD.PhasePartition{FT};
+    ρ::FT = FT(1.0),
+    S::FT = FT(1),
+    monodisperse::Bool = true,
+    ice_type::CMT.IceType = ice_type,
+    decrease_N_if_subsaturated::Bool = true,
+    N_INP_top::FT = FT(NaN),
+    q_s::FT = FT(0),
+    massflux::FT = FT(0),
+    w_i::FT = FT(0),
+    N_i_from_INP::Bool = false,
+) where {FT} = adjust_ice_N(
+    param_set,
+    N_i,
+    N_INP,
+    q.ice;
+    ρ = ρ,
+    S = S,
+    monodisperse = monodisperse,
+    ice_type = ice_type,
+    decrease_N_if_subsaturated = decrease_N_if_subsaturated,
+    N_INP_top = N_INP_top,
+    q_s = q_s,
+    massflux = massflux,
+    w_i = w_i,
+    N_i_from_INP = N_i_from_INP,
+)
 
 
 
@@ -2339,11 +2585,11 @@ function adjust_liq_N(
     param_set::APS,  # consider changing to just microphys_params since we're not using user_params anymore
     N_l::FT,
     q_l::FT;
-    ρ::FT=FT(1.0), # density of the air, if we have it, we can use it to adjust the source term
-    S::FT=FT(1), # supersaturation
-    monodisperse::Bool=true, # if true, we assume all liquid droplets are the same size, otherwise we assume a distribution of sizes
-    liq_type::CMT.LiquidType=liq_type, # this is the type of liquid we're dealing with, e.g. rain or cloud liquid
-    decrease_N_if_subsaturated::Bool=false
+    ρ::FT = FT(1.0), # density of the air, if we have it, we can use it to adjust the source term
+    S::FT = FT(1), # supersaturation
+    monodisperse::Bool = true, # if true, we assume all liquid droplets are the same size, otherwise we assume a distribution of sizes
+    liq_type::CMT.LiquidType = liq_type, # this is the type of liquid we're dealing with, e.g. rain or cloud liquid
+    decrease_N_if_subsaturated::Bool = false,
 ) where {FT}
 
 
@@ -2363,7 +2609,7 @@ function adjust_liq_N(
     else
 
         microphys_params::ACMP = TCP.microphysics_params(param_set)
-        μ = μ_from_qN(param_set, liq_type, q_l, N_l; ρ=ρ) # this is the factor by which we scale the mean radius to get the mean radius for the ice crystals, so that we can use it in the N_i and N_l calculations
+        μ = μ_from_qN(param_set, liq_type, q_l, N_l; ρ = ρ) # this is the factor by which we scale the mean radius to get the mean radius for the ice crystals, so that we can use it in the N_i and N_l calculations
 
         # make sure <r> < (r_lr/2)
         r_lr::FT = param_set.user_params.r_liq_rain # There is no r_lr for liquid...instead we just set it in user_params.
@@ -2374,13 +2620,38 @@ function adjust_liq_N(
         _r0::FT = r0(microphys_params, liq_type)
         _me::FT = me(microphys_params, liq_type)
         _Δm::FT = Δm(microphys_params, liq_type)
-        N_lr = (q_l * ρ) / (_χm * _m0 * _r0^(-(_me + _Δm)) * (CM1.SF.gamma(μ + _me + _Δm + FT(1)) / CM1.SF.gamma(μ + FT(1))) * λ^(-(_me + _Δm))) # this is the number concentration of ice crystals at the ice-snow radius
+        N_lr =
+            (q_l * ρ) / (
+                _χm *
+                _m0 *
+                _r0^(-(_me + _Δm)) *
+                (CM1.SF.gamma(μ + _me + _Δm + FT(1)) / CM1.SF.gamma(μ + FT(1))) *
+                λ^(-(_me + _Δm))
+            ) # this is the number concentration of ice crystals at the ice-snow radius
         N_l = max(N_l, N_lr) # make sure we don't get too many liquid droplets
     end
 
     return N_l
 end
-adjust_liq_N(param_set::APS, N_l::FT, q::TD.PhasePartition{FT}; ρ::FT=FT(1.0), S::FT=FT(1), monodisperse::Bool=true, liq_type::CMT.LiquidType=liq_type, decrease_N_if_subsaturated::Bool=false) where {FT} = adjust_liq_N(param_set, N_l, q.liq; ρ=ρ, S=S, monodisperse=monodisperse, liq_type=liq_type, decrease_N_if_subsaturated=decrease_N_if_subsaturated)
+adjust_liq_N(
+    param_set::APS,
+    N_l::FT,
+    q::TD.PhasePartition{FT};
+    ρ::FT = FT(1.0),
+    S::FT = FT(1),
+    monodisperse::Bool = true,
+    liq_type::CMT.LiquidType = liq_type,
+    decrease_N_if_subsaturated::Bool = false,
+) where {FT} = adjust_liq_N(
+    param_set,
+    N_l,
+    q.liq;
+    ρ = ρ,
+    S = S,
+    monodisperse = monodisperse,
+    liq_type = liq_type,
+    decrease_N_if_subsaturated = decrease_N_if_subsaturated,
+)
 
 
 """
@@ -2397,7 +2668,17 @@ Could try `TCP.TurbulenceConvectionParameters{FT}` over APS
 
 """
 
-function r_from_qN(param_set::APS, q_type::CMTWaterTypes, q::FT, N::FT; monodisperse::Bool=true, μ::FT=FT(NaN), ρ::FT=FT(1), Dmin::FT=FT(0), Dmax::FT=FT(Inf)) where {FT}
+function r_from_qN(
+    param_set::APS,
+    q_type::CMTWaterTypes,
+    q::FT,
+    N::FT;
+    monodisperse::Bool = true,
+    μ::FT = FT(NaN),
+    ρ::FT = FT(1),
+    Dmin::FT = FT(0),
+    Dmax::FT = FT(Inf),
+) where {FT}
     """
     Calculate r from q, N
     """
@@ -2417,16 +2698,18 @@ function r_from_qN(param_set::APS, q_type::CMTWaterTypes, q::FT, N::FT; monodisp
 
     if (q < 0) || (N < 0)
         # return FT(r_min)
-        error("Got negative q = $q or q_r_min = $q_r_min; inputs were q_type = $q_type; N = $N; r_min = $r_min; ρ = $ρ; μ = $μ")
+        error(
+            "Got negative q = $q or q_r_min = $q_r_min; inputs were q_type = $q_type; N = $N; r_min = $r_min; ρ = $ρ; μ = $μ",
+        )
     end
 
     if isnan(N)
         _n0 = n0(microphys_params, q, ρ, q_type)
         # λ = CM1.lambda(microphys_params, q_type, q, ρ)
-        λ = lambda(microphys_params, q_type, q, ρ, N, μ, Dmin, Dmax; _n0=_n0, _χm=_χm) # we need λ to get N from n0
+        λ = lambda(microphys_params, q_type, q, ρ, N, μ, Dmin, Dmax; _n0 = _n0, _χm = _χm) # we need λ to get N from n0
         N = _n0 / λ # needed for q_r_min
         if isnan(μ) # if μ is NaN, we need to calculate it
-            μ = μ_from_qN(param_set, q_type, q + N * q_r_min, N; ρ=ρ) # this is a test to get the μ value for the given N and q, so we can use it to scale the mean radius
+            μ = μ_from_qN(param_set, q_type, q + N * q_r_min, N; ρ = ρ) # this is a test to get the μ value for the given N and q, so we can use it to scale the mean radius
         end
         if (_n0 * CM1.SF.gamma(μ + 1) / λ^(μ + 1)) < zero(FT)
             @error "Got negative N = $(_n0 * CM1.SF.gamma(μ + 1) / λ^(μ + 1)) from inputs q = $q; N = $N; Dmin = $Dmin; Dmax = $Dmax; μ = $μ; ρ = $ρ; _n0 = $_n0; λ = $λ"
@@ -2444,21 +2727,27 @@ function r_from_qN(param_set::APS, q_type::CMTWaterTypes, q::FT, N::FT; monodisp
         # we want ∫ r n(r) dr / ∫ n(r) dr = ∫ r n(r) dr / N = <r>... We here ignore Dmin, Dmax though...
         if isnan(μ) # if μ is NaN, we need to calculate it
             # μ = FT(0) # we don't really have infrastructure to calculate μ in lambda and other functions right now bc it relies on user params, maybe i should look into fixing that...
-            μ = μ_from_qN(param_set, q_type, q + N * q_r_min, N; ρ=ρ) # this is a test to get the μ value for the given N and q, so we can use it to scale the mean radius
+            μ = μ_from_qN(param_set, q_type, q + N * q_r_min, N; ρ = ρ) # this is a test to get the μ value for the given N and q, so we can use it to scale the mean radius
         end
         λ = lambda(microphys_params, q_type, q + N * q_r_min, ρ, N, μ, Dmin, Dmax)
         if iszero(Dmin) && isinf(Dmax)
             r = (μ + 1) / (λ) # see paper derivation ( this is true from 0 to inf, idk about otherwise...)
         else
             @error "how did we end up here? inputs were q = $q; N = $N; Dmin = $Dmin; Dmax = $Dmax; μ = $μ; ρ = $ρ"
-            r = int_nr_dr(microphys_params, q_type, q + N * q_r_min, ρ, μ; Nt=N, Dmin=Dmin, Dmax=Dmax) / int_n_dr(microphys_params, q_type, q + N * q_r_min, ρ, μ; Nt=N, Dmin=Dmin, Dmax=Dmax) # this is the integral of r n(r) dr / ∫ n(r) dr = <r>... we ignore Dmin, Dmax though...
+            r =
+                int_nr_dr(microphys_params, q_type, q + N * q_r_min, ρ, μ; Nt = N, Dmin = Dmin, Dmax = Dmax) /
+                int_n_dr(microphys_params, q_type, q + N * q_r_min, ρ, μ; Nt = N, Dmin = Dmin, Dmax = Dmax) # this is the integral of r n(r) dr / ∫ n(r) dr = <r>... we ignore Dmin, Dmax though...
         end
 
         if !isfinite(r)
             if N < zero(FT)
-                error("Got non-finite r = $r from inputs q = $q; q_type = $q_type; N = $N; Dmin = $Dmin; Dmax = $Dmax; μ = $μ; ρ = $ρ")
+                error(
+                    "Got non-finite r = $r from inputs q = $q; q_type = $q_type; N = $N; Dmin = $Dmin; Dmax = $Dmax; μ = $μ; ρ = $ρ",
+                )
             else
-                error("Got non-finite r = $r from inputs q = $q; q_type = $q_type; N = $N; Dmin = $Dmin; Dmax = $Dmax; μ = $μ; ρ = $ρ")
+                error(
+                    "Got non-finite r = $r from inputs q = $q; q_type = $q_type; N = $N; Dmin = $Dmin; Dmax = $Dmax; μ = $μ; ρ = $ρ",
+                )
             end
             r = FT(r_min)
         end
@@ -2467,8 +2756,28 @@ function r_from_qN(param_set::APS, q_type::CMTWaterTypes, q::FT, N::FT; monodisp
     end
 end
 
-ri_from_qN(param_set::APS, q::FT, N::FT; monodisperse::Bool=true, ice_type::CMT.IceType=ice_type, μ::FT=FT(NaN), ρ::FT=FT(1), Dmin::FT=FT(0), Dmax::FT=FT(Inf)) where {FT} = r_from_qN(param_set, ice_type, q, N; monodisperse=monodisperse, μ=μ, ρ=ρ, Dmin=Dmin, Dmax=Dmax) # shorthand for ice type
-rl_from_qN(param_set::APS, q::FT, N::FT; monodisperse::Bool=true, liq_type::CMT.LiquidType=liq_type, μ::FT=FT(NaN), ρ::FT=FT(1), Dmin::FT=FT(0), Dmax::FT=FT(Inf)) where {FT} = r_from_qN(param_set, liq_type, q, N; monodisperse=monodisperse, μ=μ, ρ=ρ, Dmin=Dmin, Dmax=Dmax) # shorthand for liquid type
+ri_from_qN(
+    param_set::APS,
+    q::FT,
+    N::FT;
+    monodisperse::Bool = true,
+    ice_type::CMT.IceType = ice_type,
+    μ::FT = FT(NaN),
+    ρ::FT = FT(1),
+    Dmin::FT = FT(0),
+    Dmax::FT = FT(Inf),
+) where {FT} = r_from_qN(param_set, ice_type, q, N; monodisperse = monodisperse, μ = μ, ρ = ρ, Dmin = Dmin, Dmax = Dmax) # shorthand for ice type
+rl_from_qN(
+    param_set::APS,
+    q::FT,
+    N::FT;
+    monodisperse::Bool = true,
+    liq_type::CMT.LiquidType = liq_type,
+    μ::FT = FT(NaN),
+    ρ::FT = FT(1),
+    Dmin::FT = FT(0),
+    Dmax::FT = FT(Inf),
+) where {FT} = r_from_qN(param_set, liq_type, q, N; monodisperse = monodisperse, μ = μ, ρ = ρ, Dmin = Dmin, Dmax = Dmax) # shorthand for liquid type
 
 function r_from_q(param_set::APS, q_type::CMTWaterTypes, q::FT) where {FT}
     """
@@ -2480,12 +2789,21 @@ function r_from_q(param_set::APS, q_type::CMTWaterTypes, q::FT) where {FT}
     q_r_min = particle_mass(microphys_params, q_type, r_min, χm) # this is the volume of a single droplet with radius r_min, so we add it to q to get the effective q
     return particle_radius_from_mass(microphys_params, q_type, q + q_r_min, χm) # we use q=0 to get the mean radius for the given N
 end
-ri_from_q(param_set::APS, q::FT; ice_type::CMT.IceType=ice_type) where {FT} = r_from_q(param_set, ice_type, q) # shorthand for ice type
-rl_from_q(param_set::APS, q::FT; liq_type::CMT.LiquidType=liq_type) where {FT} = r_from_q(param_set, liq_type, q) # shorthand for liquid type
+ri_from_q(param_set::APS, q::FT; ice_type::CMT.IceType = ice_type) where {FT} = r_from_q(param_set, ice_type, q) # shorthand for ice type
+rl_from_q(param_set::APS, q::FT; liq_type::CMT.LiquidType = liq_type) where {FT} = r_from_q(param_set, liq_type, q) # shorthand for liquid type
 
 # -------------------------- #
 
-function q_from_rN(param_set::APS, q_type::CMTWaterTypes, r::FT, N::FT; monodisperse::Bool=true, μ::FT=FT(0), ρ::FT=FT(1), _χm::FT=FT(NaN)) where {FT}
+function q_from_rN(
+    param_set::APS,
+    q_type::CMTWaterTypes,
+    r::FT,
+    N::FT;
+    monodisperse::Bool = true,
+    μ::FT = FT(0),
+    ρ::FT = FT(1),
+    _χm::FT = FT(NaN),
+) where {FT}
     """
     Calculate q from r, N
     """
@@ -2500,7 +2818,8 @@ function q_from_rN(param_set::APS, q_type::CMTWaterTypes, r::FT, N::FT; monodisp
         _χm::FT = isnan(_χm) ? get_χm(param_set, q_type) : _χm
         if r > r_min
             if monodisperse
-                return mass(microphys_params, q_type, r, N, _χm; monodisperse=true) - mass(microphys_params, q_type, r_min, N, _χm; monodisperse=true) # we subtract the r_min radius sphere volume to get the effective q
+                return mass(microphys_params, q_type, r, N, _χm; monodisperse = true) -
+                       mass(microphys_params, q_type, r_min, N, _χm; monodisperse = true) # we subtract the r_min radius sphere volume to get the effective q
             else
                 # _χm = get_χm(param_set, q_type) # this is the mass scaling factor for the mass diameter relationship, so we can use it to scale the mean radius
                 # _χm::FT = isnan(_χm) ? get_χm(param_set, q_type) : _χm
@@ -2509,10 +2828,12 @@ function q_from_rN(param_set::APS, q_type::CMTWaterTypes, r::FT, N::FT; monodisp
                 _me::FT = me(microphys_params, q_type)
                 _Δm::FT = Δm(microphys_params, q_type)
                 _λ = (μ + 1) / r
-                _n0 = n0_from_Nλ(N, _λ; μ=μ)
+                _n0 = n0_from_Nλ(N, _λ; μ = μ)
 
-                q = _χm * _m0 * _n0 * CM1.SF.gamma(μ + _me + _Δm + FT(1)) / (_r0^(_me + _Δm) * _λ^(μ + _me + _Δm + FT(1)))
-                q = max(FT(0), q - mass(microphys_params, q_type, r_min, N, _χm; monodisperse=true))
+                q =
+                    _χm * _m0 * _n0 * CM1.SF.gamma(μ + _me + _Δm + FT(1)) /
+                    (_r0^(_me + _Δm) * _λ^(μ + _me + _Δm + FT(1)))
+                q = max(FT(0), q - mass(microphys_params, q_type, r_min, N, _χm; monodisperse = true))
                 q /= ρ  # 1/ρ to go from /m^3 to kg/kg
                 return q
 
@@ -2524,8 +2845,26 @@ function q_from_rN(param_set::APS, q_type::CMTWaterTypes, r::FT, N::FT; monodisp
         end
     end
 end
-qi_from_rN(param_set::APS, r::FT, N::FT; monodisperse::Bool=true, ice_type::CMT.IceType=ice_type, μ::FT=FT(0), ρ::FT=FT(1), _χm::FT=FT(NaN)) where {FT} = q_from_rN(param_set, ice_type, r, N; monodisperse=monodisperse, μ=μ, ρ=ρ, _χm=_χm) # shorthand for ice type
-ql_from_rN(param_set::APS, r::FT, N::FT; monodisperse::Bool=true, liq_type::CMT.LiquidType=liq_type, μ::FT=FT(0), ρ::FT=FT(1), _χm::FT=FT(NaN)) where {FT} = q_from_rN(param_set, liq_type, r, N; monodisperse=monodisperse, μ=μ, ρ=ρ, _χm=_χm) # shorthand for liquid type
+qi_from_rN(
+    param_set::APS,
+    r::FT,
+    N::FT;
+    monodisperse::Bool = true,
+    ice_type::CMT.IceType = ice_type,
+    μ::FT = FT(0),
+    ρ::FT = FT(1),
+    _χm::FT = FT(NaN),
+) where {FT} = q_from_rN(param_set, ice_type, r, N; monodisperse = monodisperse, μ = μ, ρ = ρ, _χm = _χm) # shorthand for ice type
+ql_from_rN(
+    param_set::APS,
+    r::FT,
+    N::FT;
+    monodisperse::Bool = true,
+    liq_type::CMT.LiquidType = liq_type,
+    μ::FT = FT(0),
+    ρ::FT = FT(1),
+    _χm::FT = FT(NaN),
+) where {FT} = q_from_rN(param_set, liq_type, r, N; monodisperse = monodisperse, μ = μ, ρ = ρ, _χm = _χm) # shorthand for liquid type
 
 function q_from_r(param_set::APS, q_type::CMTWaterTypes, r::FT) where {FT}
     """
@@ -2540,8 +2879,8 @@ function q_from_r(param_set::APS, q_type::CMTWaterTypes, r::FT) where {FT}
         return FT(0) # consider erroring for r < r_min
     end
 end
-qi_from_r(param_set::APS, r::FT; ice_type::CMT.IceType=ice_type) where {FT} = q_from_r(param_set, ice_type, r) # shorthand for ice type
-ql_from_r(param_set::APS, r::FT; liq_type::CMT.LiquidType=liq_type) where {FT} = q_from_r(param_set, liq_type, r) # shorthand for liquid type
+qi_from_r(param_set::APS, r::FT; ice_type::CMT.IceType = ice_type) where {FT} = q_from_r(param_set, ice_type, r) # shorthand for ice type
+ql_from_r(param_set::APS, r::FT; liq_type::CMT.LiquidType = liq_type) where {FT} = q_from_r(param_set, liq_type, r) # shorthand for liquid type
 
 
 
@@ -2561,14 +2900,14 @@ function q_effective(
     q::FT,
     N::FT,
     r_min::FT;
-    monodisperse::Bool=true, # if true, we assume the q is for a monodisperse distribution, otherwise we assume it's for a polydisperse distribution
+    monodisperse::Bool = true, # if true, we assume the q is for a monodisperse distribution, otherwise we assume it's for a polydisperse distribution
 ) where {FT}
     """
     effective q for a given N, r, ρ that basically shoves the r_min sphere into the center of every drop
     """
     # ρ_eff = ρ * mass_scaling_factor # we scale the density by the mass_scaling_factor to get the effective density for the mass diameter relationship (we assume same power, but different scaling)
     # return q + FT(4/3) * FT(π) * ρ_eff * N * (r_min^3) 
-    return q + mass(param_set, q_type, r_min, N; monodisperse=monodisperse) # this is the volume of a single droplet with radius r_min, so we add it to q to get the effective q
+    return q + mass(param_set, q_type, r_min, N; monodisperse = monodisperse) # this is the volume of a single droplet with radius r_min, so we add it to q to get the effective q
 end
 
 
@@ -2580,6 +2919,6 @@ I suppose you could try to figure how how they're doing that q <--> N mapping, b
 # q_effective_nan_N_safe(q::FT, N::FT, ρ::FT, r_min::FT) where{FT} = isnan(N) ? q : q_effective(q, N, ρ, r_min)
 # q_effective_nan_N_safe(param_set::APS, q::FT, N::FT, ρ::FT) where{FT} = isnan(N) ? q :  q_effective(q, N, ρ, FT(param_set.user_params.particle_min_radius))
 
-q_effective_nan_N_safe(param_set::APS, q_type::CMTWaterTypes, q::FT, N::FT; monodisperse::Bool=true) where {FT} = isnan(N) ? q : q_effective(param_set, q_type, q, N, FT(param_set.user_params.particle_min_radius); monodisperse=monodisperse)
-
-
+q_effective_nan_N_safe(param_set::APS, q_type::CMTWaterTypes, q::FT, N::FT; monodisperse::Bool = true) where {FT} =
+    isnan(N) ? q :
+    q_effective(param_set, q_type, q, N, FT(param_set.user_params.particle_min_radius); monodisperse = monodisperse)

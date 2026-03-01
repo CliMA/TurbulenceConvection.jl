@@ -40,7 +40,8 @@ function updraft_microphysics!(
 
     nonequilibrium_moisture_scheme = edmf.moisture_model.scheme # my new addition
     # moisture_sources_limiter = edmf.tendency_limiters.moisture_sources_limiter
-    moisture_sources_limiter = get_tendency_limiter(edmf.tendency_limiters, Val(:moisture_sources), use_fallback_tendency_limiters)
+    moisture_sources_limiter =
+        get_tendency_limiter(edmf.tendency_limiters, Val(:moisture_sources), use_fallback_tendency_limiters)
     mstl = get_tendency_limiter(edmf.tendency_limiters, Val(:moisture_sources), use_fallback_tendency_limiters)
 
     ε = eps(FT) # see EDMF_Environment.jl for explanation
@@ -71,13 +72,50 @@ function updraft_microphysics!(
                 # ========================================== #
                 #  compute nonequilibrium moisture tendencies
                 # ========================================== #
-                cld_frac_up = (aux_up[i].q_liq[k] > zero(FT) || aux_up[i].q_ice[k] > zero(FT)) ?  one(FT) : zero(FT) # updrafts are assumed 100% cloudy if they have condensate
+                cld_frac_up = (aux_up[i].q_liq[k] > zero(FT) || aux_up[i].q_ice[k] > zero(FT)) ? one(FT) : zero(FT) # updrafts are assumed 100% cloudy if they have condensate
                 liq_frac_up = aux_up[i].q_liq[k] > zero(FT) ? one(FT) : zero(FT)
                 ice_frac_up = aux_up[i].q_ice[k] > zero(FT) ? one(FT) : zero(FT)
-                mph_neq = noneq_moisture_sources(param_set, nonequilibrium_moisture_scheme, moisture_sources_limiter, aux_up[i].area[k], ρ_c[k], aux_up[i].p[k], aux_up[i].T[k], Δt + ε, aux_up[i].ts[k], w[k],  aux_up[i].q_vap_sat_liq[k], aux_up[i].q_vap_sat_ice[k], aux_tc.dqvdt[k], aux_tc.dTdt[k], aux_up[i].τ_liq[k], aux_up[i].τ_ice[k], liq_frac_up, ice_frac_up, cld_frac_up) # ts_LCL = nothing) # we currently don't store dqvdt for the updraft...
+                mph_neq = noneq_moisture_sources(
+                    param_set,
+                    nonequilibrium_moisture_scheme,
+                    moisture_sources_limiter,
+                    aux_up[i].area[k],
+                    ρ_c[k],
+                    aux_up[i].p[k],
+                    aux_up[i].T[k],
+                    Δt + ε,
+                    aux_up[i].ts[k],
+                    w[k],
+                    aux_up[i].q_vap_sat_liq[k],
+                    aux_up[i].q_vap_sat_ice[k],
+                    aux_tc.dqvdt[k],
+                    aux_tc.dTdt[k],
+                    aux_up[i].τ_liq[k],
+                    aux_up[i].τ_ice[k],
+                    liq_frac_up,
+                    ice_frac_up,
+                    cld_frac_up,
+                ) # ts_LCL = nothing) # we currently don't store dqvdt for the updraft...
 
                 if reweight_processes_for_grid
-                    mph_neq = reweight_noneq_moisture_sources_for_grid(k, grid, param_set, thermo_params, aux_up[i], aux_up_f[i], mph_neq, nonequilibrium_moisture_scheme, moisture_sources_limiter, Δt, ρ_c, p_c, w, aux_tc.dqvdt, aux_tc.dTdt; reweight_extrema_only = reweight_extrema_only)
+                    mph_neq = reweight_noneq_moisture_sources_for_grid(
+                        k,
+                        grid,
+                        param_set,
+                        thermo_params,
+                        aux_up[i],
+                        aux_up_f[i],
+                        mph_neq,
+                        nonequilibrium_moisture_scheme,
+                        moisture_sources_limiter,
+                        Δt,
+                        ρ_c,
+                        p_c,
+                        w,
+                        aux_tc.dqvdt,
+                        aux_tc.dTdt;
+                        reweight_extrema_only = reweight_extrema_only,
+                    )
                 end
 
                 aux_up[i].ql_tendency_noneq[k] = mph_neq.ql_tendency * aux_up[i].area[k]
@@ -92,14 +130,16 @@ function updraft_microphysics!(
                     aux_bulk.qi_tendency_sub_dep[k] += mph_neq.qi_tendency * aux_up[i].area[k] # for storage
                 end
 
-            
+
                 # ========================================== #
                 #  compute other tendencies
                 # ========================================== #
-    
 
-                S_ql_from_before::FT = iszero(aux_up[i].area[k]) ? FT(0) : aux_up[i].ql_tendency_noneq[k] / aux_up[i].area[k]
-                S_qi_from_before::FT = iszero(aux_up[i].area[k]) ? FT(0) : aux_up[i].qi_tendency_noneq[k] / aux_up[i].area[k] # is it possible we lost some info here if area won't be 0 after? i dont think so cause you multiply byy 0 in the end anyway
+
+                S_ql_from_before::FT =
+                    iszero(aux_up[i].area[k]) ? FT(0) : aux_up[i].ql_tendency_noneq[k] / aux_up[i].area[k]
+                S_qi_from_before::FT =
+                    iszero(aux_up[i].area[k]) ? FT(0) : aux_up[i].qi_tendency_noneq[k] / aux_up[i].area[k] # is it possible we lost some info here if area won't be 0 after? i dont think so cause you multiply byy 0 in the end anyway
                 mph_neq_other = other_microphysics_processes(
                     param_set,
                     edmf.moisture_model,
@@ -124,12 +164,18 @@ function updraft_microphysics!(
                 aux_bulk.qi_tendency_noneq[k] += mph_neq_other.qi_tendency * aux_up[i].area[k] # add here bc we're not gonna zero out again (we zero out in compute_nonequilibrium_moisture_tendencies!() )
 
                 if !state.calibrate_io
-                    aux_up[i].qi_tendency_hom_frz[k] = mph_neq_other.qi_tendency_homogeneous_freezing * aux_up[i].area[k] # for storage
-                    aux_bulk.qi_tendency_hom_frz[k] += mph_neq_other.qi_tendency_homogeneous_freezing * aux_up[i].area[k] # for storage
-                    aux_up[i].qi_tendency_het_frz[k] = mph_neq_other.qi_tendency_heterogeneous_freezing * aux_up[i].area[k] # for storage
-                    aux_bulk.qi_tendency_het_frz[k] += mph_neq_other.qi_tendency_heterogeneous_freezing * aux_up[i].area[k] # for storage
-                    aux_up[i].qi_tendency_het_nuc[k] = mph_neq_other.qi_tendency_heterogeneous_icenuc * aux_up[i].area[k] # for storage
-                    aux_bulk.qi_tendency_het_nuc[k] += mph_neq_other.qi_tendency_heterogeneous_icenuc * aux_up[i].area[k] # for storage
+                    aux_up[i].qi_tendency_hom_frz[k] =
+                        mph_neq_other.qi_tendency_homogeneous_freezing * aux_up[i].area[k] # for storage
+                    aux_bulk.qi_tendency_hom_frz[k] +=
+                        mph_neq_other.qi_tendency_homogeneous_freezing * aux_up[i].area[k] # for storage
+                    aux_up[i].qi_tendency_het_frz[k] =
+                        mph_neq_other.qi_tendency_heterogeneous_freezing * aux_up[i].area[k] # for storage
+                    aux_bulk.qi_tendency_het_frz[k] +=
+                        mph_neq_other.qi_tendency_heterogeneous_freezing * aux_up[i].area[k] # for storage
+                    aux_up[i].qi_tendency_het_nuc[k] =
+                        mph_neq_other.qi_tendency_heterogeneous_icenuc * aux_up[i].area[k] # for storage
+                    aux_bulk.qi_tendency_het_nuc[k] +=
+                        mph_neq_other.qi_tendency_heterogeneous_icenuc * aux_up[i].area[k] # for storage
                     aux_up[i].qi_tendency_melt[k] = mph_neq_other.qi_tendency_melting * aux_up[i].area[k] # for storage
                     aux_bulk.qi_tendency_melt[k] += mph_neq_other.qi_tendency_melting * aux_up[i].area[k] # for storage
                 end
@@ -217,7 +263,8 @@ function updraft_microphysics!(
                     get_tendency_limiter(edmf.tendency_limiters, Val(:precipitation), use_fallback_tendency_limiters),
                     FT(0); # no dissipation in updrafts
                     N_i_no_boost = aux_up[i].N_i[k], # no boost in updraft bc no downdraft in updraft
-                    qi_tendency_sed =  (aux_up[i].area[k] > FT(0)) ? aux_up[i].qi_tendency_sedimentation[k] / aux_up[i].area[k] : FT(0),
+                    qi_tendency_sed = (aux_up[i].area[k] > FT(0)) ?
+                                      aux_up[i].qi_tendency_sedimentation[k] / aux_up[i].area[k] : FT(0),
                     S_i = S_i,
                     τ_sub_dep = aux_up[i].τ_ice[k],
                     dN_i_dz = aux_up[i].dN_i_dz[k],
@@ -305,12 +352,7 @@ end
 """
 Sedimentation for cloud condensate handled here...
 """
-function compute_cloud_condensate_sedimentation_tendencies!(
-    state::State,
-    edmf::EDMFModel,
-    Δt::Real,
-    param_set::APS,
-)
+function compute_cloud_condensate_sedimentation_tendencies!(state::State, edmf::EDMFModel, Δt::Real, param_set::APS)
     grid = Grid(state)
     thermo_params = TCP.thermodynamics_params(param_set)
     FT = float_type(state)
@@ -326,11 +368,11 @@ function compute_cloud_condensate_sedimentation_tendencies!(
     p_c = aux_gm.p
     ρ_c = prog_gm.ρ
 
-    if edmf.cloud_sedimentation_model isa CloudSedimentationModel && !edmf.cloud_sedimentation_model.grid_mean   
+    if edmf.cloud_sedimentation_model isa CloudSedimentationModel && !edmf.cloud_sedimentation_model.grid_mean
         sedimentation = aux_tc.temporary_1
-        sedimentation_other = aux_tc.temporary_2     
+        sedimentation_other = aux_tc.temporary_2
         @inbounds for i in 1:N_up
-        # ======================================================================== #
+            # ======================================================================== #
             # sedimentation (should this maybe be a grid mean tendency?)
             ts_up = aux_up[i].ts # this is the thermodynamic state of the updraft, which is used to compute the sedimentation sources
 
@@ -350,7 +392,12 @@ function compute_cloud_condensate_sedimentation_tendencies!(
                 # velo_scheme = edmf.cloud_sedimentation_model.ice_terminal_velocity_scheme, # defined in update_aux
                 grid_mean = false,
                 use_relative_w = false, # we don't use w for sedimentation in the updrafts, so we can just set it to 0
-                scratch1 = aux_tc.temporary_3, scratch2 = aux_tc.temporary_4, scratch3 = aux_tc.temporary_5, scratch4 = aux_tc.temporary_6, scratch1F = aux_tc_f.temporary_f1, scratch2F = aux_tc_f.temporary_f2
+                scratch1 = aux_tc.temporary_3,
+                scratch2 = aux_tc.temporary_4,
+                scratch3 = aux_tc.temporary_5,
+                scratch4 = aux_tc.temporary_6,
+                scratch1F = aux_tc_f.temporary_f1,
+                scratch2F = aux_tc_f.temporary_f2,
             ) # should this be a grid mean tendency?
 
             @inbounds for k in real_center_indices(grid)
@@ -374,7 +421,7 @@ function compute_cloud_condensate_sedimentation_tendencies!(
                     aux_en = center_aux_environment(state)
                     qi_tendency_sedimentation_other = sedimentation_other[k]
                     qt_tendency_sedimentation_other = qi_tendency_sedimentation_other
-                    θ_liq_ice_tendency_sedimentation_other =  1 / Π_m / c_pm * (L_s * qi_tendency_sedimentation_other)
+                    θ_liq_ice_tendency_sedimentation_other = 1 / Π_m / c_pm * (L_s * qi_tendency_sedimentation_other)
                     aux_en.qi_tendency_sedimentation[k] += qi_tendency_sedimentation_other
                     aux_en.qt_tendency_sedimentation[k] += qt_tendency_sedimentation_other
                     aux_en.θ_liq_ice_tendency_sedimentation[k] += θ_liq_ice_tendency_sedimentation_other
@@ -402,7 +449,12 @@ function compute_cloud_condensate_sedimentation_tendencies!(
                 # velo_scheme = edmf.cloud_sedimentation_model.liq_terminal_velocity_scheme, # defined in update_aux
                 grid_mean = false,
                 use_relative_w = false,
-                scratch1 = aux_tc.temporary_3, scratch2 = aux_tc.temporary_4, scratch3 = aux_tc.temporary_5, scratch4 = aux_tc.temporary_6, scratch1F = aux_tc_f.temporary_f1, scratch2F = aux_tc_f.temporary_f2
+                scratch1 = aux_tc.temporary_3,
+                scratch2 = aux_tc.temporary_4,
+                scratch3 = aux_tc.temporary_5,
+                scratch4 = aux_tc.temporary_6,
+                scratch1F = aux_tc_f.temporary_f1,
+                scratch2F = aux_tc_f.temporary_f2,
             ) # should this be a grid mean tendency?
 
             @inbounds for k in real_center_indices(grid)
@@ -426,7 +478,7 @@ function compute_cloud_condensate_sedimentation_tendencies!(
                     aux_en = center_aux_environment(state)
                     ql_tendency_sedimentation_other = sedimentation_other[k]
                     qt_tendency_sedimentation_other = ql_tendency_sedimentation_other
-                    θ_liq_ice_tendency_sedimentation_other =  1 / Π_m / c_pm * (L_v * ql_tendency_sedimentation_other)
+                    θ_liq_ice_tendency_sedimentation_other = 1 / Π_m / c_pm * (L_v * ql_tendency_sedimentation_other)
                     aux_en.ql_tendency_sedimentation[k] += ql_tendency_sedimentation_other
                     aux_en.qt_tendency_sedimentation[k] += ql_tendency_sedimentation_other
                     aux_en.θ_liq_ice_tendency_sedimentation[k] += θ_liq_ice_tendency_sedimentation_other
@@ -438,10 +490,9 @@ function compute_cloud_condensate_sedimentation_tendencies!(
                 end
             end
 
-            
+
         end
         # ======================================================================== #
     end
     return nothing
 end
-

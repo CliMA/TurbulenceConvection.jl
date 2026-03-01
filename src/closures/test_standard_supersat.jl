@@ -31,7 +31,10 @@ thisdir = dirname(@__FILE__)
 @info thisdir
 
 reload_TC = false
-if reload_TC || !isdefined(Main, :TurbulenceConvection) || !isdefined(Main, :param_set) || !isdefined(Main, :thermo_params)
+if reload_TC ||
+   !isdefined(Main, :TurbulenceConvection) ||
+   !isdefined(Main, :param_set) ||
+   !isdefined(Main, :thermo_params)
     Pkg.activate(expanduser("~/Research_Schneider/CliMA/TurbulenceConvection.jl/integration_tests/"))
     # Pkg.activate(expanduser("~/Research_Schneider/CliMA/TurbulenceConvection.jl/"))
     tc_dir = expanduser("~/Research_Schneider/CliMA/TurbulenceConvection.jl")
@@ -65,7 +68,8 @@ else
     const BasicMoistureSourcesLimiter = TC.BasicMoistureSourcesLimiter
     const StandardSupersaturationMoistureSourcesLimiter = TC.StandardSupersaturationMoistureSourcesLimiter
     const MorrisonMilbrandt2015MoistureSourcesLimiter = TC.MorrisonMilbrandt2015MoistureSourcesLimiter
-    const MorrisonMilbrandt2015ExponentialPartOnlyMoistureSourcesLimiter = TC.MorrisonMilbrandt2015ExponentialPartOnlyMoistureSourcesLimiter
+    const MorrisonMilbrandt2015ExponentialPartOnlyMoistureSourcesLimiter =
+        TC.MorrisonMilbrandt2015ExponentialPartOnlyMoistureSourcesLimiter
     include("../microphysics_coupling_limiters.jl")
 end
 
@@ -175,25 +179,26 @@ function symlog(x, n = -3)
     result
 end
 
-function symlogformatter(x, n; ndigits=20)
+function symlogformatter(x, n; ndigits = 20)
     # if sign(x) == 0
     #     "10^$(n)"
     # else
-        s = sign(x) == 1 ? "+" : "-"
-        nexp = sign(x) * (abs(x) + n)
-        if sign(x) == -1
-            nexp = -nexp
-        end
-        n_exp_print = round(nexp, digits=ndigits)
-        # get minimal
-        # s * "10^$(n_exp_print)" # this doenst work bc stuff like BigFloats dont use minimal printing and wont be truncated
-        num_str = @sprintf("%.*f", ndigits, nexp)  # ✅ dynamic precision
-        return s * "10^" * num_str
+    s = sign(x) == 1 ? "+" : "-"
+    nexp = sign(x) * (abs(x) + n)
+    if sign(x) == -1
+        nexp = -nexp
+    end
+    n_exp_print = round(nexp, digits = ndigits)
+    # get minimal
+    # s * "10^$(n_exp_print)" # this doenst work bc stuff like BigFloats dont use minimal printing and wont be truncated
+    num_str = @sprintf("%.*f", ndigits, nexp)  # ✅ dynamic precision
+    return s * "10^" * num_str
     # end
 end
 
 # Δts = 10 .^ range(-7, stop = 5, length = 100)
-Δts = 10 .^ range(-4, stop = 4, length = 100); @warn("temp test")
+Δts = 10 .^ range(-4, stop = 4, length = 100);
+@warn("temp test");
 # Δts = 10 .^ range(log10(5), stop = log10(10), length = 100); @warn("temp test")
 
 # Δts = 10 .^ range(-18, stop = -10, length = 1000)
@@ -204,17 +209,34 @@ qls_exp = zeros(length(Δts))
 qis_exp = zeros(length(Δts))
 δ_ΔTs = zeros(length(Δts))
 using Plots
-ENV["GKSwstype"]="nul"
+ENV["GKSwstype"] = "nul"
 using ProgressMeter
-@showprogress dt=1 desc="Computing..." for (i, Δt) in enumerate(Δts)
+@showprogress dt = 1 desc = "Computing..." for (i, Δt) in enumerate(Δts)
     # qls[i], qis[i], δ_ΔTs[i] = morrison_milbrandt_2015_style(param_set, area, ρ,p, T, w, τ_liq, τ_ice, q_vap_0, q, q_eq, Δt, ts; opts = MM2015Opts{Float64}(use_fix=use_fix))
     # qls_exp[i], qis_exp[i] = morrison_milbrandt_2015_style_exponential_part_only(param_set, area, ρ, T, w, τ_liq, τ_ice, q_vap_0, dqvdt, dTdt, q_eq, Δt,)
 
     # println("============================================================================================================================================================== Δt = $Δt")
 
-    qls[i], qis[i] = 
-        # (q_vap_0 .* FT(NaN), q_vap_0 * FT(NaN))
-        calculate_timestep_limited_sources(TC.StandardSupersaturationMoistureSourcesLimiter(), param_set, area, ρ, p, T, w, τ_liq, τ_ice, q_vap, dqvdt, dTdt, q, q_eq, Δt, ts)
+    qls[i], qis[i] =
+    # (q_vap_0 .* FT(NaN), q_vap_0 * FT(NaN))
+        calculate_timestep_limited_sources(
+            TC.StandardSupersaturationMoistureSourcesLimiter(),
+            param_set,
+            area,
+            ρ,
+            p,
+            T,
+            w,
+            τ_liq,
+            τ_ice,
+            q_vap,
+            dqvdt,
+            dTdt,
+            q,
+            q_eq,
+            Δt,
+            ts,
+        )
 
 
 
@@ -281,7 +303,7 @@ if yscale === :symlog
 
     plot!(
         Δts,
-        symlog( fill(-q.liq, size(Δts)) , linthresh),
+        symlog(fill(-q.liq, size(Δts)), linthresh),
         label = "-ql/Δt base",
         color = :darkgreen,
         linestyle = :solid,
@@ -289,7 +311,7 @@ if yscale === :symlog
     )
     plot!(
         Δts,
-        symlog( fill(-q.ice, size(Δts)) , linthresh),
+        symlog(fill(-q.ice, size(Δts)), linthresh),
         label = "-qi/Δt base",
         color = :darkblue,
         linestyle = :solid,
@@ -328,14 +350,14 @@ ymax = max(ymax_l, ymax_i)
 if yscale === :symlog
     dy = ymax - ymin
     factor = 0.2
-    ymin -=  factor * dy
-    ymax +=  factor * dy
+    ymin -= factor * dy
+    ymax += factor * dy
     # ymin = ymin > 0 ? ymin * 0.9 : ymin * 1.1
     # ymax = ymax > 0 ? ymax * 1.1 : ymax * 0.9
-elseif yscale ==:linear
+elseif yscale == :linear
     dy = ymax - ymin
-    ymin -=  0.1 * dy
-    ymax +=  0.1 * dy
+    ymin -= 0.1 * dy
+    ymax += 0.1 * dy
 end
 
 ylims!(ymin, ymax)

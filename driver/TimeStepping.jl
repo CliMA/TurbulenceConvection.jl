@@ -83,7 +83,9 @@ function TimeStepping(::Type{FT}, namelist) where {FT}
 
         adaptive_depth_limit = TC.parse_namelist(namelist, "time_stepping", "adaptive_depth_limit"; default = 2) # how many recursive calls we allow to recalculate tendencies for new proposed dt
         @assert adaptive_depth_limit >= 1 "adaptive_depth_limit must be greater than or equal to 0, given value $(adaptive_depth_limit) is invalid"
-        use_tendency_timestep_limiter = explicit_solver ? TC.parse_namelist(namelist, "time_stepping", "use_tendency_timestep_limiter"; default = false) : false
+        use_tendency_timestep_limiter =
+            explicit_solver ?
+            TC.parse_namelist(namelist, "time_stepping", "use_tendency_timestep_limiter"; default = false) : false
         use_isoutofdomain_limiter = false # isoutofdomain is only used for adaptive timestepping to accept or reject timesteps
 
         if use_tendency_timestep_limiter
@@ -92,8 +94,16 @@ function TimeStepping(::Type{FT}, namelist) where {FT}
 
         spinup_half_t_max = TC.parse_namelist(namelist, "time_stepping", "spinup_half_t_max"; default = FT(0.0))
         spinup_dt_factor = TC.parse_namelist(namelist, "time_stepping", "spinup_dt_factor"; default = FT(1.0))
-        allow_spinup_adapt_dt  = adapt_dt ? TC.parse_namelist(namelist, "time_stepping", "allow_spinup_adapt_dt"; default = (adapt_dt || use_tendency_timestep_limiter)) : false
-        N_dt_max_edmf_violate_dt_min_remaining = TC.parse_namelist(namelist, "time_stepping", "N_dt_max_edmf_violate_dt_min"; default = 0)
+        allow_spinup_adapt_dt =
+            adapt_dt ?
+            TC.parse_namelist(
+                namelist,
+                "time_stepping",
+                "allow_spinup_adapt_dt";
+                default = (adapt_dt || use_tendency_timestep_limiter),
+            ) : false
+        N_dt_max_edmf_violate_dt_min_remaining =
+            TC.parse_namelist(namelist, "time_stepping", "N_dt_max_edmf_violate_dt_min"; default = 0)
 
         # -------------------------------- #
         reltol = FT(NaN) # not used here
@@ -115,7 +125,7 @@ function TimeStepping(::Type{FT}, namelist) where {FT}
         # -------------------------------- #
         spinup_half_t_max = FT(0.0) # not used w/ adaptive
         spinup_dt_factor = FT(1.0) # not used w/ adaptive
-        allow_spinup_adapt_dt  = false # not used w/ adaptive
+        allow_spinup_adapt_dt = false # not used w/ adaptive
         N_dt_max_edmf_violate_dt_min_remaining = 0 # Not used here
 
     end
@@ -128,10 +138,12 @@ function TimeStepping(::Type{FT}, namelist) where {FT}
     t_max = TC.parse_namelist(namelist, "time_stepping", "t_max"; default = FT(7200.0))
     cfl_limit = TC.parse_namelist(namelist, "time_stepping", "cfl_limit"; default = FT(0.5))
     cfl_dt_max = TC.parse_namelist(namelist, "time_stepping", "cfl_dt_max"; default = dt_max)
-    allow_cfl_dt_max_violate_dt_min = TC.parse_namelist(namelist, "time_stepping", "allow_cfl_dt_max_violate_dt_min"; default = false)
-    
+    allow_cfl_dt_max_violate_dt_min =
+        TC.parse_namelist(namelist, "time_stepping", "allow_cfl_dt_max_violate_dt_min"; default = false)
+
     use_fallback_tendency_limiters = false # initialize as false for everything... it'll get set to true later if needed.
-    use_fallback_during_spinup = TC.parse_namelist(namelist, "time_stepping", "use_fallback_during_spinup"; default = false)
+    use_fallback_during_spinup =
+        TC.parse_namelist(namelist, "time_stepping", "use_fallback_during_spinup"; default = false)
 
     # [[ deprecated ]] [ this was bad because, say if dt was longer than dt_limit_tendencies, then you're actually undoing your limiter. it's the real TS.dt that matters for most things, not the Δt you pass to ∑tendencies!()
     # so passing in a custom dt to calculate the tendencies, but then using the real one in ODE solver did bad things. We now still offer a factor but base it off the real TS.dt ]
@@ -142,8 +154,10 @@ function TimeStepping(::Type{FT}, namelist) where {FT}
     #     dt_limit_tendencies = dt_min * limit_tendencies_using_dt_min_factor
     # end
 
-    dt_limit_tendencies_factor = TC.parse_namelist(namelist, "time_stepping", "dt_limit_tendencies_factor"; default = FT(1)) # for consistency, tendencies are limited by this factor times dt_min (so adapt_dt doesn't oscillate)
-    limit_tendencies_by_dt_min = TC.parse_namelist(namelist, "time_stepping", "limit_tendencies_by_dt_min"; default = false) # whether to limit by dt_min instead of current dt. The former is at least consistent in magnitude, but if dt is changing bad things can happen. Limiting by dt is prone to wild swings in the limited tendencies though.
+    dt_limit_tendencies_factor =
+        TC.parse_namelist(namelist, "time_stepping", "dt_limit_tendencies_factor"; default = FT(1)) # for consistency, tendencies are limited by this factor times dt_min (so adapt_dt doesn't oscillate)
+    limit_tendencies_by_dt_min =
+        TC.parse_namelist(namelist, "time_stepping", "limit_tendencies_by_dt_min"; default = false) # whether to limit by dt_min instead of current dt. The former is at least consistent in magnitude, but if dt is changing bad things can happen. Limiting by dt is prone to wild swings in the limited tendencies though.
 
     dt_max_edmf = FT(0)  # initialize
 
@@ -152,7 +166,7 @@ function TimeStepping(::Type{FT}, namelist) where {FT}
     @assert (FT(0) < spinup_dt_factor) "spinup_dt_factor must be greater than 0, given value $(spinup_dt_factor) is invalid"
 
     if spinup_half_t_max > FT(0)
-       dt = dt * spinup_dt_factor # enforce this spinup factor for the first timestep.... otherwise it doesnt seem to happen until after the first timestep when callbacks are called.
+        dt = dt * spinup_dt_factor # enforce this spinup factor for the first timestep.... otherwise it doesnt seem to happen until after the first timestep when callbacks are called.
     end
 
 

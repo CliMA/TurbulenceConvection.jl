@@ -17,11 +17,11 @@ Because we pack our parameters in a named tuple and put symbols in Vals so they'
 Put in here so can use here and in driver
 """
 
- # like SciMLBase._unwrap_val with _unwrap_val(::Val{B}) where {B} = B and _unwrap_val(B) = B
- unwrap_val(::Val{B}) where {B} = B 
- unwrap_val(B) = B # idk if we should keep this definition, seems error prone
+# like SciMLBase._unwrap_val with _unwrap_val(::Val{B}) where {B} = B and _unwrap_val(B) = B
+unwrap_val(::Val{B}) where {B} = B
+unwrap_val(B) = B # idk if we should keep this definition, seems error prone
 
- 
+
 function get_isbits_nt(named_tuple::NamedTuple, symbol::Symbol, default)
 
     if symbol in keys(named_tuple)

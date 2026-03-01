@@ -160,8 +160,8 @@ function my_Chen2022_vel_coeffs(prs::ACMP, ::CMT.SnowType, ρ::FT) where {FT <: 
 
     ρ_i::FT = CMP.ρ_cloud_ice(prs)
 
-    (_As_s::FT, _Bs_s::FT, _Cs_s::FT, _Es_s::FT, _Fs_s::FT, _Gs_s::FT), (_As_l::FT, _Bs_l::FT, _Cs_l::FT, _Es_l::FT, _Fs_l::FT, _Gs_l::FT, _Hs_l::FT) =
-        my_Chen2022snow_coeffs(prs, ρ_i)
+    (_As_s::FT, _Bs_s::FT, _Cs_s::FT, _Es_s::FT, _Fs_s::FT, _Gs_s::FT),
+    (_As_l::FT, _Bs_l::FT, _Cs_l::FT, _Es_l::FT, _Fs_l::FT, _Gs_l::FT, _Hs_l::FT) = my_Chen2022snow_coeffs(prs, ρ_i)
 
     # == small ================================================== # Table B2
     ai_s = (_Es_s * ρ^_As_s, _Fs_s * ρ^_As_s)
@@ -197,7 +197,16 @@ Returns the addends of the bulk fall speed of rain or ice particles
 following Chen et al 2022 DOI: 10.1016/j.atmosres.2022.106171 in [m/s].
 We are assuming exponential size distribution and hence μ=0.
 """
-function my_Chen2022_vel_add(a::FT, b::FT, c::FT, λ::FT, k::FT; Dmax::FT = Inf, Dmin::FT = 0.0, μ::FT = FT(0)) where {FT <: Real}
+function my_Chen2022_vel_add(
+    a::FT,
+    b::FT,
+    c::FT,
+    λ::FT,
+    k::FT;
+    Dmax::FT = Inf,
+    Dmin::FT = 0.0,
+    μ::FT = FT(0),
+) where {FT <: Real}
     δ = μ + k + FT(1)
     # return a * λ^δ * CM1.SF.gamma(b + δ) / (λ + c)^(b + δ) / CM1.SF.gamma(δ)
 
@@ -283,7 +292,7 @@ end
     q = ∫ n(r)m(r) dr / ρ
 
  """
- function int_nm_dr(
+function int_nm_dr(
     prs::ACMP,
     precip::CMTWaterTypes,
     q::FT,
@@ -298,10 +307,10 @@ end
     _n0::FT = isnan(Nt) ? n0(prs, q, ρ, precip) : n0(prs, q, ρ, precip, Nt, μ) # use wanted Nt If given
     λ = lambda(prs, precip, q, ρ, Nt, μ, Dmin, Dmax)
 
-    return int_nm_dr(prs, precip, _n0, λ, ρ, μ; Dmin=Dmin, Dmax=Dmax)
- end
+    return int_nm_dr(prs, precip, _n0, λ, ρ, μ; Dmin = Dmin, Dmax = Dmax)
+end
 
-    
+
 
 function int_nm_dr(
     prs::ACMP,
@@ -330,9 +339,9 @@ function int_nm_dr(
         _χm,
         _m0,
         n0,
-        (1/(_r0))^(_me + _Δm), 
+        (1 / (_r0))^(_me + _Δm),
         λ^-(μ_tot + FT(1)), # this is the same as λ^(-μ) * λ^(-1)
-        CM1.SF.gamma(μ_tot + FT(1), upper_limit) - CM1.SF.gamma(μ_tot + FT(1), lower_limit)
+        CM1.SF.gamma(μ_tot + FT(1), upper_limit) - CM1.SF.gamma(μ_tot + FT(1), lower_limit),
     )
 
     if any(iszero, parts)
@@ -342,12 +351,20 @@ function int_nm_dr(
         return isnan(out) ? FT(0) : out # in case the inf was introduced later, default to 0... (is that bad should probably only happen with very small inputs so probably is fine.)
     end
     # return -_χm * _m0 * n0 * (CM1.SF.gamma(μ + FT(1), upper_limit) - CM1.SF.gamma(μ + FT(1), lower_limit))
- end
+end
 
-int_q(prs::ACMP, precip::CMTWaterTypes, q::FT, ρ::FT, μ::FT; Nt::FT = FT(NaN), Dmin::FT = FT(0), Dmax::FT = FT(Inf)) where {FT} =
-    int_nm_dr(prs, precip, q, ρ, μ; Nt=Nt, Dmin=Dmin, Dmax=Dmax) / ρ
+int_q(
+    prs::ACMP,
+    precip::CMTWaterTypes,
+    q::FT,
+    ρ::FT,
+    μ::FT;
+    Nt::FT = FT(NaN),
+    Dmin::FT = FT(0),
+    Dmax::FT = FT(Inf),
+) where {FT} = int_nm_dr(prs, precip, q, ρ, μ; Nt = Nt, Dmin = Dmin, Dmax = Dmax) / ρ
 int_q(prs::ACMP, precip::CMTWaterTypes, n0::FT, λ::FT, ρ::FT, μ::FT; Dmin::FT = FT(0), Dmax::FT = FT(Inf)) where {FT} =
-    int_nm_dr(prs, precip, n0, λ, ρ, μ; Dmin=Dmin, Dmax=Dmax) / ρ
+    int_nm_dr(prs, precip, n0, λ, ρ, μ; Dmin = Dmin, Dmax = Dmax) / ρ
 
 
 
@@ -369,9 +386,9 @@ function int_n_dr(
     Dmax::FT = FT(Inf),
 ) where {FT <: Real}
 
-    _n0::FT = isnan(Nt) ? n0(prs, q, ρ, precip) : n0(prs, q, ρ, precip, Nt, μ; Dmin=Dmin, Dmax=Dmax) # use wanted Nt If given
+    _n0::FT = isnan(Nt) ? n0(prs, q, ρ, precip) : n0(prs, q, ρ, precip, Nt, μ; Dmin = Dmin, Dmax = Dmax) # use wanted Nt If given
     λ::FT = lambda(prs, precip, q, ρ, Nt, μ, Dmin, Dmax)
-    return int_n_dr(prs, precip, _n0, λ, ρ, μ; Dmin=Dmin, Dmax=Dmax)
+    return int_n_dr(prs, precip, _n0, λ, ρ, μ; Dmin = Dmin, Dmax = Dmax)
 end
 
 function int_n_dr(
@@ -394,7 +411,7 @@ function int_n_dr(
     parts = (
         n0,
         λ^-(μ + FT(1)), # this is the same as λ^(-μ) * λ^(-1)
-        CM1.SF.gamma(μ + FT(1), upper_limit) - CM1.SF.gamma(μ + FT(1), lower_limit)
+        CM1.SF.gamma(μ + FT(1), upper_limit) - CM1.SF.gamma(μ + FT(1), lower_limit),
     )
 
 
@@ -405,7 +422,16 @@ function int_n_dr(
         return isnan(out) ? FT(0) : out # in case the inf was introduced later
     end
 end
-n_int(prs::ACMP, precip::CMTWaterTypes, q::FT, ρ::FT, μ::FT; Nt::FT = FT(NaN), Dmin::FT = FT(0), Dmax::FT = FT(Inf)) where {FT} = int_n_dr(prs, precip, q, ρ, μ; Nt=Nt, Dmin=Dmin, Dmax=Dmax) / ρ
+n_int(
+    prs::ACMP,
+    precip::CMTWaterTypes,
+    q::FT,
+    ρ::FT,
+    μ::FT;
+    Nt::FT = FT(NaN),
+    Dmin::FT = FT(0),
+    Dmax::FT = FT(Inf),
+) where {FT} = int_n_dr(prs, precip, q, ρ, μ; Nt = Nt, Dmin = Dmin, Dmax = Dmax) / ρ
 
 
 """
@@ -426,10 +452,10 @@ function int_nr_dr(
     Dmax::FT = FT(Inf),
 ) where {FT <: Real}
 
-    _n0 = isnan(Nt) ? n0(prs, q, ρ, precip) : n0(prs, q, ρ, precip, Nt, μ; Dmin=Dmin, Dmax=Dmax) # use wanted Nt If given
+    _n0 = isnan(Nt) ? n0(prs, q, ρ, precip) : n0(prs, q, ρ, precip, Nt, μ; Dmin = Dmin, Dmax = Dmax) # use wanted Nt If given
     λ = lambda(prs, precip, q, ρ, Nt, μ, Dmin, Dmax)
 
-    return int_nr_dr(prs, precip, _n0, λ, ρ, μ; Dmin=Dmin, Dmax=Dmax)
+    return int_nr_dr(prs, precip, _n0, λ, ρ, μ; Dmin = Dmin, Dmax = Dmax)
 end
 
 function int_nr_dr(
@@ -450,7 +476,7 @@ function int_nr_dr(
     parts = (
         n0,
         λ^-(μ + FT(1)), # this is the same as λ^(-μ) * λ^(-1)
-        CM1.SF.gamma(μ_tot + FT(1), upper_limit) - CM1.SF.gamma(μ_tot + FT(1), lower_limit)
+        CM1.SF.gamma(μ_tot + FT(1), upper_limit) - CM1.SF.gamma(μ_tot + FT(1), lower_limit),
     )
 
     if any(iszero, parts)
@@ -478,11 +504,11 @@ function int_na_dr(
     Nt::FT = FT(NaN), # testing for type stability, use NaN instead of nothing
     Dmin::FT = FT(0),
     Dmax::FT = FT(Inf),
-) where {FT <: Real}    
+) where {FT <: Real}
 
-    _n0::FT = isnan(Nt) ? n0(prs, q, ρ, precip) : n0(prs, q, ρ, precip, Nt, μ; Dmin=Dmin, Dmax=Dmax) # use wanted Nt If given
+    _n0::FT = isnan(Nt) ? n0(prs, q, ρ, precip) : n0(prs, q, ρ, precip, Nt, μ; Dmin = Dmin, Dmax = Dmax) # use wanted Nt If given
     λ = lambda(prs, precip, q, ρ, Nt, μ, Dmin, Dmax)
-    return int_na_dr(prs, precip, _n0, λ, ρ, μ; Dmin=Dmin, Dmax=Dmax)
+    return int_na_dr(prs, precip, _n0, λ, ρ, μ; Dmin = Dmin, Dmax = Dmax)
 end
 
 function int_na_dr(
@@ -495,7 +521,7 @@ function int_na_dr(
     Nt::FT = FT(NaN), # testing for type stability, use NaN instead of nothing
     Dmin::FT = FT(0),
     Dmax::FT = FT(Inf),
-) where {FT <: Real}   
+) where {FT <: Real}
 
     _r0::FT = r0(prs, precip)
     _a0::FT = a0(prs, precip)
@@ -512,9 +538,9 @@ function int_na_dr(
         _χa,
         _a0,
         n0,
-        (1/(_r0))^(_ae + _Δa), 
+        (1 / (_r0))^(_ae + _Δa),
         λ^-(μ_tot + FT(1)), # this is the same as λ^(-μ) * λ^(-1)
-        CM1.SF.gamma(μ_tot + FT(1), upper_limit) - CM1.SF.gamma(μ_tot + FT(1), lower_limit)
+        CM1.SF.gamma(μ_tot + FT(1), upper_limit) - CM1.SF.gamma(μ_tot + FT(1), lower_limit),
     )
 
     if any(iszero, parts)
@@ -528,7 +554,7 @@ end
 
 
 
- """
+"""
     Numerator of Eq 20 in Chen et al 2022 for the kth moment.
         = ∫_Dmin^Dmax V(D) D^k n(D) dD =  n0 ∑ -a / (λ + c)^(b + δ) * (CM1.SF.gamma(b + δ, upper_limit) - CM1.SF.gamma(b + δ, lower_limit))
         V(D) = ϕ^κ ∑(a_i * D_i^b_i * e^(-c_i * D))
@@ -540,7 +566,17 @@ end
 
         Helper for int_nav_dr
 """
-function int__v_Dk_n__dD(a::FT, b::FT, c::FT, n0::FT, λ::FT, k::FT; Dmax::FT = FT(Inf), Dmin::FT = FT(0), μ::FT=FT(0)) where {FT <: Real}
+function int__v_Dk_n__dD(
+    a::FT,
+    b::FT,
+    c::FT,
+    n0::FT,
+    λ::FT,
+    k::FT;
+    Dmax::FT = FT(Inf),
+    Dmin::FT = FT(0),
+    μ::FT = FT(0),
+) where {FT <: Real}
     # defaults to μ = 0,  Exponential (Marshall-Palmer) instead of Gamma distribution
     δ = μ + k + 1
 
@@ -562,7 +598,7 @@ v(r) = χ_v v_0 (r/r_0)^(v_e + Δ_v) = velocity
     though in principle we put bounds on the integral so it's not infinite... so it's really
 -χ_m m_0 χ_a m_a n_0 (1/(r_0*λ))^(m_e + Δ_m + a_e + Δ_a)) [Γ(m_e + Δ_m + m_a + Δ_a 1, Dmax*λ) - Γ(m_e + Δ_m + m_a + Δ_a + 1, Dmin*λ)]
 """
- function int_nav_dr(
+function int_nav_dr(
     # prs::ACMP,
     param_set::APS,
     precip::CMTWaterTypes,
@@ -576,11 +612,11 @@ v(r) = χ_v v_0 (r/r_0)^(v_e + Δ_v) = velocity
 ) where {FT <: Real}
 
     error("int_nav_dr not implemented yet for Blk1MVelType -- this fcn needs to bupdated with v(r) instead of a(r)")
- end
+end
 
- 
 
- """
+
+"""
     Unlike Eq 5,20 in Chen et al 2022 [ https://doi.org/10.1016/j.atmosres.2022.106171 ], here we're not going for a mass-weighted average of the terminal velocities.
     Instead we just want the one integral ∫ n(r)a(r)v(r) dr
 
@@ -597,7 +633,7 @@ v(r) = χ_v v_0 (r/r_0)^(v_e + Δ_v) = velocity
     From Eq 20 this means [ using V =  ϕ^κ ∑_i (a_i * D^b_i * e^(-c_i*D)) from Eq 19 ]
         ∫ n(r)a(r)v(r) dr = π/4 ϕ^κ n0 ∑_i (a_i * λ^δ Γ(b_i + δ) / (λ+c_i)^(b_i+δ)
 """
- function int_nav_dr(
+function int_nav_dr(
     # prs::ACMP,
     param_set::APS,
     precip::CMT.IceType,
@@ -608,7 +644,7 @@ v(r) = χ_v v_0 (r/r_0)^(v_e + Δ_v) = velocity
     Nt::FT = FT(NaN), # testing for type stability, use NaN instead of nothing
     Dmin::FT = FT(0),
     Dmax::FT = FT(Inf),
-    D_transition::FT = FT((0.625e-3)/2), # .625mm is the transition from small to large ice crystals in Chen paper
+    D_transition::FT = FT((0.625e-3) / 2), # .625mm is the transition from small to large ice crystals in Chen paper
 ) where {FT <: Real}
 
     int::FT = FT(0)
@@ -617,7 +653,7 @@ v(r) = χ_v v_0 (r/r_0)^(v_e + Δ_v) = velocity
         prs = TCP.microphysics_params(param_set)
 
         if isnan(μ)
-            μ = μ_from_qN(param_set, precip, q, Nt; ρ=ρ)
+            μ = μ_from_qN(param_set, precip, q, Nt; ρ = ρ)
         end
 
         # coefficients from Appendix B from Chen et. al. 2022
@@ -627,14 +663,14 @@ v(r) = χ_v v_0 (r/r_0)^(v_e + Δ_v) = velocity
         # Ok so here's the thing.... we want q to fit between Dmin and Dmax...
         # so we need a lambda that works for that....
         # _λ::FT = lambda(param_set, precip, q, ρ, Nt, μ, Dmin, Dmax)
-        _n0::FT = isnan(Nt) ? n0(prs, q, ρ, precip) : n0(prs, q, ρ, precip, Nt, μ; Dmin=Dmin, Dmax=Dmax) # use wanted Nt If given
-        _λ::FT = lambda(prs, precip, q, ρ, Nt, μ; _n0=_n0, Dmin=Dmin, Dmax=Dmax)
+        _n0::FT = isnan(Nt) ? n0(prs, q, ρ, precip) : n0(prs, q, ρ, precip, Nt, μ; Dmin = Dmin, Dmax = Dmax) # use wanted Nt If given
+        _λ::FT = lambda(prs, precip, q, ρ, Nt, μ; _n0 = _n0, Dmin = Dmin, Dmax = Dmax)
 
         a0c::FT = a0(prs, precip) * χa(prs, precip)
         aec::FT = ae(prs, precip) + Δa(prs, precip)
         _r0::FT = r0(prs, precip)
 
-        
+
         if Dmin < D_transition
             if Dmax <= D_transition
                 regions = ((Dmin, Dmax),)
@@ -650,8 +686,8 @@ v(r) = χ_v v_0 (r/r_0)^(v_e + Δ_v) = velocity
 
         # Here we assume μ = 0, otherewise we would add it to k... (we had δ = μ + k + 1)
 
-        Dmax = min(Dmax,  FT(.625e-3)/2) # v is I think poorly defined past that point... for Chen.. grows too big, so we upper bound it.
-        
+        Dmax = min(Dmax, FT(.625e-3) / 2) # v is I think poorly defined past that point... for Chen.. grows too big, so we upper bound it.
+
 
         # Here the integrals should be additive, so we can just sum them up without any weighting
         # k = 2 #  k = 2 here bc a ∝ r^2
@@ -667,7 +703,7 @@ v(r) = χ_v v_0 (r/r_0)^(v_e + Δ_v) = velocity
             aiu, bi, ciu = abcs[i]
             # Eq 20 from Chen et al 2022
             @inbounds for (aiu_j, bi_j, ciu_j) in zip(aiu, bi, ciu)
-                int += int__v_Dk_n__dD(aiu_j, bi_j, ciu_j, _n0, _λ, k; Dmin=Dmin, Dmax=Dmax, μ=μ)
+                int += int__v_Dk_n__dD(aiu_j, bi_j, ciu_j, _n0, _λ, k; Dmin = Dmin, Dmax = Dmax, μ = μ)
             end
         end
 
@@ -677,10 +713,10 @@ v(r) = χ_v v_0 (r/r_0)^(v_e + Δ_v) = velocity
         int = max(zero(FT), int) # n, a, and v are all positive, so the integral should be positive
     end
     return resolve_nan(int)
- end
+end
 
 
- function int_nav_dr(
+function int_nav_dr(
     # prs::ACMP,
     param_set::APS,
     precip::CMT.RainType,
@@ -703,8 +739,8 @@ v(r) = χ_v v_0 (r/r_0)^(v_e + Δ_v) = velocity
         # coefficients from Table B1 from Chen et. al. 2022
         aiu, bi, ciu = my_Chen2022_vel_coeffs(prs, precip, ρ)
         # size distribution parameter
-        _λ::FT = lambda(param_set, precip, q, ρ, Nt, Dmin, Dmax; μ=μ)
-        _n0::FT = isnan(Nt) ? n0(prs, q, ρ, precip) : n0(param_set, q, ρ, precip, Nt; Dmin=Dmin, Dmax=Dmax, μ=μ)
+        _λ::FT = lambda(param_set, precip, q, ρ, Nt, Dmin, Dmax; μ = μ)
+        _n0::FT = isnan(Nt) ? n0(prs, q, ρ, precip) : n0(param_set, q, ρ, precip, Nt; Dmin = Dmin, Dmax = Dmax, μ = μ)
 
         # what is n0 here?
         _χa::FT = χa(prs, precip)
@@ -734,7 +770,7 @@ function int_nav_dr(
     Nt::FT = FT(NaN), # testing for type stability, use NaN instead of nothing
     Dmin::FT = FT(0),
     Dmax::FT = FT(Inf),
-    D_transition::FT = FT((0.625e-3)/2), # .625mm is the transition from small to large ice crystals in Chen paper
+    D_transition::FT = FT((0.625e-3) / 2), # .625mm is the transition from small to large ice crystals in Chen paper
 ) where {FT <: Real}
     error("Not implemented yet")
     # you would just look to terminal_velocity() for inspiration but we don't need this atm... so
@@ -789,16 +825,20 @@ function my_terminal_velocity(
         _v0::FT = v0(prs, ρ, precip)
         _ve::FT = ve(prs, precip)
         _Δv::FT = Δv(prs, precip)
-        _λ::FT = lambda(param_set, precip, q_, ρ, Nt, Dmin, Dmax; μ=μ)
+        _λ::FT = lambda(param_set, precip, q_, ρ, Nt, Dmin, Dmax; μ = μ)
 
         upper_limit = Dmax * _λ # Dmax should not be zero...
         lower_limit = iszero(Dmin) ? FT(0) : Dmin * _λ # avoid 0*Inf
 
         fall_w =
-            _χv * _v0 * (_λ * _r0)^(-_ve - _Δv) * 
-            (CM1.SF.gamma(_me + _ve + _Δm + _Δv + FT(1), upper_limit) - CM1.SF.gamma(_me + _Δm + _Δv + FT(1), lower_limit)) /
-            (CM1.SF.gamma(_me + _Δm + FT(1), upper_limit) - CM1.SF.gamma(_me + _Δm + FT(1), lower_limit))
-            # CM1.SF.gamma(_me + _ve + _Δm + _Δv + FT(1)) / CM1.SF.gamma(_me + _Δm + FT(1))
+            _χv *
+            _v0 *
+            (_λ * _r0)^(-_ve - _Δv) *
+            (
+                CM1.SF.gamma(_me + _ve + _Δm + _Δv + FT(1), upper_limit) -
+                CM1.SF.gamma(_me + _Δm + _Δv + FT(1), lower_limit)
+            ) / (CM1.SF.gamma(_me + _Δm + FT(1), upper_limit) - CM1.SF.gamma(_me + _Δm + FT(1), lower_limit))
+        # CM1.SF.gamma(_me + _ve + _Δm + _Δv + FT(1)) / CM1.SF.gamma(_me + _Δm + FT(1))
     end
 
     return resolve_nan(fall_w)
@@ -831,9 +871,9 @@ function my_terminal_velocity(
         # coefficients from Table B1 from Chen et. al. 2022
         aiu, bi, ciu = my_Chen2022_vel_coeffs(prs, precip, ρ)
         # size distribution parameter
-        _λ::FT = lambda(param_set, precip, q_, ρ, Nt, Dmin, Dmax; μ=μ)
+        _λ::FT = lambda(param_set, precip, q_, ρ, Nt, Dmin, Dmax; μ = μ)
         # eq 20 from Chen et al 2022
-        fall_w = sum(my_Chen2022_vel_add.(aiu, bi, ciu, _λ, k; Dmin = Dmin, Dmax = Dmax, μ=μ))
+        fall_w = sum(my_Chen2022_vel_add.(aiu, bi, ciu, _λ, k; Dmin = Dmin, Dmax = Dmax, μ = μ))
         # It should be ϕ^κ * fall_w, but for rain drops ϕ = 1 and κ = 0
         fall_w = max(FT(0), fall_w)
 
@@ -857,7 +897,9 @@ function my_terminal_velocity(
     # Nt::Union{FT, Nothing} = nothing,
     Nt::FT = FT(NaN), # testing for type stability, use NaN instead of nothing
 ) where {FT <: Real}
-    error("my_terminal_velocity for LiquidType not implemented yet, use my_terminal_velocity for RainType instead, but be sure to pass in your own `N` as the default will be far too small for rain.")
+    error(
+        "my_terminal_velocity for LiquidType not implemented yet, use my_terminal_velocity for RainType instead, but be sure to pass in your own `N` as the default will be far too small for rain.",
+    )
 end
 
 
@@ -869,11 +911,11 @@ function my_terminal_velocity(
     ρ::FT,
     q_::FT;
     Dmin::FT = FT(0), # Default to 0, but in CloudMicrophysics.jl technically it's 62.5μm...
-    Dmax::FT = FT((0.625e-3)/2), # 625 μm but we're really in r units now
+    Dmax::FT = FT((0.625e-3) / 2), # 625 μm but we're really in r units now
     # Nt::Union{FT, Nothing} = nothing,
     Nt::FT = FT(NaN), # testing for type stability, use NaN instead of nothing
-    D_transition::FT = FT((0.625e-3)/2), # .625mm is the transition from small to large ice crystals in Chen paper
-    μ::FT = FT(NaN)
+    D_transition::FT = FT((0.625e-3) / 2), # .625mm is the transition from small to large ice crystals in Chen paper
+    μ::FT = FT(NaN),
 ) where {FT <: Real}
     fall_w::FT = FT(0)
     # if q_ > FT(0)
@@ -965,7 +1007,7 @@ function my_terminal_velocity(
             total_weight += mass_weight
 
             @inbounds for (aiu_j, bi_j, ciu_j) in zip(aiu, bi, ciu)
-                fall_w += my_Chen2022_vel_add(aiu_j, bi_j, ciu_j, _λ, k; Dmin = Dmin, Dmax = Dmax, μ=μ) .* mass_weight
+                fall_w += my_Chen2022_vel_add(aiu_j, bi_j, ciu_j, _λ, k; Dmin = Dmin, Dmax = Dmax, μ = μ) .* mass_weight
             end
         end
 
@@ -1243,8 +1285,7 @@ function my_terminal_velocity(
         k = mec
 
         # Get shape-dependent physics parameters from our new helper
-        (; tmp_phys, α_shape, κ) =
-            my_aspect_ratio_coeffs(shape, m0c, mec, a0c, aec, ρ_i, _r0)
+        (; tmp_phys, α_shape, κ) = my_aspect_ratio_coeffs(shape, m0c, mec, a0c, aec, ρ_i, _r0)
 
         @assert(Dmin <= Dmax, "Dmin must be less than Dmax, got Dmin = $Dmin and Dmax = $Dmax")
 
@@ -1277,7 +1318,7 @@ function my_terminal_velocity(
 
         #     # This is the unscaled mass in the region (the denominator of the weighted average for this region)
         #     mass_weights[i] = _λ^-(μ + k + 1) * (-CM1.SF.gamma(μ + k + 1, upper_limit) + CM1.SF.gamma(μ + k + 1, lower_limit))
-            
+
         #     # V_avg_i = sum(my_Chen..._sno.(...))
         #     # fall_w += V_avg_i * mass_weights[i]
         #     # This computes the total numerator of the integral
@@ -1292,7 +1333,7 @@ function my_terminal_velocity(
             mass_weight = _λ^-(μ + k + 1) * (-CM1.SF.gamma(μ + k + 1, Dmax * _λ) + CM1.SF.gamma(μ + k + 1, Dmin * _λ))
             total_weight += mass_weight
             @inbounds for (aiu_j, bi_j, ciu_j) in zip(aiu, bi, ciu)
-                ci_pow = (ciu_j + _λ) ^ (-(α_shape * κ + bi_j + k + μ + 1))
+                ci_pow = (ciu_j + _λ)^(-(α_shape * κ + bi_j + k + μ + 1))
                 ti = tmp * aiu_j * ci_pow
                 fall_w += my_Chen2022_vel_add_sno(ti, bi_j, aec, mec, κ, k, ciu_j, _λ, Dmin, Dmax; μ = μ) * mass_weight
             end
@@ -1361,15 +1402,7 @@ function my_aspect_ratio_coeffs(
     return (; tmp_phys, α_shape, κ)
 end
 
-function my_aspect_ratio_coeffs(
-    ::Val{:Oblate},
-    m0c::FT,
-    mec::FT,
-    a0c::FT,
-    aec::FT,
-    ρ_i::FT,
-    _r0::FT,
-) where {FT <: Real}
+function my_aspect_ratio_coeffs(::Val{:Oblate}, m0c::FT, mec::FT, a0c::FT, aec::FT, ρ_i::FT, _r0::FT) where {FT <: Real}
     # Oblate (squashed) shape: Φ(R) = 3 * sqrt(π) * m(R) / (4 * ρᵢ * a(R)^(3/2))
     # Φ < 1, so κ must be positive.
     # κ = +1/3

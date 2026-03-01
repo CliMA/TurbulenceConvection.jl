@@ -762,7 +762,7 @@ function SOCRATES(namelist_defaults; case_name = "SOCRATES_RFXX_XXX_data")
         11 => 115e6, # 115 / cm^3
         12 => 210e6, # 210 / cm^3
         13 => 180e6, # 180 / cm^3
-        )
+    )
 
     namelist["user_params"]["N_CCN"] = N_CCNs_default[namelist["meta"]["flight_number"]]
 
@@ -782,7 +782,7 @@ function convert_namelist_types_to_default!(namelist, default_namelist)
             else
                 try
                     namelist[key] = convert(typeof(default_namelist[key]), value)
-                catch 
+                catch
                     default_type = typeof(default_namelist[key])
                     # @info "default_type: $default_type"
                     if default_type <: Tuple

@@ -127,7 +127,13 @@ function set_thermo_state_from_prog!(state::TC.State, moisture_model::TC.Abstrac
         else
             error("Something went wrong. The moisture_model options are equilibrium or nonequilibrium")
         end
-        ts_gm[k] = TC.thermo_state_pθq(param_set, p_c[k], prog_gm.ρθ_liq_ice[k] / ρ_c[k], prog_gm.ρq_tot[k] / ρ_c[k], thermo_args..., )
+        ts_gm[k] = TC.thermo_state_pθq(
+            param_set,
+            p_c[k],
+            prog_gm.ρθ_liq_ice[k] / ρ_c[k],
+            prog_gm.ρq_tot[k] / ρ_c[k],
+            thermo_args...,
+        )
     end
     return nothing
 end
@@ -185,32 +191,32 @@ function assign_thermo_aux!(state, param_set)
         aux_gm.q_liq[k] = TD.liquid_specific_humidity(thermo_params, ts)
         aux_gm.q_ice[k] = TD.ice_specific_humidity(thermo_params, ts)
         aux_gm.T[k] = TD.air_temperature(thermo_params, ts)
-        
+
         # @assert [for search optimization, but don't use assert, use an explicit error]
         # (0 < aux_gm.T[k] < Inf) || error("Negative/zero or nonfinite temperature will cause issues here, status is z = $(grid.zc[k].z), T = $(aux_gm.T[k]), q = $(ts_gm[k].q), θ_liq_ice = $(aux_gm.θ_liq_ice[k]), ts = $ts") # debugging, remove later -- will slow down code
 
         # if !(0 < aux_gm.T[k] < Inf)
-            # @info "status: T = $(TC.full_print(aux_gm.T)); θ_liq_ice = $(TC.full_print(aux_gm.θ_liq_ice)); q_tot = $(TC.full_print(aux_gm.q_tot)); q_liq = $(TC.full_print(aux_gm.q_liq)); q_ice = $(TC.full_print(aux_gm.q_ice))"
-            # aux_up = TC.center_aux_updrafts(state)
-            # aux_up_f = TC.face_aux_updrafts(state)
-            # aux_en = TC.center_aux_environment(state)
-            # aux_en_f = TC.face_aux_environment(state)
-            # prog_up = TC.center_prog_updrafts(state)
-            # prog_up_f = TC.face_prog_updrafts(state)
-            # prog_gm = TC.center_prog_grid_mean(state)
-            # aux_gm = TC.center_aux_grid_mean(state)
+        # @info "status: T = $(TC.full_print(aux_gm.T)); θ_liq_ice = $(TC.full_print(aux_gm.θ_liq_ice)); q_tot = $(TC.full_print(aux_gm.q_tot)); q_liq = $(TC.full_print(aux_gm.q_liq)); q_ice = $(TC.full_print(aux_gm.q_ice))"
+        # aux_up = TC.center_aux_updrafts(state)
+        # aux_up_f = TC.face_aux_updrafts(state)
+        # aux_en = TC.center_aux_environment(state)
+        # aux_en_f = TC.face_aux_environment(state)
+        # prog_up = TC.center_prog_updrafts(state)
+        # prog_up_f = TC.face_prog_updrafts(state)
+        # prog_gm = TC.center_prog_grid_mean(state)
+        # aux_gm = TC.center_aux_grid_mean(state)
 
-            # println("---------------------------------------------------")
-            # # summary(stdout, state.prog)
-            # @info summary(state.prog)
-            # println("---------------------------------------------------")
-            # # summary(stdout, state.aux)
-            # @info summary(state.aux)
-            # println("---------------------------------------------------")
-            # flush(stdout); flush(stderr)
-            # error("Negative or nonfinite temperature will cause issues here, status is z = $(grid.zc[k].z), T = $(aux_gm.T[k]), q = $(ts_gm[k].q), θ_liq_ice = $(aux_gm.θ_liq_ice[k]), ts = $ts")
+        # println("---------------------------------------------------")
+        # # summary(stdout, state.prog)
+        # @info summary(state.prog)
+        # println("---------------------------------------------------")
+        # # summary(stdout, state.aux)
+        # @info summary(state.aux)
+        # println("---------------------------------------------------")
+        # flush(stdout); flush(stderr)
+        # error("Negative or nonfinite temperature will cause issues here, status is z = $(grid.zc[k].z), T = $(aux_gm.T[k]), q = $(ts_gm[k].q), θ_liq_ice = $(aux_gm.θ_liq_ice[k]), ts = $ts")
         # end
-        
+
         aux_gm.RH[k] = TD.relative_humidity(thermo_params, ts)
         if !state.calibrate_io
             aux_gm.RH_liq[k] = TC.relative_humidity_over_liquid(thermo_params, ts)
@@ -247,7 +253,7 @@ function my_unstable_check_test(dt::Real, prog::FV, params::NT, t::Real) where {
     TS.isoutofdomain = false # reset to false at the beginning of the function
 
     @debug "Checking for nan in prognostic variables"
-    
+
     CC.Fields.bycolumn(axes(prog.cent)) do colidx # have to do this bc it's a do block which is technically an anonymous function...
         UnPack.@unpack edmf, precip_model, param_set, case = params
         UnPack.@unpack surf_params, radiation, forcing, aux, TS = params
@@ -266,17 +272,17 @@ end
 """
 neg_or_nan(x::FT) where {FT} = x < FT(0) || isnan(x)
 function isoutofdomain(prog::FV, params::NT, t::Real) where {NT, FV <: CC.Fields.FieldVector}
-# need to figure something out
+    # need to figure something out
     # bycolumn() returns nothing, and also we'd like to short circuit if we find a negative value
     # basically it's passing do_block(colidx) = /block/ as first argument to bycolumn
 
-    
+
     # not sure if we need this before the by-column call (or does it get automatically rolled back?)
     TS = params.TS
     TS.isoutofdomain = false # reset to false at the beginning of the function
 
     @debug "Checking for negative values in prognostic variables in isoutofdomain() at t = $t, TS.isoutofdomain = $(params.TS.isoutofdomain)"
-    
+
     CC.Fields.bycolumn(axes(prog.cent)) do colidx # have to do this bc it's a do block which is technically an anonymous function...
         UnPack.@unpack edmf, precip_model, param_set, case = params
         UnPack.@unpack surf_params, radiation, forcing, aux, TS = params
@@ -289,7 +295,7 @@ function isoutofdomain(prog::FV, params::NT, t::Real) where {NT, FV <: CC.Fields
         N_up = TC.n_updrafts(edmf)
         kc_surf = TC.kc_surface(grid)
         kf_surf = TC.kf_surface(grid)
-    
+
         aux_tc = TC.center_aux_turbconv(state)
         aux_up = TC.center_aux_updrafts(state)
         aux_en = TC.center_aux_environment(state)
@@ -479,8 +485,21 @@ function ∑tendencies!(tendencies::FV, prog::FV, params::NT, t::Real) where {NT
         TC.update_aux_tendencies!(edmf, state, param_set, Δt, TS.use_fallback_tendency_limiters) # move update aux to after step, in a callback I guess
         # compute tendencies
         # causes division error in dry bubble first time step
-        TC.compute_precipitation_sink_tendencies(precip_model, edmf, state, param_set, Δt, TS.use_fallback_tendency_limiters)
-        TC.compute_precipitation_advection_tendencies(precip_model, edmf, state, param_set, TS.use_fallback_tendency_limiters)
+        TC.compute_precipitation_sink_tendencies(
+            precip_model,
+            edmf,
+            state,
+            param_set,
+            Δt,
+            TS.use_fallback_tendency_limiters,
+        )
+        TC.compute_precipitation_advection_tendencies(
+            precip_model,
+            edmf,
+            state,
+            param_set,
+            TS.use_fallback_tendency_limiters,
+        )
 
         TC.compute_turbconv_tendencies!(edmf, state, param_set, surf, Δt, cfl_limit, TS.use_fallback_tendency_limiters)
         compute_gm_tendencies!(edmf, state, surf, radiation, forcing, param_set, TS.use_fallback_tendency_limiters, Δt)
@@ -550,7 +569,14 @@ end
 #  HELPER FUNCTION (Strict Types Enforced)
 # ------------------------------------------------------------------
 function apply_subsidence_barrier!(
-    tendency::F, subsidence::F, scalar::F, scalar_F::F2, scalar_F2::F2, val_bottom::FT, val_top::FT, prefactor::ForFT
+    tendency::F,
+    subsidence::F,
+    scalar::F,
+    scalar_F::F2,
+    scalar_F2::F2,
+    val_bottom::FT,
+    val_top::FT,
+    prefactor::ForFT,
 ) where {FT, F <: CC.Fields.Field, F2 <: CC.Fields.Field, ForFT <: Union{F, FT}} # Strictly enforces ClimaCore Fields
     InterpScalar = CCO.InterpolateC2F(bottom = CCO.SetValue(val_bottom), top = CCO.SetValue(val_top))
     InterpW = CCO.InterpolateC2F(bottom = CCO.SetValue(zero(FT)), top = CCO.Extrapolate())
@@ -578,17 +604,25 @@ function apply_subsidence_barrier!(
     # @. tendency -= Base.materialize(out)
 
 
-    
+
     @. scalar_F = InterpScalar(scalar) # 1. Fill Face Scratch (Reads scalar, Writes scalar_F)  ( MUST be done first before we overwrite scalar.)
     @. scalar = Div(W(scalar_F)) # 2. Fill Center Scratch (Reads scalar_F, Overwrites scalar) ( We use 'scalar' itself to store the Divergence result, as you did.)
     @. scalar_F2 = InterpW(subsidence) # 3. Fill Face Scratch (Reads subsidence, Writes scalar_F2)
     out = @. TC.lazy(prefactor * Reconstruct(TC.toscalar(Upwind(W(scalar_F2), scalar)))) # 4. Final Fused Tendency Update [[ We use TC.lazy ONLY here.  This fuses Reconstruct + toscalar + prefactor into the Upwind loop. Upwind reads the materialized 'scalar_F2' and 'scalar' from above.
     @. tendency -= Base.materialize(out)
-        
+
 
     return nothing
 end
-function save_subsidence_barrier!(dest::F, subsidence::F, scalar::F, scalar_F::F2, scalar_F2::F2, val_bottom::FT, val_top::FT, prefactor::ForFT
+function save_subsidence_barrier!(
+    dest::F,
+    subsidence::F,
+    scalar::F,
+    scalar_F::F2,
+    scalar_F2::F2,
+    val_bottom::FT,
+    val_top::FT,
+    prefactor::ForFT,
 ) where {FT, F <: CC.Fields.Field, F2 <: CC.Fields.Field, ForFT <: Union{F, FT}}
     InterpScalar = CCO.InterpolateC2F(bottom = CCO.SetValue(val_bottom), top = CCO.SetValue(val_top))
     InterpW = CCO.InterpolateC2F(bottom = CCO.SetValue(zero(FT)), top = CCO.Extrapolate())
@@ -704,7 +738,7 @@ function compute_gm_tendencies!(
 
     TC.zero_field!(aux_tc.dqvdt) # reset to zero, do here instead of in update_aux bc we need only some of these values...
     TC.zero_field!(aux_tc.dTdt) # reset to zero, do here instead of in update_aux bc we need only some of these values...
-    
+
 
     # We have access to three center temp vars: ϕ, ψ, and Φ, and one face temp var ϕ [[ These are okay because we do not make any nested calls here... ]]
     # ∇Tr = aux_tc.temporary_1 # reusing temporary storage for w∇ stuff :: Tracer
@@ -739,7 +773,16 @@ function compute_gm_tendencies!(
     # 1. Reuse one scratch field for division
     w∇θ_liq_ice_gm = aux_tc.temporary_2
     @. w∇θ_liq_ice_gm = prog_gm.ρθ_liq_ice / ρ_c
-    apply_subsidence_barrier!(tendencies_gm.ρθ_liq_ice, aux_gm.subsidence, w∇θ_liq_ice_gm, aux_tc_f.temporary_f1, aux_tc_f.temporary_f2, θ_liq_ice_gm_boa, θ_liq_ice_gm_toa, ρ_c)
+    apply_subsidence_barrier!(
+        tendencies_gm.ρθ_liq_ice,
+        aux_gm.subsidence,
+        w∇θ_liq_ice_gm,
+        aux_tc_f.temporary_f1,
+        aux_tc_f.temporary_f2,
+        θ_liq_ice_gm_boa,
+        θ_liq_ice_gm_toa,
+        ρ_c,
+    )
 
 
     # ∇q_tot_gm = ∇Tr # alias
@@ -755,9 +798,27 @@ function compute_gm_tendencies!(
     w∇q_tot_gm = aux_tc.temporary_2
     @. w∇q_tot_gm = prog_gm.ρq_tot / ρ_c
     if state.calibrate_io
-        apply_subsidence_barrier!(tendencies_gm.ρq_tot, aux_gm.subsidence, w∇q_tot_gm, aux_tc_f.temporary_f1, aux_tc_f.temporary_f2, q_tot_gm_boa, q_tot_gm_toa, ρ_c)
+        apply_subsidence_barrier!(
+            tendencies_gm.ρq_tot,
+            aux_gm.subsidence,
+            w∇q_tot_gm,
+            aux_tc_f.temporary_f1,
+            aux_tc_f.temporary_f2,
+            q_tot_gm_boa,
+            q_tot_gm_toa,
+            ρ_c,
+        )
     else
-        save_subsidence_barrier!(aux_tc.qt_tendency_ls_vert_adv, aux_gm.subsidence, w∇q_tot_gm, aux_tc_f.temporary_f1, aux_tc_f.temporary_f2, q_tot_gm_boa, q_tot_gm_toa, one(FT))
+        save_subsidence_barrier!(
+            aux_tc.qt_tendency_ls_vert_adv,
+            aux_gm.subsidence,
+            w∇q_tot_gm,
+            aux_tc_f.temporary_f1,
+            aux_tc_f.temporary_f2,
+            q_tot_gm_boa,
+            q_tot_gm_toa,
+            one(FT),
+        )
         @. tendencies_gm.ρq_tot -= ρ_c * aux_tc.qt_tendency_ls_vert_adv
     end
     # if !state.calibrate_io
@@ -787,9 +848,27 @@ function compute_gm_tendencies!(
         w∇q_liq_gm = aux_tc.temporary_2
         @.w∇q_liq_gm = prog_gm.q_liq
         if state.calibrate_io
-            apply_subsidence_barrier!(tendencies_gm.q_liq, aux_gm.subsidence, w∇q_liq_gm, aux_tc_f.temporary_f1, aux_tc_f.temporary_f2, q_liq_gm_boa, q_liq_gm_toa, one(FT))
+            apply_subsidence_barrier!(
+                tendencies_gm.q_liq,
+                aux_gm.subsidence,
+                w∇q_liq_gm,
+                aux_tc_f.temporary_f1,
+                aux_tc_f.temporary_f2,
+                q_liq_gm_boa,
+                q_liq_gm_toa,
+                one(FT),
+            )
         else
-            save_subsidence_barrier!(aux_tc.ql_tendency_ls_vert_adv, aux_gm.subsidence, w∇q_liq_gm, aux_tc_f.temporary_f1, aux_tc_f.temporary_f2, q_liq_gm_boa, q_liq_gm_toa, one(FT))
+            save_subsidence_barrier!(
+                aux_tc.ql_tendency_ls_vert_adv,
+                aux_gm.subsidence,
+                w∇q_liq_gm,
+                aux_tc_f.temporary_f1,
+                aux_tc_f.temporary_f2,
+                q_liq_gm_boa,
+                q_liq_gm_toa,
+                one(FT),
+            )
             @. tendencies_gm.q_liq -= aux_tc.ql_tendency_ls_vert_adv
         end
         # if !state.calibrate_io
@@ -808,11 +887,29 @@ function compute_gm_tendencies!(
         # @. tendencies_gm.q_ice -= w∇q_ice_gm
         w∇q_ice_gm = aux_tc.temporary_2
         @. w∇q_ice_gm = prog_gm.q_ice
-        
+
         if state.calibrate_io
-            apply_subsidence_barrier!(tendencies_gm.q_ice, aux_gm.subsidence, w∇q_ice_gm, aux_tc_f.temporary_f1, aux_tc_f.temporary_f2, q_ice_gm_boa, q_ice_gm_toa, one(FT))
+            apply_subsidence_barrier!(
+                tendencies_gm.q_ice,
+                aux_gm.subsidence,
+                w∇q_ice_gm,
+                aux_tc_f.temporary_f1,
+                aux_tc_f.temporary_f2,
+                q_ice_gm_boa,
+                q_ice_gm_toa,
+                one(FT),
+            )
         else
-            save_subsidence_barrier!(aux_tc.qi_tendency_ls_vert_adv, aux_gm.subsidence, w∇q_ice_gm, aux_tc_f.temporary_f1, aux_tc_f.temporary_f2, q_ice_gm_boa, q_ice_gm_toa, one(FT))
+            save_subsidence_barrier!(
+                aux_tc.qi_tendency_ls_vert_adv,
+                aux_gm.subsidence,
+                w∇q_ice_gm,
+                aux_tc_f.temporary_f1,
+                aux_tc_f.temporary_f2,
+                q_ice_gm_boa,
+                q_ice_gm_toa,
+                one(FT),
+            )
             @. tendencies_gm.q_ice -= aux_tc.qi_tendency_ls_vert_adv
         end
         # if !state.calibrate_io
@@ -839,9 +936,27 @@ function compute_gm_tendencies!(
     w∇q_rai_gm = aux_tc.temporary_2
     @. w∇q_rai_gm = prog_pr.q_rai
     if state.calibrate_io
-        apply_subsidence_barrier!(tendencies_pr.q_rai, aux_gm.subsidence, w∇q_rai_gm, aux_tc_f.temporary_f1, aux_tc_f.temporary_f2, q_rai_gm_boa, q_rai_gm_toa, one(FT))
+        apply_subsidence_barrier!(
+            tendencies_pr.q_rai,
+            aux_gm.subsidence,
+            w∇q_rai_gm,
+            aux_tc_f.temporary_f1,
+            aux_tc_f.temporary_f2,
+            q_rai_gm_boa,
+            q_rai_gm_toa,
+            one(FT),
+        )
     else
-        save_subsidence_barrier!(aux_tc.qr_tendency_ls_vert_adv, aux_gm.subsidence, w∇q_rai_gm, aux_tc_f.temporary_f1, aux_tc_f.temporary_f2, q_rai_gm_boa, q_rai_gm_toa, one(FT))
+        save_subsidence_barrier!(
+            aux_tc.qr_tendency_ls_vert_adv,
+            aux_gm.subsidence,
+            w∇q_rai_gm,
+            aux_tc_f.temporary_f1,
+            aux_tc_f.temporary_f2,
+            q_rai_gm_boa,
+            q_rai_gm_toa,
+            one(FT),
+        )
         @. tendencies_pr.q_rai -= aux_tc.qr_tendency_ls_vert_adv
     end
     # if !state.calibrate_io
@@ -860,9 +975,27 @@ function compute_gm_tendencies!(
     w∇q_sno_gm = aux_tc.temporary_2
     @. w∇q_sno_gm = prog_pr.q_sno
     if state.calibrate_io
-        apply_subsidence_barrier!(tendencies_pr.q_sno, aux_gm.subsidence, w∇q_sno_gm, aux_tc_f.temporary_f1, aux_tc_f.temporary_f2, q_sno_gm_boa, q_sno_gm_toa, one(FT))
+        apply_subsidence_barrier!(
+            tendencies_pr.q_sno,
+            aux_gm.subsidence,
+            w∇q_sno_gm,
+            aux_tc_f.temporary_f1,
+            aux_tc_f.temporary_f2,
+            q_sno_gm_boa,
+            q_sno_gm_toa,
+            one(FT),
+        )
     else
-        save_subsidence_barrier!(aux_tc.qs_tendency_ls_vert_adv, aux_gm.subsidence, w∇q_sno_gm, aux_tc_f.temporary_f1, aux_tc_f.temporary_f2, q_sno_gm_boa, q_sno_gm_toa, one(FT))
+        save_subsidence_barrier!(
+            aux_tc.qs_tendency_ls_vert_adv,
+            aux_gm.subsidence,
+            w∇q_sno_gm,
+            aux_tc_f.temporary_f1,
+            aux_tc_f.temporary_f2,
+            q_sno_gm_boa,
+            q_sno_gm_toa,
+            one(FT),
+        )
         @. tendencies_pr.q_sno -= aux_tc.qs_tendency_ls_vert_adv
     end
     # apply_subsidence_barrier!(tendencies_pr.q_sno, w∇q_sno_gm, aux_gm.subsidence, q_sno_gm_boa, q_sno_gm_toa, -FT(1))
@@ -877,15 +1010,16 @@ function compute_gm_tendencies!(
         Π = TD.exner(thermo_params, ts_gm[k])
 
         # Radiation
-        if Cases.rad_type(radiation) <: Union{Cases.RadiationDYCOMS_RF01, Cases.RadiationLES, Cases.RadiationTRMM_LBA, Cases.RadiationSOCRATES}
-            tendencies_gm.ρθ_liq_ice[k] += ρ_c[k] * aux_gm.dTdt_rad[k] / Π 
+        if Cases.rad_type(radiation) <:
+           Union{Cases.RadiationDYCOMS_RF01, Cases.RadiationLES, Cases.RadiationTRMM_LBA, Cases.RadiationSOCRATES}
+            tendencies_gm.ρθ_liq_ice[k] += ρ_c[k] * aux_gm.dTdt_rad[k] / Π
             aux_tc.dTdt[k] += aux_gm.dTdt_rad[k] # [store things that matter for our dTdt] [ dTdt priority ] [ idk if this totally helps, it's typically strong cloud top cooling so maybe it drives liquid generation?]
         end
 
         # LS advection
         tendencies_gm.ρq_tot[k] += ρ_c[k] * aux_gm.dqtdt_hadv[k]
         if !(Cases.force_type(force) <: Cases.ForcingDYCOMS_RF01)
-            tendencies_gm.ρθ_liq_ice[k] += ρ_c[k] * aux_gm.dTdt_hadv[k] / Π 
+            tendencies_gm.ρθ_liq_ice[k] += ρ_c[k] * aux_gm.dTdt_hadv[k] / Π
             aux_tc.dTdt[k] += aux_gm.dTdt_hadv[k] # [store things that matter for our dTdt] [ dTdt priority ]
 
         end
@@ -919,7 +1053,7 @@ function compute_gm_tendencies!(
             tendencies_gm_uₕ[k] += CCG.Covariant12Vector(CCG.UVVector(gm_U_nudge_k, gm_V_nudge_k), lg[k])
             if edmf.moisture_model isa TC.NonEquilibriumMoisture
                 tendencies_gm.q_liq[k] += aux_gm.dqldt_hadv[k] + gm_q_liq_nudge_k + aux_gm.dqldt_fluc[k]
-                tendencies_gm.q_ice[k] += aux_gm.dqidt_hadv[k] + gm_q_ice_nudge_k + aux_gm.dqidt_fluc[k]                
+                tendencies_gm.q_ice[k] += aux_gm.dqidt_hadv[k] + gm_q_ice_nudge_k + aux_gm.dqidt_fluc[k]
             end
         end
 
@@ -944,7 +1078,7 @@ function compute_gm_tendencies!(
             aux_gm.dqtdt_nudge[k] = gm_q_tot_nudge_k
 
             aux_tc.dqvdt[k] += (gm_q_tot_nudge_k + aux_gm.dqtdt_fluc[k]) # [store things that matter for our dqvdt] [dqvdt priority ]
-            aux_tc.dTdt[k] += (gm_H_nudge_k* Π + aux_gm.dTdt_fluc[k]) #  [store things that matter for our aux_tc.dTdt] [dTdt priority ] [ go opposite way with exner] # DO NOT DO THIS, it's not at all the same thing as temperature!!! because of condensate. it's really not the same thing as θ_liq_ice, so we don't do this.
+            aux_tc.dTdt[k] += (gm_H_nudge_k * Π + aux_gm.dTdt_fluc[k]) #  [store things that matter for our aux_tc.dTdt] [dTdt priority ] [ go opposite way with exner] # DO NOT DO THIS, it's not at all the same thing as temperature!!! because of condensate. it's really not the same thing as θ_liq_ice, so we don't do this.
 
             # nudge liquid and ice -- but we don't have a ql_nudge qi_nudge from external forcing in socrates? only qt_nudge -- what are ql_nudge and qi_nudge derived from
             if edmf.moisture_model isa TC.NonEquilibriumMoisture
@@ -982,23 +1116,23 @@ function compute_gm_tendencies!(
 
 
         # ====== sedimentation grid mean only (stability fix...)
-        if edmf.cloud_sedimentation_model isa TC.CloudSedimentationModel 
+        if edmf.cloud_sedimentation_model isa TC.CloudSedimentationModel
             if edmf.cloud_sedimentation_model.grid_mean
                 error("Grid mean sedimentation not implemented yet")
             else
 
-            if edmf.moisture_model isa TC.NonEquilibriumMoisture
-                tendencies_gm.q_liq[k] +=
-                    aux_en.ql_tendency_sedimentation[k] + aux_bulk.ql_tendency_sedimentation[k]
-                tendencies_gm.q_ice[k] +=
-                    aux_en.qi_tendency_sedimentation[k] + aux_bulk.qi_tendency_sedimentation[k]
-            end
+                if edmf.moisture_model isa TC.NonEquilibriumMoisture
+                    tendencies_gm.q_liq[k] +=
+                        aux_en.ql_tendency_sedimentation[k] + aux_bulk.ql_tendency_sedimentation[k]
+                    tendencies_gm.q_ice[k] +=
+                        aux_en.qi_tendency_sedimentation[k] + aux_bulk.qi_tendency_sedimentation[k]
+                end
 
-            tendencies_gm.ρq_tot[k] +=
-                ρ_c[k] * (aux_bulk.qt_tendency_sedimentation[k] + aux_en.qt_tendency_sedimentation[k])
+                tendencies_gm.ρq_tot[k] +=
+                    ρ_c[k] * (aux_bulk.qt_tendency_sedimentation[k] + aux_en.qt_tendency_sedimentation[k])
 
-            tendencies_gm.ρθ_liq_ice[k] +=
-                ρ_c[k] * (aux_bulk.θ_liq_ice_tendency_sedimentation[k] + aux_en.θ_liq_ice_tendency_sedimentation[k])
+                tendencies_gm.ρθ_liq_ice[k] +=
+                    ρ_c[k] * (aux_bulk.θ_liq_ice_tendency_sedimentation[k] + aux_en.θ_liq_ice_tendency_sedimentation[k])
             end
         end
     end
@@ -1056,4 +1190,3 @@ function compute_gm_tendencies!(
 
     return nothing
 end
-

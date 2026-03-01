@@ -42,8 +42,12 @@ function make_hybrid_spaces(h_space, z_mesh)
     face_space = CC.Spaces.FaceExtrudedFiniteDifferenceSpace(center_space)
 
     svpc_domain =
-        # CC.Domains.IntervalDomain(CC.Geometry.ZPoint{FT}(0), CC.Geometry.ZPoint{FT}(1), boundary_tags = (:bottom, :top))
-        CC.Domains.IntervalDomain(CC.Geometry.ZPoint{FT}(0), CC.Geometry.ZPoint{FT}(1); boundary_names = (:bottom, :top)) # see https://github.com/CliMA/ClimaCore.jl/commit/4ec6aa960a12f22e6575df64724ea8ddcd1ce0d1
+    # CC.Domains.IntervalDomain(CC.Geometry.ZPoint{FT}(0), CC.Geometry.ZPoint{FT}(1), boundary_tags = (:bottom, :top))
+        CC.Domains.IntervalDomain(
+            CC.Geometry.ZPoint{FT}(0),
+            CC.Geometry.ZPoint{FT}(1);
+            boundary_names = (:bottom, :top),
+        ) # see https://github.com/CliMA/ClimaCore.jl/commit/4ec6aa960a12f22e6575df64724ea8ddcd1ce0d1
     svpc_mesh = CC.Meshes.IntervalMesh(svpc_domain, nelems = 1)
     svpc_space = CC.Spaces.CenterFiniteDifferenceSpace(svpc_mesh)
 

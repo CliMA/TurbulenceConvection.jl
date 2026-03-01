@@ -35,7 +35,7 @@ function n0(prs::ACMP, q_liq::FT, ρ::FT, ::CMT.LiquidType) where {FT <: Real}
     N = FT(200) * 1e6
     # average 5 micron droplets
     _λ_liq::FT = (_μ_liq + 1) / (5e-6)
-   # we want total N to be something like 200 / cm^3
+    # we want total N to be something like 200 / cm^3
     n0 = N * _λ_liq^(_μ_liq + 1) / CM1.SF.gamma(_μ_liq + 1)
     return n0
 end
@@ -61,8 +61,7 @@ function n0(
     ρ::FT,
     precip::CMTWaterTypes,
     Nt::FT,
-    μ::FT # μ is the exponent in the PSD, default to 0 for marshall palmer
-    ;
+    μ::FT;
     Dmin::FT = FT(0), # Dmin is the lower limit of the PSD, default to 0
     Dmax::FT = FT(Inf), # Dmax is the upper limit of the PSD, default to Inf    
 ) where {FT <: Real}
@@ -98,11 +97,11 @@ function n0(
                 # Call FT(1 / (_me + _Δm + μ + 1)) `E`
                 #  So we have  N_t = n_0 *  Γ(μ+1) / λ^(μ+1) = n_0 * Γ(μ+1) / (λ_no_n0 * n_0^E)^(μ+1) = n_0^(1-E) * Γ(μ+1) / λ_no_n0^(μ+1)
                 # Then, n_0^(1-E) = N_t λ_no_n0^(μ+1) / Γ(μ+1), and:
-                _n0 = (Nt * λ_no_n0^(μ + FT(1)) / CM1.SF.gamma(μ + FT(1)))^(1 / (1 - E*(μ + FT(1))))
+                _n0 = (Nt * λ_no_n0^(μ + FT(1)) / CM1.SF.gamma(μ + FT(1)))^(1 / (1 - E * (μ + FT(1))))
             end
         else
             if !iszero(Dmin) && !isinf(Dmax) # use numerical solver...
-                _n0, _ = get_n0_lambda(prs, precip, q, ρ, Nt, μ; Dmin=Dmin, Dmax=Dmax)
+                _n0, _ = get_n0_lambda(prs, precip, q, ρ, Nt, μ; Dmin = Dmin, Dmax = Dmax)
             end
         end
     end
@@ -118,7 +117,16 @@ function n0(
     return _n0
 end
 
-function n0(param_set::APS, q::FT, ρ::FT, precip::CMTWaterTypes, Nt::FT; μ::FT = FT(NaN), Dmin::FT = FT(0), Dmax::FT = FT(Inf)) where {FT <: Real}
+function n0(
+    param_set::APS,
+    q::FT,
+    ρ::FT,
+    precip::CMTWaterTypes,
+    Nt::FT;
+    μ::FT = FT(NaN),
+    Dmin::FT = FT(0),
+    Dmax::FT = FT(Inf),
+) where {FT <: Real}
 
     microphys_params = TCP.microphysics_params(param_set)
 
@@ -129,15 +137,15 @@ function n0(param_set::APS, q::FT, ρ::FT, precip::CMTWaterTypes, Nt::FT; μ::FT
         q += Nt * q_r_min
     end
     if isnan(μ)
-        μ = μ_from_qN(param_set, precip, q, Nt; ρ=ρ)
+        μ = μ_from_qN(param_set, precip, q, Nt; ρ = ρ)
     end
 
-    return n0(microphys_params, q, ρ, precip, Nt, μ; Dmin=Dmin, Dmax=Dmax)
+    return n0(microphys_params, q, ρ, precip, Nt, μ; Dmin = Dmin, Dmax = Dmax)
 end
 
 # We know N = n0 Γ(μ + 1) / λ^(μ+1), so we just invert this
-function n0_from_Nλ(N::FT, λ::FT; μ::FT = FT(0)) where{FT <: Real}
-    return N * λ^(μ+1) / CM1.SF.gamma(μ + 1)
+function n0_from_Nλ(N::FT, λ::FT; μ::FT = FT(0)) where {FT <: Real}
+    return N * λ^(μ + 1) / CM1.SF.gamma(μ + 1)
 end
 
 
@@ -159,7 +167,7 @@ function v0(prs::ACMP, ρ::FT, ::CMT.RainType) where {FT <: Real}
 
     return sqrt(FT(8 / 3) / _C_drag * (_ρ_cloud_liq / ρ - FT(1)) * _grav * _r0_rai)
 end
-v0(prs::ACMP, ::FT, ::CMT.SnowType) where{FT <: Real} = CMP.v0_sno(prs)
+v0(prs::ACMP, ::FT, ::CMT.SnowType) where {FT <: Real} = CMP.v0_sno(prs)
 
 # Other ice/rain/snow parameters to dispatch over
 a_vent(prs::ACMP, ::CMT.RainType) = CMP.a_vent_rai(prs)
@@ -176,9 +184,10 @@ me(prs::ACMP, ::CMT.IceType) = CMP.me_ice(prs)
 # my ice additions ----------------------------------------------- #
 # For these, you might want to fall back to snow but they need to work with r0 for ice etc.... just assume regular
 a0(prs::ACMP, ice_type::CMT.IceType) = eltype(prs)(π) * r0(prs, ice_type)^2 # [ should just be π * r0^2 ]
-v0(prs::ACMP, ρ::FT, ::CMT.IceType) where {FT <: Real} = error("`v0` not implemented for ice yet. Try using Chen parameterization") # (we will be using Chen2022 mostly anyway)
+v0(prs::ACMP, ρ::FT, ::CMT.IceType) where {FT <: Real} =
+    error("`v0` not implemented for ice yet. Try using Chen parameterization") # (we will be using Chen2022 mostly anyway)
 
-χa(prs::ACMP, ::CMT.IceType) = eltype(prs)(1) 
+χa(prs::ACMP, ::CMT.IceType) = eltype(prs)(1)
 ae(prs::ACMP, ::CMT.IceType) = eltype(prs)(2)
 Δa(prs::ACMP, ::CMT.IceType) = eltype(prs)(0) # [ should just be 0 ]
 
@@ -190,7 +199,7 @@ ve(prs::ACMP, ::CMT.IceType) = error("`ve` not implemented for ice yet. Try usin
 r0(prs::ACMP, ::CMT.LiquidType) = eltype(prs)(10e-6) # 10 micron mean.
 function m0(prs::ACMP, liq_type::CMT.LiquidType)
     FT = eltype(prs)
-    return FT(4/3) * FT(π) * CMP.ρ_cloud_liq(prs) * r0(prs, liq_type)^3
+    return FT(4 / 3) * FT(π) * CMP.ρ_cloud_liq(prs) * r0(prs, liq_type)^3
 end
 χm(prs::ACMP, ::CMT.LiquidType) = error("I put this in param_set.user_params, use that one...")
 me(prs::ACMP, ::CMT.LiquidType) = eltype(prs)(3) # this is the exponent in the PSD, so we can use it to scale n_0
@@ -198,7 +207,7 @@ me(prs::ACMP, ::CMT.LiquidType) = eltype(prs)(3) # this is the exponent in the P
 χa(prs::ACMP, ::CMT.LiquidType) = eltype(prs)(1) #
 a0(prs::ACMP, liq_type::CMT.LiquidType) = eltype(prs)(π) * r0(prs, liq_type)^2
 ae(prs::ACMP, ::CMT.LiquidType) = eltype(prs)(2) # this is the exponent in the PSD, so we can use it to scale n_0
-Δa(prs::ACMP, ::CMT.LiquidType) = eltype(prs)(0) 
+Δa(prs::ACMP, ::CMT.LiquidType) = eltype(prs)(0)
 χv(prs::ACMP, ::CMT.LiquidType) = eltype(prs)(1) #
 ve(prs::ACMP, ::CMT.LiquidType) = error("`ve` not implemented for liquid yet. Try using Chen parameterization") # (we will be using Chen2022 mostly anyway)
 Δv(prs::ACMP, ::CMT.LiquidType) = eltype(prs)(0) #
@@ -275,11 +284,11 @@ function lambda(
         end
 
         if !iszero(Dmin) || !isinf(Dmax) # use numerical solver...
-            _n0, λ = get_n0_lambda(prs, precip, q, ρ, Nt, μ; Dmin=Dmin, Dmax=Dmax)
+            _n0, λ = get_n0_lambda(prs, precip, q, ρ, Nt, μ; Dmin = Dmin, Dmax = Dmax)
         else
             # _n0::FT = isnothing(Nt) ? n0(prs, q, ρ, precip) : n0(prs, q, ρ, Nt, precip) # use wanted Nt If given
             if isnan(_n0)
-                _n0::FT = isnan(Nt) ? n0(prs, q, ρ, precip) : n0(prs, q, ρ, precip, Nt, μ; Dmin=Dmin, Dmax=Dmax) # use wanted Nt If given
+                _n0::FT = isnan(Nt) ? n0(prs, q, ρ, precip) : n0(prs, q, ρ, precip, Nt, μ; Dmin = Dmin, Dmax = Dmax) # use wanted Nt If given
             end
 
 
@@ -293,11 +302,16 @@ function lambda(
             # _χm::FT = χm(prs, precip) # technically we change this in user_params... 
             _χm::FT = isnan(_χm) ? χm(prs, precip) : _χm
 
-            λ = (_χm * _m0 * _n0 * CM1.SF.gamma(_me + _Δm + μ + FT(1)) / ρ / q / _r0^(_me + _Δm))^FT(1 / (_me + _Δm + μ + 1))
+            λ =
+                (
+                    _χm * _m0 * _n0 * CM1.SF.gamma(_me + _Δm + μ + FT(1)) / ρ / q / _r0^(_me + _Δm)
+                )^FT(1 / (_me + _Δm + μ + 1))
             # w/ loggama you could do something like     λ = exp((1 / (_me + _Δm + μ + 1)) * (log(_χm * _m0 * _n0) + CM1.SF.loggamma(_me + _Δm + μ + FT(1)) - log(ρ) - log(q) - (_me + _Δm) * log(_r0)))
 
             if !isfinite(_n0) || (iszero(_n0) && !iszero(Nt) && !iszero(q)) # if we wanted a nonzero Nt and q, but got n0 = 0 or Inf, something is wrong
-                @error("Got n0 = $_n0; λ = $λ; q = $q; ρ = $ρ; Nt = $Nt; μ = $μ; Dmin = $Dmin; Dmax = $Dmax; precip = $precip; _r0 = $_r0; _m0 = $_m0; _me = $_me; _Δm = $_Δm; _χm = $_χm;")
+                @error(
+                    "Got n0 = $_n0; λ = $λ; q = $q; ρ = $ρ; Nt = $Nt; μ = $μ; Dmin = $Dmin; Dmax = $Dmax; precip = $precip; _r0 = $_r0; _m0 = $_m0; _me = $_me; _Δm = $_Δm; _χm = $_χm;"
+                )
             end
 
         end
@@ -317,9 +331,31 @@ function lambda(
     return λ
 end
 
-lambda(prs::ACMP, precip::CMTWaterTypes, q::FT, ρ::FT, Nt::FT, μ::FT, Dmin::FT, Dmax::FT; _n0::FT = FT(NaN), _χm::FT = FT(NaN)) where {FT <: Real} = lambda(prs, precip, q, ρ, Nt, μ; Dmin=Dmin, Dmax=Dmax, _n0=_n0, _χm=_χm)
+lambda(
+    prs::ACMP,
+    precip::CMTWaterTypes,
+    q::FT,
+    ρ::FT,
+    Nt::FT,
+    μ::FT,
+    Dmin::FT,
+    Dmax::FT;
+    _n0::FT = FT(NaN),
+    _χm::FT = FT(NaN),
+) where {FT <: Real} = lambda(prs, precip, q, ρ, Nt, μ; Dmin = Dmin, Dmax = Dmax, _n0 = _n0, _χm = _χm)
 
-function lambda(param_set::APS, precip::CMTWaterTypes, q::FT, ρ::FT, Nt::FT; Dmin::FT = FT(0), Dmax::FT = FT(Inf), _n0::FT = FT(NaN), μ::FT = FT(NaN), _χm::FT = FT(NaN)) where {FT <: Real}
+function lambda(
+    param_set::APS,
+    precip::CMTWaterTypes,
+    q::FT,
+    ρ::FT,
+    Nt::FT;
+    Dmin::FT = FT(0),
+    Dmax::FT = FT(Inf),
+    _n0::FT = FT(NaN),
+    μ::FT = FT(NaN),
+    _χm::FT = FT(NaN),
+) where {FT <: Real}
     microphys_params = TCP.microphysics_params(param_set)
 
     if !isnan(Nt) # aerosol inside each particle...
@@ -327,18 +363,29 @@ function lambda(param_set::APS, precip::CMTWaterTypes, q::FT, ρ::FT, Nt::FT; Dm
         # _χm::FT = get_χm(param_set, precip) # this is the mass scaling factor for the mass diameter relationship, so we can use it to scale the mean radius
         _χm::FT = isnan(_χm) ? get_χm(param_set, precip) : _χm
         q_r_min = particle_mass(microphys_params, precip, r_min, _χm)
-        q += Nt*q_r_min
+        q += Nt * q_r_min
     end
     if isnan(μ)
-        μ = μ_from_qN(param_set, precip, q, Nt; ρ=ρ)
+        μ = μ_from_qN(param_set, precip, q, Nt; ρ = ρ)
     end
 
     _χm = isnan(_χm) ? get_χm(param_set, precip) : _χm
 
-    return lambda(microphys_params, precip, q, ρ, Nt, μ; Dmin=Dmin, Dmax=Dmax, _n0=_n0, _χm=_χm)
+    return lambda(microphys_params, precip, q, ρ, Nt, μ; Dmin = Dmin, Dmax = Dmax, _n0 = _n0, _χm = _χm)
 end
 
-lambda(param_set::APS, precip::CMTWaterTypes, q::FT, ρ::FT, Nt::FT, Dmin::FT, Dmax::FT; _n0::FT = FT(NaN), μ::FT = FT(NaN), _χm::FT = FT(NaN)) where {FT <: Real} = lambda(param_set, precip, q, ρ, Nt; μ=μ, Dmin=Dmin, Dmax=Dmax, _n0=_n0, _χm=_χm)
+lambda(
+    param_set::APS,
+    precip::CMTWaterTypes,
+    q::FT,
+    ρ::FT,
+    Nt::FT,
+    Dmin::FT,
+    Dmax::FT;
+    _n0::FT = FT(NaN),
+    μ::FT = FT(NaN),
+    _χm::FT = FT(NaN),
+) where {FT <: Real} = lambda(param_set, precip, q, ρ, Nt; μ = μ, Dmin = Dmin, Dmax = Dmax, _n0 = _n0, _χm = _χm)
 
 
 
@@ -390,8 +437,8 @@ function get_n0_lambda(
     ;
     Dmin::FT = FT(0),
     Dmax::FT = FT(Inf),
-    add_dry_aerosol_mass::Bool=false, # if true, we add the dry aerosol mass to q before solving
-    particle_min_radius::FT = FT(0.2e-6)
+    add_dry_aerosol_mass::Bool = false, # if true, we add the dry aerosol mass to q before solving
+    particle_min_radius::FT = FT(0.2e-6),
 ) where {FT <: Real}
 
 
@@ -401,14 +448,14 @@ function get_n0_lambda(
 
     if add_dry_aerosol_mass
         if !(q_type isa CMT.LiquidType)
-            q += mass(prs, q_type, particle_min_radius, N, get_χm(prs, q_type); monodisperse=true)
+            q += mass(prs, q_type, particle_min_radius, N, get_χm(prs, q_type); monodisperse = true)
         else
-            q += mass(prs, q_type, particle_min_radius, N, FT(1); monodisperse=true) # liquid needs param_set to get χm
+            q += mass(prs, q_type, particle_min_radius, N, FT(1); monodisperse = true) # liquid needs param_set to get χm
         end
     end
-    
+
     if iszero(Dmin) && !isinf(Dmax)
-        
+
         # return solve_n0_lambda_upper_truncated_gamma(prs, q, q_type, N, Dmax, μ, _me + _Δm, ρ, _χm * _m0 * _r0^(-(_me + _Δm)))
         # This is just too unreliable right now, it has essentially a 0 percent success rate...
         # The real problem is that as soon as cbrt(q/c_mass) hits about 5 times Dmax, the solutions vanish rapidly.
@@ -418,8 +465,8 @@ function get_n0_lambda(
         # It sems even now that our N are reasonable, 62.5 just doesn't cut it
 
         # _n0 = n0(prs, q, ρ, q_type, N, μ; Dmin=Dmin, Dmax=Dmax) # this is the n0 we want to use
-        _n0 = isnan(N) ? n0(prs, q, ρ, q_type) : n0(prs, q, ρ, q_type, N, μ; Dmin=Dmin, Dmax=Dmax)
-        λ = lambda(prs, q_type, q, ρ, N, μ; _n0=_n0, Dmin=FT(0), Dmax=FT(Inf)) # this is the λ we want to use
+        _n0 = isnan(N) ? n0(prs, q, ρ, q_type) : n0(prs, q, ρ, q_type, N, μ; Dmin = Dmin, Dmax = Dmax)
+        λ = lambda(prs, q_type, q, ρ, N, μ; _n0 = _n0, Dmin = FT(0), Dmax = FT(Inf)) # this is the λ we want to use
 
         # we could check feasibility
         # is_feasible, q_max = check_N_q_μ_feasibility(q, N, μ, _χm * _m0 * _r0^(-(_me + _Δm)), _me + _Δm; Dmin=FT(0), Dmax=Dmax)
@@ -430,26 +477,46 @@ function get_n0_lambda(
         # also `truncated_gamma_solver()` might be easier to use or more correct than `solve_n0_lambda_upper_truncated_gamma()`? not sure yet...
         # end
         return _n0, λ
-    # elseif !iszero(Dmin) && isinf(Dmax)
-    # elseif !iszero(Dmin) && !isinf(Dmax)
+        # elseif !iszero(Dmin) && isinf(Dmax)
+        # elseif !iszero(Dmin) && !isinf(Dmax)
     else
 
         # @warn "Dmin = $Dmin; Dmax = $Dmax; q = $q; N = $N; μ = $μ; ρ = $ρ"
 
         # Normal Closed form solution...
         # _n0 = n0(prs, q, ρ, q_type, N, μ)
-        _n0 = isnan(N) ? n0(prs, q, ρ, q_type) : n0(prs, q, ρ, q_type, N, μ; Dmin=Dmin, Dmax=Dmax)
-        λ = lambda(prs, q_type, q, ρ, N, μ; _n0=_n0, Dmin=FT(0), Dmax=Dmax)
+        _n0 = isnan(N) ? n0(prs, q, ρ, q_type) : n0(prs, q, ρ, q_type, N, μ; Dmin = Dmin, Dmax = Dmax)
+        λ = lambda(prs, q_type, q, ρ, N, μ; _n0 = _n0, Dmin = FT(0), Dmax = Dmax)
         return _n0, λ
     end
 end
 
-function get_n0_lambda(param_set::APS, q_type::CMTWaterTypes, q::FT, ρ::FT, N::FT; μ::FT = FT(NaN), Dmin::FT = FT(0), Dmax::FT = FT(Inf), add_dry_aerosol_mass::Bool=false) where {FT <: Real}
+function get_n0_lambda(
+    param_set::APS,
+    q_type::CMTWaterTypes,
+    q::FT,
+    ρ::FT,
+    N::FT;
+    μ::FT = FT(NaN),
+    Dmin::FT = FT(0),
+    Dmax::FT = FT(Inf),
+    add_dry_aerosol_mass::Bool = false,
+) where {FT <: Real}
     if isnan(μ)
-        μ = μ_from_qN(param_set, q_type, q, N; ρ=ρ)
+        μ = μ_from_qN(param_set, q_type, q, N; ρ = ρ)
     end
     microphys_params = TCP.microphysics_params(param_set)
-    return get_n0_lambda(microphys_params, q_type, q, ρ, N, μ; Dmin=Dmin, Dmax=Dmax, add_dry_aerosol_mass=add_dry_aerosol_mass)
+    return get_n0_lambda(
+        microphys_params,
+        q_type,
+        q,
+        ρ,
+        N,
+        μ;
+        Dmin = Dmin,
+        Dmax = Dmax,
+        add_dry_aerosol_mass = add_dry_aerosol_mass,
+    )
 end
 
 
@@ -507,7 +574,7 @@ function solve_n0_lambda_upper_truncated_gamma( # assumes Dmin = 0, so you can b
     c_mass::FT, # should be, mass = c_mass * D^me, so c_mass = χm * m0 * r0^(-me) # this is the mass prefactor, so we can use it to scale the mass of the particles
     ;
     tol::FT = FT(1e-6),
-    maxiter::Int = 1000
+    maxiter::Int = 1000,
 ) where {FT <: Real}
 
     # note, Dmax should be > 0
@@ -517,9 +584,9 @@ function solve_n0_lambda_upper_truncated_gamma( # assumes Dmin = 0, so you can b
 
     if isinf(Dmax)
         # Closed form solution for the full gamma distribution
-        return get_n0_lambda(prs, q_type, q, ρ, N, μ; Dmax=Dmax) # fallback only
+        return get_n0_lambda(prs, q_type, q, ρ, N, μ; Dmax = Dmax) # fallback only
     end
-        
+
     function residual(λ)
         # if λ <= FT(0)
         #     return FT(NaN)
@@ -542,7 +609,7 @@ function solve_n0_lambda_upper_truncated_gamma( # assumes Dmin = 0, so you can b
                     λ^(-me) * γ(μ + me + 1, x) / γ(μ + 1, x) ≈ Dmax^me * (μ + 1) / (μ + me + 1)
                 This gives a smooth and finite limit as x → 0 and avoids division by zero.
             =#
-            num_o_den = Dmax^(me) * (μ+1) / (μ + me + 1) # this is the limit of the ratio as x -> 0, so we can use it to avoid division by 0
+            num_o_den = Dmax^(me) * (μ + 1) / (μ + me + 1) # this is the limit of the ratio as x -> 0, so we can use it to avoid division by 0
         elseif isnan(den)  # probably means very big x, just fall back to x = Inf |  use a fallback... at very large λ, just use infinity
 
             num = CM1.SF.gamma(μ + me + 1)
@@ -563,8 +630,8 @@ function solve_n0_lambda_upper_truncated_gamma( # assumes Dmin = 0, so you can b
 
     λ_lower = FT(0) # lower bound is 0
 
-    n0_upper = n0(prs, q, ρ, q_type, N, μ; Dmin=FT(0), Dmax=FT(Inf))
-    λ_upper = lambda(prs, q_type, q, ρ, N, μ; _n0=n0_upper, Dmin=FT(0), Dmax=FT(Inf)) # upper bound is the closed form solution for the full gamma distribution
+    n0_upper = n0(prs, q, ρ, q_type, N, μ; Dmin = FT(0), Dmax = FT(Inf))
+    λ_upper = lambda(prs, q_type, q, ρ, N, μ; _n0 = n0_upper, Dmin = FT(0), Dmax = FT(Inf)) # upper bound is the closed form solution for the full gamma distribution
 
 
     methods_to_try = (TD.RS.RegulaFalsiMethod, TD.RS.BrentsMethod, TD.RS.SecantMethod, TD.RS.BisectionMethod) # False is allegedly the fastest? Secant can converge out of bounds, Bisection is slow...
@@ -575,7 +642,7 @@ function solve_n0_lambda_upper_truncated_gamma( # assumes Dmin = 0, so you can b
             method(λ_lower, λ_upper),
             TD.RS.CompactSolution(),
             TD.RS.ResidualTolerance(tol * target),
-            maxiter
+            maxiter,
         )
         if sol.converged
             converged = true
@@ -590,7 +657,7 @@ function solve_n0_lambda_upper_truncated_gamma( # assumes Dmin = 0, so you can b
     error("No solution found")
 
     # Fallback if no method converged, to just using Dmax = Inf
-    return get_n0_lambda(prs, q_type, q, ρ, N, μ; Dmax=FT(Inf)) # fallback only
+    return get_n0_lambda(prs, q_type, q, ρ, N, μ; Dmax = FT(Inf)) # fallback only
 
 end
 
@@ -625,24 +692,27 @@ where:
 If `Dmax` is infinite, the complete gamma function is used instead of the incomplete one.
 """
 
-function verify_truncated_gamma_fit(λ::FT, n₀::FT, Dmax::FT;
+function verify_truncated_gamma_fit(
+    λ::FT,
+    n₀::FT,
+    Dmax::FT;
     μ::FT = FT(0),
     me::FT = FT(3),
     ρ::FT = FT(1),
-    c_mass::FT = FT(1)
-    ) where {FT <: Real}
+    c_mass::FT = FT(1),
+) where {FT <: Real}
 
     if isinf(Dmax)
-        I_μ  = λ^(-μ - 1)       * CM1.SF.gamma(μ + 1)
-        I_μd = λ^(-μ - me - 1)   * CM1.SF.gamma(μ + me + 1)
+        I_μ = λ^(-μ - 1) * CM1.SF.gamma(μ + 1)
+        I_μd = λ^(-μ - me - 1) * CM1.SF.gamma(μ + me + 1)
     else
         x = λ * Dmax
-        I_μ  = λ^(-μ - 1)       * Γ_lower(μ + 1, x)
-        I_μd = λ^(-μ - me - 1)  * Γ_lower(μ + me + 1, x)
+        I_μ = λ^(-μ - 1) * Γ_lower(μ + 1, x)
+        I_μd = λ^(-μ - me - 1) * Γ_lower(μ + me + 1, x)
     end
 
     N_model = n₀ * I_μ
-    q_model = (1/ρ) * n₀ * c_mass * I_μd
+    q_model = (1 / ρ) * n₀ * c_mass * I_μd
     return (q_model, N_model)
 end
 
@@ -658,7 +728,7 @@ function check_N_q_μ_feasibility(
     c_mass::FT, # should be equal to χm * m0 * r0 ^(-(m_e + Δm))
     me::FT; # should be (me + Δm) combined
     Dmin::FT = FT(0),
-    Dmax::FT = FT(Inf)
+    Dmax::FT = FT(Inf),
 ) where {FT <: Real}
 
     if iszero(Dmin)
@@ -680,8 +750,7 @@ function check_N_q_μ_feasibility(
     q::FT,
     q_type::CMTWaterTypes,
     N::FT,
-    μ::FT
-    ;
+    μ::FT;
     Dmin::FT = FT(0),
     Dmax::FT = FT(Inf),
 ) where {FT <: Real}
@@ -694,7 +763,7 @@ function check_N_q_μ_feasibility(
     _me::FT = me(prs, q_type)
     _Δm::FT = Δm(prs, q_type)
     c_mass = _χm * _m0 * _r0^(-(_me + _Δm)) # should be equal to χm * m0 * r0 ^(-(m_e + Δm))
-    return check_N_q_μ_feasibility(q, N, μ, c_mass, _me; Dmin=Dmin, Dmax=Dmax)
+    return check_N_q_μ_feasibility(q, N, μ, c_mass, _me; Dmin = Dmin, Dmax = Dmax)
 end
 
 
@@ -707,7 +776,7 @@ end
 # might be a simpler solver than the one above
 function truncated_gamma_solver(
     q::FT,
-    N::FT, 
+    N::FT,
     ρ::FT,
     r_max::FT,
     c_mass::FT, # should be χm * m0 * r0^(-(me + Δm))
@@ -721,10 +790,10 @@ function truncated_gamma_solver(
     maxiter::Int = 100,
     λ_lower::FT = FT(1e-5), # we see some potentially spurious tiny roots we should exclude...
     λ_upper::FT = FT(1e10), # need to set this up soon to use the old lambda perhaps?
-    ) where {FT <: Real}
+) where {FT <: Real}
 
     # ν = m_e + Δm
-    const_term = N * c_mass; # c_mass = χm * m₀ * r₀^(-(me + Δm))
+    const_term = N * c_mass # c_mass = χm * m₀ * r₀^(-(me + Δm))
 
     function lower_incomplete_gamma(a, x)
         P, _ = CM1.SF.gamma_inc(a, x)
@@ -750,7 +819,7 @@ function truncated_gamma_solver(
             TD.RS.SecantMethod(λ_lower, λ_upper),
             TD.RS.VerboseSolution(),
             TD.RS.ResidualTolerance(tol * q),
-            maxiter
+            maxiter,
         )
 
         @info "root should be : $λ"
@@ -759,7 +828,7 @@ function truncated_gamma_solver(
         @info "no root prediciton"
     end
     println()
-    
+
 
     # ---------------------------------------------------------------------- #
     # n0_upper = n0(prs, q, ρ, N, q_type; μ=μ, Dmin=FT(0), Dmax=FT(Inf))
@@ -775,7 +844,7 @@ function truncated_gamma_solver(
             # method(FT(1e-6), FT(100*5.0) / r_max),
             TD.RS.VerboseSolution(),
             TD.RS.ResidualTolerance(tol * q),
-            maxiter
+            maxiter,
         )
         print(sol)
 
@@ -792,5 +861,3 @@ function truncated_gamma_solver(
 
     error("no sol'n found")
 end
-
-

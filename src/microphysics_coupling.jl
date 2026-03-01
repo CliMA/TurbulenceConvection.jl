@@ -20,7 +20,8 @@ include("microphysics_coupling_limiters.jl")
 """
 for dispatch backwards compat. we've moved to caching saturation sepcific humidities, so in general those methods can just accept an argument.
 """
-function noneq_moisture_sources(param_set::APS,
+function noneq_moisture_sources(
+    param_set::APS,
     noneq_sources_type::AbstractNonEquillibriumSourcesType,
     moisture_sources_limiter::AbstractMoistureSourcesLimiter,
     area::FT,
@@ -37,20 +38,39 @@ function noneq_moisture_sources(param_set::APS,
     τ_ice::FT = FT(NaN),
     liq_fraction::FT = FT(1),
     ice_fraction::FT = FT(1),
-    cld_fraction::FT = FT(1)
-    ;
+    cld_fraction::FT = FT(1);
     # ts_LCL::Union{Nothing, TD.ThermodynamicState} = nothing,
-)  where {FT}
+) where {FT}
 
     thermo_params::TDPS = TCP.thermodynamics_params(param_set)
     microphys_params::ACMP = TCP.microphysics_params(param_set)
     ρ = TD.air_density(thermo_params, ts)
     # TODO - when using adaptive timestepping we are limiting the source terms with the previous timestep Δt
-    
+
     q_vap_sat_liq = TD.q_vap_saturation_generic(thermo_params, T, ρ, TD.Liquid())
     q_vap_sat_ice = TD.q_vap_saturation_generic(thermo_params, T, ρ, TD.Ice())
 
-    return noneq_moisture_sources(param_set, noneq_sources_type, moisture_sources_limiter, area, ρ, p, T, Δt, ts, w, q_vap_sat_liq, q_vap_sat_ice, dqvdt, dTdt, τ_liq, τ_ice, liq_fraction, ice_fraction, cld_fraction)
+    return noneq_moisture_sources(
+        param_set,
+        noneq_sources_type,
+        moisture_sources_limiter,
+        area,
+        ρ,
+        p,
+        T,
+        Δt,
+        ts,
+        w,
+        q_vap_sat_liq,
+        q_vap_sat_ice,
+        dqvdt,
+        dTdt,
+        τ_liq,
+        τ_ice,
+        liq_fraction,
+        ice_fraction,
+        cld_fraction,
+    )
 end
 
 # -------------------------------------------------------------------------------------------------------------------------- #
@@ -75,10 +95,9 @@ function noneq_moisture_sources(
     τ_ice::FT = FT(NaN),
     liq_fraction::FT = FT(1),
     ice_fraction::FT = FT(1),
-    cld_fraction::FT = FT(1)
-    ;
+    cld_fraction::FT = FT(1);
     # ts_LCL::Union{Nothing, TD.ThermodynamicState} = nothing,
-)  where {FT}
+) where {FT}
     thermo_params::TDPS = TCP.thermodynamics_params(param_set)
     microphys_params::ACMP = TCP.microphysics_params(param_set)
     # TODO - when using adaptive timestepping we are limiting the source terms with the previous timestep Δt
@@ -96,7 +115,29 @@ function noneq_moisture_sources(
 
         S_ql = CMNe.conv_q_vap_to_q_liq_ice(microphys_params, liq_type, q_eq, q)
         S_qi = CMNe.conv_q_vap_to_q_liq_ice(microphys_params, ice_type, q_eq, q)
-        S_ql, S_qi = calculate_timestep_limited_sources(moisture_sources_limiter, param_set, area, ρ, FT(0), FT(0), FT(0), FT(0), FT(0), q_vap, dqvdt, dTdt, q, q_eq, Δt, ts, S_ql, S_qi; liq_fraction=liq_fraction, ice_fraction=ice_fraction, cld_fraction=cld_fraction)
+        S_ql, S_qi = calculate_timestep_limited_sources(
+            moisture_sources_limiter,
+            param_set,
+            area,
+            ρ,
+            FT(0),
+            FT(0),
+            FT(0),
+            FT(0),
+            FT(0),
+            q_vap,
+            dqvdt,
+            dTdt,
+            q,
+            q_eq,
+            Δt,
+            ts,
+            S_ql,
+            S_qi;
+            liq_fraction = liq_fraction,
+            ice_fraction = ice_fraction,
+            cld_fraction = cld_fraction,
+        )
         ql_tendency += S_ql
         qi_tendency += S_qi
     end
@@ -123,8 +164,7 @@ function noneq_moisture_sources(
     τ_ice::FT,
     liq_fraction::FT = FT(1),
     ice_fraction::FT = FT(1),
-    cld_fraction::FT = FT(1)
-    ;
+    cld_fraction::FT = FT(1);
     # ts_LCL::Union{Nothing, TD.ThermodynamicState} = nothing,
 ) where {FT}
     thermo_params::TDPS = TCP.thermodynamics_params(param_set)
@@ -134,19 +174,35 @@ function noneq_moisture_sources(
     qi_tendency::FT = FT(0)
     if area > 0
 
-        q::TD.PhasePartition{FT} =TD.PhasePartition(thermo_params, ts)
+        q::TD.PhasePartition{FT} = TD.PhasePartition(thermo_params, ts)
         ρ::FT = TD.air_density(thermo_params, ts)
         q_vap::FT = TD.vapor_specific_humidity(thermo_params, ts)
 
         # use phase partition in case we wanna use the conv_q_vap fcn but maybe not best for supersat since it's not really a phase partition (all 3 are vapor amounts)
         # τ_liq, τ_ice = get_τs(param_set, microphys_params, noneq_moisture_scheme, q, T, p, ρ, w) # no more z, there's just not valid world in which z matters sine we're not doing raymond ice anymore.
 
-        q_eq = TD.PhasePartition(
-            q.tot,
-            q_vap_sat_liq,
-            q_vap_sat_ice,
-        ) # all 3 are vapor amounts
-        S_ql, S_qi = calculate_timestep_limited_sources(moisture_sources_limiter, param_set, area, ρ, p, T, w, τ_liq, τ_ice, q_vap, dqvdt, dTdt, q, q_eq, Δt, ts; liq_fraction=liq_fraction, ice_fraction=ice_fraction, cld_fraction=cld_fraction)
+        q_eq = TD.PhasePartition(q.tot, q_vap_sat_liq, q_vap_sat_ice) # all 3 are vapor amounts
+        S_ql, S_qi = calculate_timestep_limited_sources(
+            moisture_sources_limiter,
+            param_set,
+            area,
+            ρ,
+            p,
+            T,
+            w,
+            τ_liq,
+            τ_ice,
+            q_vap,
+            dqvdt,
+            dTdt,
+            q,
+            q_eq,
+            Δt,
+            ts;
+            liq_fraction = liq_fraction,
+            ice_fraction = ice_fraction,
+            cld_fraction = cld_fraction,
+        )
         ql_tendency += S_ql
         qi_tendency += S_qi
     end
@@ -184,7 +240,7 @@ end
 #         q::TD.PhasePartition{FT} =TD.PhasePartition(thermo_params, ts)
 #         ρ::FT = TD.air_density(thermo_params, ts)
 #         q_vap::FT = TD.vapor_specific_humidity(thermo_params, ts)
-        
+
 #         q_eq = TD.PhasePartition(
 #             q.tot,
 #             q_vap_sat_liq,
@@ -247,7 +303,7 @@ function other_microphysics_processes(
     qi_tendency_melting::FT = FT(0)
     if area > 0
         if moisture_model isa NonEquilibriumMoisture
-            q::TD.PhasePartition{FT} =TD.PhasePartition(thermo_params, ts)
+            q::TD.PhasePartition{FT} = TD.PhasePartition(thermo_params, ts)
             q_vap::FT = TD.vapor_specific_humidity(thermo_params, ts)
             ρ = TD.air_density(thermo_params, ts)
 
@@ -278,8 +334,10 @@ function other_microphysics_processes(
                 # if heterogeneous_ice_nucleation[1]
                 if heterogeneous_ice_nucleation.use_heterogeneous_ice_nucleation
                     # heterogeneous_ice_nucleation_coefficient, heterogeneous_ice_nucleation_exponent = heterogeneous_ice_nucleation[2:3]
-                    heterogeneous_ice_nucleation_coefficient = heterogeneous_ice_nucleation.heterogeneous_ice_nucleation_coefficient
-                    heterogeneous_ice_nucleation_exponent = heterogeneous_ice_nucleation.heterogeneous_ice_nucleation_exponent
+                    heterogeneous_ice_nucleation_coefficient =
+                        heterogeneous_ice_nucleation.heterogeneous_ice_nucleation_coefficient
+                    heterogeneous_ice_nucleation_exponent =
+                        heterogeneous_ice_nucleation.heterogeneous_ice_nucleation_exponent
                     c_1 =
                         ρ *
                         heterogeneous_ice_nucleation_coefficient *
@@ -291,7 +349,13 @@ function other_microphysics_processes(
                     if S_ql < 0
                         # qi_tendency_heterogeneous_icenuc = max(-q.liq / Δt - S_ql, -qi_tendency_heterogeneous_icenuc) # S_ql should be smaller than q.liq/Δt after doing limiters above, but maybe move them down here? [[ i think this is wrong..., should be -max(...) ]]
                         # qi_tendency_heterogeneous_icenuc = min(q.liq / Δt + S_ql, qi_tendency_heterogeneous_icenuc) # S_ql should be smaller than q.liq/Δt after doing limiters above, but maybe move them down here?
-                        qi_tendency_heterogeneous_icenuc = -limit_tendency(moisture_sources_limiter, -qi_tendency_heterogeneous_icenuc, q.liq + S_ql * Δt, Δt)
+                        qi_tendency_heterogeneous_icenuc =
+                            -limit_tendency(
+                                moisture_sources_limiter,
+                                -qi_tendency_heterogeneous_icenuc,
+                                q.liq + S_ql * Δt,
+                                Δt,
+                            )
                     end
                     S_ql -= qi_tendency_heterogeneous_icenuc
                     S_qi += qi_tendency_heterogeneous_icenuc
@@ -319,7 +383,17 @@ function other_microphysics_processes(
                     r0_activation = FT(10e-6) # 10 μm particle post activation, matches
                     m0_activation = particle_mass(param_set, ice_type, r0_activation)
                     scaling_factor = INP_supersaturation_scaling_factor(param_set, S_i, q.ice, FT(Inf)) # never saturation q_ice_threshold so that we are never forced to 1
-                    N_INP_max = get_INP_concentration(param_set, noneq_moisture_scheme, q, T, ρ_c, w, S_i; apply_supersaturation_scaling=false) * scaling_factor
+                    N_INP_max =
+                        get_INP_concentration(
+                            param_set,
+                            noneq_moisture_scheme,
+                            q,
+                            T,
+                            ρ_c,
+                            w,
+                            S_i;
+                            apply_supersaturation_scaling = false,
+                        ) * scaling_factor
 
                     # Cooper curve: max number of INPs per L, convert to per kg and clamp
                     # if !(noneq_moisture_scheme isa INP_Aware_Timescale)
@@ -331,7 +405,7 @@ function other_microphysics_processes(
                     if isnan(N_i) # just assume q / MI0 (actually that's too small, we'll assume r_is...)
                         # N_i = q.ice / m0_activation
                         r_is = CMP.r_ice_snow(microphys_params)
-                        N_i = N_from_qr(param_set, ice_type, q.ice, r_is; monodisperse=false, μ=FT(0), ρ=ρ_c)
+                        N_i = N_from_qr(param_set, ice_type, q.ice, r_is; monodisperse = false, μ = FT(0), ρ = ρ_c)
                     end
 
                     # This means within 10 seconds, we will be at 10 micron average, which is about 100x smaller than 30 micron average, regardless of what the later growth rate we calibrated is...
@@ -340,9 +414,15 @@ function other_microphysics_processes(
                         N_i_activation = (N_INP_max - N_i) / FT(10) # just go w/ 10 seconds, it should be pretty fast... [[ note this means that in practice, tau is very fast at the start to get you to 10 micrometer droplets, hence prolly the jump we see in our LES data plots from the low tau,N at cold to suddenly hella ice. ]]
                         q_activation = N_i_activation * m0_activation / ρ_c
                     end
-            
+
                     qi_tendency_heterogeneous_freezing += q_activation
-                    qi_tendency_heterogeneous_freezing = -limit_tendency(moisture_sources_limiter, -qi_tendency_heterogeneous_freezing, max(N_INP_max - N_i, FT(0)) * m0_activation, Δt)
+                    qi_tendency_heterogeneous_freezing =
+                        -limit_tendency(
+                            moisture_sources_limiter,
+                            -qi_tendency_heterogeneous_freezing,
+                            max(N_INP_max - N_i, FT(0)) * m0_activation,
+                            Δt,
+                        )
                     S_qi += qi_tendency_heterogeneous_freezing
                 end
             end
@@ -441,7 +521,7 @@ function precipitation_formation(
     α_accr = TCP.microph_scaling_accr(param_set)
 
 
-    
+
 
     if area > 0
         q = TD.PhasePartition(thermo_params, ts)
@@ -463,7 +543,12 @@ function precipitation_formation(
             L_s = TD.latent_heat_sublim(thermo_params, ts)
 
             # S_qt = -min((q.liq + q.ice) / Δt, -CM0.remove_precipitation(microphys_params, q, qsat))
-            S_qt = limit_tendency(precipitation_tendency_limiter, CM0.remove_precipitation(microphys_params, q, qsat), (q.liq + q.ice), Δt)
+            S_qt = limit_tendency(
+                precipitation_tendency_limiter,
+                CM0.remove_precipitation(microphys_params, q, qsat),
+                (q.liq + q.ice),
+                Δt,
+            )
 
             qr_tendency -= S_qt * λ
             qs_tendency -= S_qt * (1 - λ)
@@ -490,11 +575,16 @@ function precipitation_formation(
             # that the supersaturation is present in the domain.
             if rain_formation_model isa Clima1M_default
                 # S_qt_rain = -min(q.liq / Δt, α_acnv * CM1.conv_q_liq_to_q_rai(microphys_params, q.liq))
-                               
+
                 # S_qt_rain = limit_tendency(precipitation_tendency_limiter, -α_acnv * CM1.conv_q_liq_to_q_rai(microphys_params, q.liq), q.liq, Δt)
                 ql_tendency_cond_evap = resolve_nan(max(FT(0), ql_tendency_cond_evap), FT(0)) # Only accept evaporation, and if we passed in FT(NaN) as a fallback (e.g. in Equilibrium, just use FT(0))
-                S_qt_rain = limit_tendency(precipitation_tendency_limiter, -α_acnv * CM1.conv_q_liq_to_q_rai(microphys_params, q.liq), max(q.liq + ql_tendency_cond_evap*Δt - get_q_threshold(param_set, CMT.LiquidType()), 0), Δt) # don't allow reducing below threshold
-                # should we have a noneq version here? that uses my_conv_q_liq_to_q_rai()
+                S_qt_rain = limit_tendency(
+                    precipitation_tendency_limiter,
+                    -α_acnv * CM1.conv_q_liq_to_q_rai(microphys_params, q.liq),
+                    max(q.liq + ql_tendency_cond_evap * Δt - get_q_threshold(param_set, CMT.LiquidType()), 0),
+                    Δt,
+                ) # don't allow reducing below threshold
+            # should we have a noneq version here? that uses my_conv_q_liq_to_q_rai()
             elseif rain_formation_model isa Clima2M
                 S_qt_rain =
                     -min(
@@ -514,7 +604,7 @@ function precipitation_formation(
             ql_tendency_acnv = S_qt_rain # for storage
 
             if (snow_formation_model isa NonEquilibriumSnowFormationModel)
-                q::TD.PhasePartition{FT} =TD.PhasePartition(thermo_params, ts)
+                q::TD.PhasePartition{FT} = TD.PhasePartition(thermo_params, ts)
                 # q_vap::FT = TD.vapor_specific_humidity(thermo_params, ts)
 
                 # S_qt_snow_ice_dep = limit_tendency(precipitation_tendency_limiter, -α_acnv * my_conv_q_ice_to_q_sno_no_supersat(param_set, q; N = Ni, τ = τ_ice, r_acnv_scaling_factor=snow_formation_model.r_ice_acnv_scaling_factor), q.ice, Δt) # based on growth but threshold is fixed [ needs a scaling factor for how much is over the thresh]
@@ -524,7 +614,7 @@ function precipitation_formation(
 
                 # not sure if we should only use positive sedimentation convergence... i think so bc losing ice doesnt make things smaller
                 # qi_tendency_sed =  max(FT(0), qi_tendency_sed)
-                qi_tendency_sed =  resolve_nan(max(FT(0), qi_tendency_sed), FT(0)) # Only accept deposition, and if we passed in FT(NaN) as a fallback (e.g. in Equilibrium, just use FT(0))
+                qi_tendency_sed = resolve_nan(max(FT(0), qi_tendency_sed), FT(0)) # Only accept deposition, and if we passed in FT(NaN) as a fallback (e.g. in Equilibrium, just use FT(0))
                 # qi_tendency_sed = FT(0)
 
                 # qi_tendency_sub_dep = max(FT(0), qi_tendency_sub_dep) # this is the part that is new ice formation, so we can use that to limit the snow formation
@@ -538,13 +628,30 @@ function precipitation_formation(
                 # S_qt_snow_ice_dep_is = limit_tendency(precipitation_tendency_limiter, -α_acnv * snow_formation_model.ice_dep_acnv_scaling_factor * my_conv_q_ice_to_q_sno(param_set, q, T, p; N = Ni, thresh_only=true), q.ice + qi_tendency_sub_dep*Δt + qi_tendency_sed*Δt, Δt) # based on growth but threshold is fixed [ needs a scaling factor for how much is over the thresh]
 
                 # this version respects whatever the limiter did in creating qi_tendency_sub_dep, even for the MM2015 variants
-                S_qt_snow_ice_dep_is = -α_acnv * snow_formation_model.ice_dep_acnv_scaling_factor * my_conv_q_ice_to_q_sno_at_r_is_given_qi_tendency_sub_dep(param_set, qi_tendency_sub_dep, q.ice, Ni, ρ) # This is better i think  bc it respects the real sub_dep tendency
-                S_qt_snow_ice_dep_above = -α_acnv * snow_formation_model.ice_dep_acnv_scaling_factor_above * my_conv_q_ice_to_q_sno_by_fraction(param_set, qi_tendency_sub_dep, q.ice, Ni, ρ) # I feel like this shouldn't really be rescalable idk...
-                S_qt_snow_ice_dep = limit_tendency(precipitation_tendency_limiter, S_qt_snow_ice_dep_is + S_qt_snow_ice_dep_above, q.ice + qi_tendency_sub_dep*Δt + qi_tendency_sed*Δt, Δt) # technically this is the way to do it that respects the sub_dep from the limiter, even MM2015
+                S_qt_snow_ice_dep_is =
+                    -α_acnv *
+                    snow_formation_model.ice_dep_acnv_scaling_factor *
+                    my_conv_q_ice_to_q_sno_at_r_is_given_qi_tendency_sub_dep(
+                        param_set,
+                        qi_tendency_sub_dep,
+                        q.ice,
+                        Ni,
+                        ρ,
+                    ) # This is better i think  bc it respects the real sub_dep tendency
+                S_qt_snow_ice_dep_above =
+                    -α_acnv *
+                    snow_formation_model.ice_dep_acnv_scaling_factor_above *
+                    my_conv_q_ice_to_q_sno_by_fraction(param_set, qi_tendency_sub_dep, q.ice, Ni, ρ) # I feel like this shouldn't really be rescalable idk...
+                S_qt_snow_ice_dep = limit_tendency(
+                    precipitation_tendency_limiter,
+                    S_qt_snow_ice_dep_is + S_qt_snow_ice_dep_above,
+                    q.ice + qi_tendency_sub_dep * Δt + qi_tendency_sed * Δt,
+                    Δt,
+                ) # technically this is the way to do it that respects the sub_dep from the limiter, even MM2015
 
                 # This check may not be true (i.e. in principle you can really acnv more than the new ice formation in thier (not morrison 05) framework -- this check also encourages boosting acnv scaling w/o penalty which may lead to unrealistic outcomes from balanced parameters.
                 # S_qt_snow_ice_dep = max(-max(0, qi_tendency_sub_dep), S_qt_snow_ice_dep) # Now that they're calculated differently, ensure S_qt_snow_ice_dep takes lss than deposition from qi_tendency_noneq
-                
+
 
 
                 # the limiter should probably pick one to give priority, dep i would assume
@@ -558,7 +665,7 @@ function precipitation_formation(
                     this is kinda fragile though... the target threshold is kinda buried in there...
                     and if it's a q based threshold, does it even matter? maybe we just fall back to the default min threshold regardless? either way it would be nice to get out the threshold the fcn is using...
                 =#
-                    
+
                 #=
                     This is a challenging implementation 
                     We would like, in steady state, for acnv loss to be supported by incoming vapor. Thus, we set the limit to allow for contributions from qi_tendency_sub_dep and qi_tendency_sed.
@@ -579,7 +686,7 @@ function precipitation_formation(
                 # S_qt_snow_ice_agg, q_ice_thresh = get_thresh_and_my_conv_q_ice_to_q_sno_thresh(param_set, q.ice + qi_tendency_sub_dep*Δt + qi_tendency_sed*Δt; N = Ni, r_acnv_scaling_factor=snow_formation_model.r_ice_acnv_scaling_factor, ice_acnv_power = snow_formation_model.ice_acnv_power) # For balance, allow incoming to contribute to acnv. Deposition acnv is already accounted for, so maybe don't double count? sedimentation should lead to acnv though.
                 # S_qt_snow_ice_agg = limit_tendency(precipitation_tendency_limiter, -α_acnv * S_qt_snow_ice_agg , max(q.ice + (qi_tendency_sub_dep + S_qt_snow_ice_dep)*Δt + qi_tendency_sed*Δt - q_ice_thresh, 0), Δt) # based on growth but threshold is fixed [ needs a scaling factor for how much is over the thresh]
                 # S_qt_snow_ice_agg = limit_tendency(precipitation_tendency_limiter, -α_acnv * S_qt_snow_ice_agg , max(q.ice - q_ice_thresh, 0) + qi_tendency_sed * Δt, Δt)  # I think allowing sed to join the party is a mistake bc we do not calculate acnv including that so you still get jumps. i.e. you hit the tresh and then all of a sudden sed ca take you wherever you want, you'd need to add it when calculating the thresh, as in the input being q.ice + sed tendency etc... but that get's more and more complicated, you could make the argument with more and more tendencies... etc... this is simple and in line wit everything else...
-                
+
                 # Nearly impossible to work with, almost always far too large in the wrong places...
                 # S_qt_snow_ice_agg_mix = tke_eddy_diffusivity_driven_acnv(param_set, ice_type, qi, Ni, CMP.ρ_cloud_ice(microphys_params), ρ_c, tke_var; r_acnv_scaling_factor = snow_formation_model.r_ice_acnv_scaling_factor, C = cloud_sedimentation_model.E_ice_ice_mix, Dmax = cloud_sedimentation_model.ice_Dmax)
                 # S_qt_snow_ice_agg_mix = limit_tendency(precipitation_tendency_limiter, -α_acnv * S_qt_snow_ice_agg_mix, max(q.ice + qi_tendency_sub_dep*Δt + qi_tendency_sed*Δt, 0), Δt) # based on growth but threshold is fixed [ needs a scaling factor for how much is over the thresh]
@@ -587,9 +694,43 @@ function precipitation_formation(
 
                 # [[ since we assume evap is constantly raising <r>, there is actually no need to enforce q_thresh... just proceed at τ or even faster -- you should never get <r> below your target value... honestly the longer time timestep the worse it should get lol. No threshold kind of means assuming <r> constant and so the rate is fixed.. maybe not a bad guess if you assume steady state idk... ]]
                 use_cloak = (area_partition_model isa CoreCloakAreaPartitionModel)
-                qi_tendency_sub_dep_for_thresh = max(qi_tendency_sub_dep + S_qt_snow_ice_dep_above + S_qt_snow_ice_dep_is, FT(0)) # remove the part already going to snow from sub dep
-                S_qt_snow_ice_thresh, q_thresh_acnv = threshold_driven_acnv(param_set, ice_type, qi, Ni, ρ; Δt = Δt, Dmax=cloud_sedimentation_model.ice_Dmax, r_threshold_scaling_factor=snow_formation_model.r_ice_snow_threshold_scaling_factor, r_acnv_scaling_factor=snow_formation_model.r_ice_acnv_scaling_factor, add_dry_aerosol_mass=true, N_i_no_boost=N_i_no_boost, S_i=S_i, τ_sub_dep=τ_sub_dep, dqdt_sed=qi_tendency_sed, dqdt_dep=qi_tendency_sub_dep_for_thresh, dN_i_dz=dN_i_dz, dqidz=dqidz, w=term_vel_ice, N_INP=N_INP, massflux=massflux, domain=domain, use_cloak=use_cloak, tke=tke_var, qt_var=qt_var, qt = q.tot, dqtdz=dqtdz, qisedflux = term_vel_ice*qi) # pass in sed tendency so it can be accounted for in the threshold calculation
-                S_qt_snow_ice_thresh = limit_tendency(precipitation_tendency_limiter, -α_acnv * S_qt_snow_ice_thresh, max(q.ice + qi_tendency_sub_dep*Δt + qi_tendency_sed*Δt - q_thresh_acnv, 0), Δt) # based on growth but threshold is fixed [ needs a scaling factor for how much is over the thresh]
+                qi_tendency_sub_dep_for_thresh =
+                    max(qi_tendency_sub_dep + S_qt_snow_ice_dep_above + S_qt_snow_ice_dep_is, FT(0)) # remove the part already going to snow from sub dep
+                S_qt_snow_ice_thresh, q_thresh_acnv = threshold_driven_acnv(
+                    param_set,
+                    ice_type,
+                    qi,
+                    Ni,
+                    ρ;
+                    Δt = Δt,
+                    Dmax = cloud_sedimentation_model.ice_Dmax,
+                    r_threshold_scaling_factor = snow_formation_model.r_ice_snow_threshold_scaling_factor,
+                    r_acnv_scaling_factor = snow_formation_model.r_ice_acnv_scaling_factor,
+                    add_dry_aerosol_mass = true,
+                    N_i_no_boost = N_i_no_boost,
+                    S_i = S_i,
+                    τ_sub_dep = τ_sub_dep,
+                    dqdt_sed = qi_tendency_sed,
+                    dqdt_dep = qi_tendency_sub_dep_for_thresh,
+                    dN_i_dz = dN_i_dz,
+                    dqidz = dqidz,
+                    w = term_vel_ice,
+                    N_INP = N_INP,
+                    massflux = massflux,
+                    domain = domain,
+                    use_cloak = use_cloak,
+                    tke = tke_var,
+                    qt_var = qt_var,
+                    qt = q.tot,
+                    dqtdz = dqtdz,
+                    qisedflux = term_vel_ice * qi,
+                ) # pass in sed tendency so it can be accounted for in the threshold calculation
+                S_qt_snow_ice_thresh = limit_tendency(
+                    precipitation_tendency_limiter,
+                    -α_acnv * S_qt_snow_ice_thresh,
+                    max(q.ice + qi_tendency_sub_dep * Δt + qi_tendency_sed * Δt - q_thresh_acnv, 0),
+                    Δt,
+                ) # based on growth but threshold is fixed [ needs a scaling factor for how much is over the thresh]
 
                 # TEST!
                 # S_qt_snow_ice_thresh = limit_tendency(precipitation_tendency_limiter, -α_acnv * S_qt_snow_ice_thresh, max(q.ice + qi_tendency_sub_dep*Δt - q_thresh_acnv, 0), Δt) # based on growth but threshold is fixed [ needs a scaling factor for how much is over the thresh]
@@ -599,14 +740,19 @@ function precipitation_formation(
 
                 # not sure if we should only use positive sedimentation convergence...
                 # S_qt_snow = limit_tendency(precipitation_tendency_limiter, S_qt_snow_ice_dep + S_qt_snow_ice_agg_mix, q.ice + qi_tendency_sub_dep*Δt + qi_tendency_sed*Δt, Δt) # based on growth and aggregation # technically the part from sub_dep is new ice so add that in to the limiter (net bc the acnv tendency is neg of the sub tendency)
-                
+
 
                 # agg no longer just comes from us, so remove here...
-                S_qt_snow = limit_tendency(precipitation_tendency_limiter, S_qt_snow_ice_dep + S_qt_snow_ice_agg_mix + S_qt_snow_ice_thresh, q.ice + qi_tendency_sub_dep*Δt + qi_tendency_sed*Δt, Δt) # based on growth and aggregation # technically the part from sub_dep is new ice so add that in to the limiter (net bc the acnv tendency is neg of the sub tendency)
+                S_qt_snow = limit_tendency(
+                    precipitation_tendency_limiter,
+                    S_qt_snow_ice_dep + S_qt_snow_ice_agg_mix + S_qt_snow_ice_thresh,
+                    q.ice + qi_tendency_sub_dep * Δt + qi_tendency_sed * Δt,
+                    Δt,
+                ) # based on growth and aggregation # technically the part from sub_dep is new ice so add that in to the limiter (net bc the acnv tendency is neg of the sub tendency)
 
 
-                # S_qt_snow = -min(q.ice / Δt, α_acnv * my_conv_q_ice_to_q_sno_no_supersat(param_set, q))
-                # S_qt_snow = limit_tendency(precipitation_tendency_limiter, -α_acnv * my_conv_q_ice_to_q_sno_no_supersat(param_set, q; N0 = Ni, r_acnv_scaling_factor=snow_formation_model.r_ice_acnv_scaling_factor), q.ice, Δt)
+            # S_qt_snow = -min(q.ice / Δt, α_acnv * my_conv_q_ice_to_q_sno_no_supersat(param_set, q))
+            # S_qt_snow = limit_tendency(precipitation_tendency_limiter, -α_acnv * my_conv_q_ice_to_q_sno_no_supersat(param_set, q; N0 = Ni, r_acnv_scaling_factor=snow_formation_model.r_ice_acnv_scaling_factor), q.ice, Δt)
 
             elseif snow_formation_model isa DefaultSnowFormationModel
                 #=
@@ -615,13 +761,20 @@ function precipitation_formation(
                 =#
                 # S_qt_snow = -min(q.ice / Δt, α_acnv * CM1.conv_q_ice_to_q_sno_no_supersat(microphys_params, q.ice))
 
-                qi_tendency_sed =  resolve_nan(max(FT(0), qi_tendency_sed), FT(0)) # Only accept deposition, and if we passed in FT(NaN) as a fallback (e.g. in Equilibrium, just use FT(0))
+                qi_tendency_sed = resolve_nan(max(FT(0), qi_tendency_sed), FT(0)) # Only accept deposition, and if we passed in FT(NaN) as a fallback (e.g. in Equilibrium, just use FT(0))
                 qi_tendency_sub_dep = resolve_nan(max(FT(0), qi_tendency_sub_dep), FT(0)) # Only accept deposition, and if we passed in FT(NaN) as a fallback (e.g. in Equilibrium, just use FT(0))
-                
-                S_qt_snow = limit_tendency(precipitation_tendency_limiter, -α_acnv * CM1.conv_q_ice_to_q_sno_no_supersat(microphys_params, q.ice), max(q.ice + qi_tendency_sub_dep*Δt - CMP.q_ice_threshold(TCP.microphysics_params(param_set)), 0), Δt) # don't allow reducing below threshold
+
+                S_qt_snow = limit_tendency(
+                    precipitation_tendency_limiter,
+                    -α_acnv * CM1.conv_q_ice_to_q_sno_no_supersat(microphys_params, q.ice),
+                    max(q.ice + qi_tendency_sub_dep * Δt - CMP.q_ice_threshold(TCP.microphysics_params(param_set)), 0),
+                    Δt,
+                ) # don't allow reducing below threshold
 
                 if !isfinite(S_qt_snow)
-                    @error("Got nonfinite S_qt_snow = $(S_qt_snow) from inputs qi = $(qi); Ni = $(Ni); ρ_c = $(ρ_c); p = $(p)")
+                    @error(
+                        "Got nonfinite S_qt_snow = $(S_qt_snow) from inputs qi = $(qi); Ni = $(Ni); ρ_c = $(ρ_c); p = $(p)"
+                    )
                 end
 
                 S_qt_snow_ice_dep = FT(0) # no easy breakdown [ don't actually put NaN because it messes with the sums below and with the regridder afterwards], just put 0
@@ -629,26 +782,69 @@ function precipitation_formation(
                 S_qt_snow_ice_dep_above = FT(0)
                 S_qt_snow_ice_agg_mix = FT(0) # no easy breakdown
                 use_cloak = (area_partition_model isa CoreCloakAreaPartitionModel)
-                qi_tendency_sub_dep_for_thresh = max(qi_tendency_sub_dep + S_qt_snow_ice_dep_above + S_qt_snow_ice_dep_is, FT(0)) # remove the part already going to snow from sub dep
-                S_qt_snow_ice_thresh, q_thresh_acnv = threshold_driven_acnv(param_set, ice_type, qi, Ni, ρ_c; Δt=Δt, Dmax=cloud_sedimentation_model.ice_Dmax, r_threshold_scaling_factor=param_set.user_params.r_ice_snow_threshold_scaling_factor, r_acnv_scaling_factor=param_set.user_params.r_ice_acnv_scaling_factor, add_dry_aerosol_mass=true, N_i_no_boost=N_i_no_boost, S_i=S_i, τ_sub_dep=τ_sub_dep, dqdt_sed=qi_tendency_sed, dqdt_dep=qi_tendency_sub_dep_for_thresh, dN_i_dz=dN_i_dz, dqidz=dqidz, w=term_vel_ice, N_INP=N_INP, massflux=massflux, domain=domain, use_cloak=use_cloak, tke=tke_var, qt=q.tot, qt_var=qt_var, dqtdz=dqtdz, qisedflux=term_vel_ice*qi) # pass in sed tendency so it can be accounted for in the threshold calculation
+                qi_tendency_sub_dep_for_thresh =
+                    max(qi_tendency_sub_dep + S_qt_snow_ice_dep_above + S_qt_snow_ice_dep_is, FT(0)) # remove the part already going to snow from sub dep
+                S_qt_snow_ice_thresh, q_thresh_acnv = threshold_driven_acnv(
+                    param_set,
+                    ice_type,
+                    qi,
+                    Ni,
+                    ρ_c;
+                    Δt = Δt,
+                    Dmax = cloud_sedimentation_model.ice_Dmax,
+                    r_threshold_scaling_factor = param_set.user_params.r_ice_snow_threshold_scaling_factor,
+                    r_acnv_scaling_factor = param_set.user_params.r_ice_acnv_scaling_factor,
+                    add_dry_aerosol_mass = true,
+                    N_i_no_boost = N_i_no_boost,
+                    S_i = S_i,
+                    τ_sub_dep = τ_sub_dep,
+                    dqdt_sed = qi_tendency_sed,
+                    dqdt_dep = qi_tendency_sub_dep_for_thresh,
+                    dN_i_dz = dN_i_dz,
+                    dqidz = dqidz,
+                    w = term_vel_ice,
+                    N_INP = N_INP,
+                    massflux = massflux,
+                    domain = domain,
+                    use_cloak = use_cloak,
+                    tke = tke_var,
+                    qt = q.tot,
+                    qt_var = qt_var,
+                    dqtdz = dqtdz,
+                    qisedflux = term_vel_ice * qi,
+                ) # pass in sed tendency so it can be accounted for in the threshold calculation
 
                 if !isfinite(S_qt_snow_ice_thresh) || ~isfinite(q_thresh_acnv)
-                    @error("Got nonfinite S_qt_snow_ice_thresh = $(S_qt_snow_ice_thresh) or q_thresh_acnv = $(q_thresh_acnv) from inputs qi = $(qi); Ni = $(Ni); ρ_c = $(ρ_c)")
+                    @error(
+                        "Got nonfinite S_qt_snow_ice_thresh = $(S_qt_snow_ice_thresh) or q_thresh_acnv = $(q_thresh_acnv) from inputs qi = $(qi); Ni = $(Ni); ρ_c = $(ρ_c)"
+                    )
                 end
 
-                S_qt_snow_ice_thresh = limit_tendency(precipitation_tendency_limiter, -α_acnv * S_qt_snow_ice_thresh, max(q.ice + qi_tendency_sub_dep*Δt + qi_tendency_sed*Δt - q_thresh_acnv, 0), Δt) # based on growth but threshold is fixed [ needs a scaling factor for how much is over the thresh]
-                
+                S_qt_snow_ice_thresh = limit_tendency(
+                    precipitation_tendency_limiter,
+                    -α_acnv * S_qt_snow_ice_thresh,
+                    max(q.ice + qi_tendency_sub_dep * Δt + qi_tendency_sed * Δt - q_thresh_acnv, 0),
+                    Δt,
+                ) # based on growth but threshold is fixed [ needs a scaling factor for how much is over the thresh]
+
                 if !isfinite(S_qt_snow_ice_thresh) || ~isfinite(q_thresh_acnv)
-                    @error("After limiting, got nonfinite S_qt_snow_ice_thresh = $(S_qt_snow_ice_thresh) or q_thresh_acnv = $(q_thresh_acnv) from inputs qi = $(qi); Ni = $(Ni); ρ_c = $(ρ_c)")
+                    @error(
+                        "After limiting, got nonfinite S_qt_snow_ice_thresh = $(S_qt_snow_ice_thresh) or q_thresh_acnv = $(q_thresh_acnv) from inputs qi = $(qi); Ni = $(Ni); ρ_c = $(ρ_c)"
+                    )
                 end
 
 
-                S_qt_snow = limit_tendency(precipitation_tendency_limiter, S_qt_snow + S_qt_snow_ice_thresh, q.ice + qi_tendency_sub_dep*Δt + qi_tendency_sed*Δt, Δt) # based on growth and aggregation # technically the part from sub_dep is new ice so add that in to the limiter (net bc the acnv tendency is neg of the sub tendency)
+                S_qt_snow = limit_tendency(
+                    precipitation_tendency_limiter,
+                    S_qt_snow + S_qt_snow_ice_thresh,
+                    q.ice + qi_tendency_sub_dep * Δt + qi_tendency_sed * Δt,
+                    Δt,
+                ) # based on growth and aggregation # technically the part from sub_dep is new ice so add that in to the limiter (net bc the acnv tendency is neg of the sub tendency)
             else
                 error("Unrecognized snow formation model $(snow_formation_model)")
             end
 
-            
+
             qi_tendency_acnv = S_qt_snow # for storage
             qi_tendency_acnv_dep = S_qt_snow_ice_dep # for storage [ was already an input but may be removing ]
             qi_tendency_acnv_dep_is = S_qt_snow_ice_dep_is
@@ -670,17 +866,41 @@ function precipitation_formation(
             # accretion cloud water + rain
             if rain_formation_model isa Clima1M_default
                 # S_qr = min(q.liq / Δt, α_accr * CM1.accretion(microphys_params, liq_type, rain_type, q.liq, qr, ρ_c)) * precip_fraction
-                S_qr = -limit_tendency(precipitation_tendency_limiter, -α_accr * CM1.accretion(microphys_params, liq_type, rain_type, q.liq, qr, ρ_c), q.liq, Δt) * precip_fraction
+                S_qr =
+                    -limit_tendency(
+                        precipitation_tendency_limiter,
+                        -α_accr * CM1.accretion(microphys_params, liq_type, rain_type, q.liq, qr, ρ_c),
+                        q.liq,
+                        Δt,
+                    ) * precip_fraction
             elseif rain_formation_model isa Clima2M
                 if rain_formation_model.type isa CMT.LD2004Type
                     # S_qr = min(q.liq / Δt, α_accr * CM1.accretion(microphys_params, liq_type, rain_type, q.liq, qr, ρ_c)) * precip_fraction
-                    S_qr = -limit_tendency(precipitation_tendency_limiter, -α_accr * CM1.accretion(microphys_params, liq_type, rain_type, q.liq, qr, ρ_c), q.liq, Δt) * precip_fraction
+                    S_qr =
+                        -limit_tendency(
+                            precipitation_tendency_limiter,
+                            -α_accr * CM1.accretion(microphys_params, liq_type, rain_type, q.liq, qr, ρ_c),
+                            q.liq,
+                            Δt,
+                        ) * precip_fraction
                 elseif rain_formation_model.type isa CMT.KK2000Type || rain_formation_model.type isa CMT.B1994Type
                     # S_qr = min(q.liq / Δt, α_accr * CM2.accretion(microphys_params, rain_formation_model.type, q.liq, qr, ρ_c), ) * precip_fraction
-                    S_qr = -limit_tendency(precipitation_tendency_limiter, -α_accr * CM2.accretion(microphys_params, rain_formation_model.type, q.liq, qr, ρ_c), q.liq, Δt) * precip_fraction
+                    S_qr =
+                        -limit_tendency(
+                            precipitation_tendency_limiter,
+                            -α_accr * CM2.accretion(microphys_params, rain_formation_model.type, q.liq, qr, ρ_c),
+                            q.liq,
+                            Δt,
+                        ) * precip_fraction
                 elseif rain_formation_model.type isa CMT.TC1980Type
                     # S_qr = min(q.liq / Δt, α_accr * CM2.accretion(microphys_params, rain_formation_model.type, q.liq, qr),) * precip_fraction
-                    S_qr = -limit_tendency(precipitation_tendency_limiter, -α_accr * CM2.accretion(microphys_params, rain_formation_model.type, q.liq, qr), q.liq, Δt) * precip_fraction
+                    S_qr =
+                        -limit_tendency(
+                            precipitation_tendency_limiter,
+                            -α_accr * CM2.accretion(microphys_params, rain_formation_model.type, q.liq, qr),
+                            q.liq,
+                            Δt,
+                        ) * precip_fraction
                 else
                     error("Unrecognized 2-moment rain formation model type")
                 end
@@ -695,7 +915,13 @@ function precipitation_formation(
 
             # accretion cloud ice + snow
             # S_qs = min(q.ice / Δt, α_accr * CM1.accretion(microphys_params, ice_type, snow_type, q.ice, qs, ρ_c)) * precip_fraction
-            S_qs = -limit_tendency(precipitation_tendency_limiter,  -α_accr * CM1.accretion(microphys_params, ice_type, snow_type, q.ice, qs, ρ_c), q.ice, Δt) * precip_fraction
+            S_qs =
+                -limit_tendency(
+                    precipitation_tendency_limiter,
+                    -α_accr * CM1.accretion(microphys_params, ice_type, snow_type, q.ice, qs, ρ_c),
+                    q.ice,
+                    Δt,
+                ) * precip_fraction
 
             qs_tendency += S_qs
             qt_tendency -= S_qs
@@ -705,7 +931,13 @@ function precipitation_formation(
 
             # sink of cloud water via accretion cloud water + snow
             # S_qt = -min(q.liq / Δt, α_accr * CM1.accretion(microphys_params, liq_type, snow_type, q.liq, qs, ρ_c)) * precip_fraction
-            S_qt = limit_tendency(precipitation_tendency_limiter, -α_accr * CM1.accretion(microphys_params, liq_type, snow_type, q.liq, qs, ρ_c), q.liq, Δt) * precip_fraction # microphysics params should contain E_liq_sno which can be a tuning knob here.
+            S_qt =
+                limit_tendency(
+                    precipitation_tendency_limiter,
+                    -α_accr * CM1.accretion(microphys_params, liq_type, snow_type, q.liq, qs, ρ_c),
+                    q.liq,
+                    Δt,
+                ) * precip_fraction # microphysics params should contain E_liq_sno which can be a tuning knob here.
             if T < T_fr # cloud droplets freeze to become snow)
                 qs_tendency -= S_qt
                 qt_tendency += S_qt
@@ -725,10 +957,22 @@ function precipitation_formation(
 
             # sink of cloud ice via accretion cloud ice - rain
             # S_qt = -min(q.ice / Δt, α_accr * CM1.accretion(microphys_params, ice_type, rain_type, q.ice, qr, ρ_c)) * precip_fraction
-            S_qt = limit_tendency(precipitation_tendency_limiter, -α_accr * CM1.accretion(microphys_params, ice_type, rain_type, q.ice, qr, ρ_c), q.ice, Δt) * precip_fraction
+            S_qt =
+                limit_tendency(
+                    precipitation_tendency_limiter,
+                    -α_accr * CM1.accretion(microphys_params, ice_type, rain_type, q.ice, qr, ρ_c),
+                    q.ice,
+                    Δt,
+                ) * precip_fraction
             # sink of rain via accretion cloud ice - rain
             # S_qr = -min(qr / Δt, α_accr * CM1.accretion_rain_sink(microphys_params, q.ice, qr, ρ_c)) * precip_fraction
-            S_qr = limit_tendency(precipitation_tendency_limiter, -α_accr * CM1.accretion_rain_sink(microphys_params, q.ice, qr, ρ_c), qr, Δt) * precip_fraction
+            S_qr =
+                limit_tendency(
+                    precipitation_tendency_limiter,
+                    -α_accr * CM1.accretion_rain_sink(microphys_params, q.ice, qr, ρ_c),
+                    qr,
+                    Δt,
+                ) * precip_fraction
             qt_tendency += S_qt
             qi_tendency += S_qt
             qr_tendency += S_qr
@@ -739,10 +983,44 @@ function precipitation_formation(
             # accretion rain - snow
             if T < T_fr
                 # S_qs = min(qr / Δt, α_accr * CM1.accretion_snow_rain(microphys_params, snow_type, rain_type, qs, qr, ρ_c)) * precip_fraction * precip_fraction
-                S_qs = -limit_tendency(precipitation_tendency_limiter, -α_accr * my_accretion_snow_rain(microphys_params, snow_type, rain_type, qs, qr, ρ_c, term_vel_snow, term_vel_rain), qr, Δt) * precip_fraction * precip_fraction
+                S_qs =
+                    -limit_tendency(
+                        precipitation_tendency_limiter,
+                        -α_accr * my_accretion_snow_rain(
+                            microphys_params,
+                            snow_type,
+                            rain_type,
+                            qs,
+                            qr,
+                            ρ_c,
+                            term_vel_snow,
+                            term_vel_rain,
+                        ),
+                        qr,
+                        Δt,
+                    ) *
+                    precip_fraction *
+                    precip_fraction
             else
                 # S_qs = -min(qs / Δt, α_accr * CM1.accretion_snow_rain(microphys_params, rain_type, snow_type, qr, qs, ρ_c)) * precip_fraction * precip_fraction
-                S_qs = limit_tendency(precipitation_tendency_limiter, -α_accr * my_accretion_snow_rain(microphys_params, rain_type, snow_type, qr, qs, ρ_c, term_vel_rain, term_vel_snow), qs, Δt) * precip_fraction * precip_fraction
+                S_qs =
+                    limit_tendency(
+                        precipitation_tendency_limiter,
+                        -α_accr * my_accretion_snow_rain(
+                            microphys_params,
+                            rain_type,
+                            snow_type,
+                            qr,
+                            qs,
+                            ρ_c,
+                            term_vel_rain,
+                            term_vel_snow,
+                        ),
+                        qs,
+                        Δt,
+                    ) *
+                    precip_fraction *
+                    precip_fraction
             end
             qs_tendency += S_qs
             qr_tendency -= S_qs
@@ -753,10 +1031,20 @@ function precipitation_formation(
 
             if moisture_model isa NonEquilibriumMoisture
                 if T < T_fr # losing liq
-                    S_qi = accretion_liq_ice(param_set, ql, qi, ρ_c, term_vel_ice, cloud_sedimentation_model.ice_terminal_velocity_scheme, Ni, cloud_sedimentation_model.ice_Dmax, cloud_sedimentation_model.E_liq_ice) #; liq_ice_accr_scaling_factor = cloud_sedimentation_model.liq_ice_collision_scaling_factor ) # should be a positive number
+                    S_qi = accretion_liq_ice(
+                        param_set,
+                        ql,
+                        qi,
+                        ρ_c,
+                        term_vel_ice,
+                        cloud_sedimentation_model.ice_terminal_velocity_scheme,
+                        Ni,
+                        cloud_sedimentation_model.ice_Dmax,
+                        cloud_sedimentation_model.E_liq_ice,
+                    ) #; liq_ice_accr_scaling_factor = cloud_sedimentation_model.liq_ice_collision_scaling_factor ) # should be a positive number
                     # Tendencies get multiplied by area outside of this fcn and cloud fraction is 1 if has condensate and 0 if not so no need here
                     S_qi = max(S_qi, FT(0)) # don't allow negative values (depending on ai, bi, ci in Chen that can just barely happen)
-                    S_qi = -limit_tendency(precipitation_tendency_limiter, -α_accr * S_qi , ql, Δt) # signs should match accretion_snow_rain except snow ⟹ ice, rain ⟹ liq
+                    S_qi = -limit_tendency(precipitation_tendency_limiter, -α_accr * S_qi, ql, Δt) # signs should match accretion_snow_rain except snow ⟹ ice, rain ⟹ liq
                 else # losing ice
                     # We don't have accretion liq-ice because we only send the result to liq or ice so it doesn't matter -- if it ever gets sent to precip we can bring this back...
                     # S_qi = accretion_liq_ice(microphys_params, ql, qi, ρ_c, term_vel_ice, cloud_sedimentation_model.ice_terminal_velocity_scheme, Ni, cloud_sedimentation_model.ice_Dmax, cloud_sedimentation_model.E_liq_ice; liq_ice_accr_scaling_factor = cloud_sedimentation_model.liq_ice_collision_scaling_factor ) # should be a positive number
@@ -765,7 +1053,7 @@ function precipitation_formation(
                     S_qi = FT(0) # PSACWI doesn't cover this, either way we have instant melting so...
                 end
                 qi_tendency += S_qi
-                ql_tendency -= S_qi   
+                ql_tendency -= S_qi
                 # Because both ql and qi are part of the working fluid and θ_liq_ice_tendency is 0, we really should have  no change in θ_liq_ice_tendency
                 # θ_liq_ice_tendency += FT(0)
                 # θ_liq_ice_tendency += S_qi * Lf / Π_m / c_vm # fusion liq ⟹ ice
@@ -804,7 +1092,7 @@ function precipitation_formation(
     )
 end
 
- precipitation_formation(
+precipitation_formation(
     param_set::APS,
     moisture_model::AbstractMoistureModel,
     precip_model::AbstractPrecipitationModel,
@@ -841,48 +1129,47 @@ end
     domain::AbstractDomain = Env,
     qt_var::FT = FT(0),
     dqtdz::FT = FT(0),
-) where {FT} = 
-    precipitation_formation(
-        param_set,
-        moisture_model,
-        precip_model,
-        cloud_sedimentation_model,
-        rain_formation_model,
-        snow_formation_model,
-        area_partition_model,
-        qr,
-        qs,
-        ql,
-        qi,
-        Ni,
-        term_vel_ice,
-        term_vel_rain,
-        term_vel_snow,
-        area,
-        ρ_c,
-        p,
-        T,
-        Δt,
-        ts,
-        # FT(NaN), # placeholder for backwards compat w [removed]
-        # FT(NaN), # placeholder for backwards compat z [removed]
-        FT(NaN), # placeholder for backwards compat ql_tendency_cond_evap
-        FT(NaN), # placeholder for backwards compat qi_tendency_sub_dep
-        qi_tendency_sed, # placeholder for backwards compat qi_tendency_sed
-        precip_fraction,
-        precipitation_tendency_limiter,
-        tke_var,
-        N_i_no_boost,
-        S_i,
-        τ_sub_dep,
-        dN_i_dz,
-        dqidz,
-        N_INP,
-        massflux,
-        domain,
-        qt_var,
-        dqtdz,
-    )
+) where {FT} = precipitation_formation(
+    param_set,
+    moisture_model,
+    precip_model,
+    cloud_sedimentation_model,
+    rain_formation_model,
+    snow_formation_model,
+    area_partition_model,
+    qr,
+    qs,
+    ql,
+    qi,
+    Ni,
+    term_vel_ice,
+    term_vel_rain,
+    term_vel_snow,
+    area,
+    ρ_c,
+    p,
+    T,
+    Δt,
+    ts,
+    # FT(NaN), # placeholder for backwards compat w [removed]
+    # FT(NaN), # placeholder for backwards compat z [removed]
+    FT(NaN), # placeholder for backwards compat ql_tendency_cond_evap
+    FT(NaN), # placeholder for backwards compat qi_tendency_sub_dep
+    qi_tendency_sed, # placeholder for backwards compat qi_tendency_sed
+    precip_fraction,
+    precipitation_tendency_limiter,
+    tke_var,
+    N_i_no_boost,
+    S_i,
+    τ_sub_dep,
+    dN_i_dz,
+    dqidz,
+    N_INP,
+    massflux,
+    domain,
+    qt_var,
+    dqtdz,
+)
 
 
 """
@@ -932,13 +1219,13 @@ function accretion_liq_ice(
         # At <r> = 100 μm, it does suggest single droplet velocities around 0.2 m/s, but that grows quickly, so if N is very small it can get out of hand.
 
 
-        integral_nav = int_nav_dr(param_set, ice_type, velo_scheme, qi, ρ, FT(NaN); Nt=N_i, Dmax=ice_Dmax) # assume μ in n(r) is 0 (exponential distribution)
-        
+        integral_nav = int_nav_dr(param_set, ice_type, velo_scheme, qi, ρ, FT(NaN); Nt = N_i, Dmax = ice_Dmax) # assume μ in n(r) is 0 (exponential distribution)
+
         accr_rate = E_liq_ice * ql * integral_nav  # Eq 16 https://clima.github.io/CloudMicrophysics.jl/dev/Microphysics1M/#Accretion, ql * ρ goes from /kgair to /m^3 like nav, but to go back then we need to divide by ρ so we just ignore ρ completely
 
 
     end
-    return accr_rate 
+    return accr_rate
 end
 
 """
@@ -979,14 +1266,14 @@ function my_collision_coalescence(
     if (qi > FT(0) && qj > FT(0))
 
         if add_dry_aerosol_mass
-            qi += mass(param_set, type_i, param_set.user_params.particle_min_radius, N_i; monodisperse=true) / ρ # add the dry aerosol mass to q when calculating λ and n0
-            qj += mass(param_set, type_j, param_set.user_params.particle_min_radius, N_j; monodisperse=true) / ρ # add the dry aerosol mass to q when calculating λ and n0
+            qi += mass(param_set, type_i, param_set.user_params.particle_min_radius, N_i; monodisperse = true) / ρ # add the dry aerosol mass to q when calculating λ and n0
+            qj += mass(param_set, type_j, param_set.user_params.particle_min_radius, N_j; monodisperse = true) / ρ # add the dry aerosol mass to q when calculating λ and n0
         end
 
         # _n0_i::FT = CM1.n0(prs, qi, ρ, type_i)
         # _n0_j::FT = CM1.n0(prs, qj, ρ, type_j)
-        _n0_i::FT = isnan(N_i) ? n0(prs, qi, ρ, type_i) : n0(param_set, qi, ρ, type_i, N_i; μ=μ_i) # use wanted N_i If given
-        _n0_j::FT = isnan(N_j) ? n0(prs, qj, ρ, type_j) : n0(param_set, qj, ρ, type_j, N_j; μ=μ_j) # use wanted N_j If given
+        _n0_i::FT = isnan(N_i) ? n0(prs, qi, ρ, type_i) : n0(param_set, qi, ρ, type_i, N_i; μ = μ_i) # use wanted N_i If given
+        _n0_j::FT = isnan(N_j) ? n0(prs, qj, ρ, type_j) : n0(param_set, qj, ρ, type_j, N_j; μ = μ_j) # use wanted N_j If given
 
         _r0_j::FT = r0(prs, type_j)
         _m0_j::FT = m0(prs, type_j)
@@ -996,25 +1283,16 @@ function my_collision_coalescence(
 
         # _λ_i::FT = CM1.lambda(prs, type_i, qi, ρ)
         # _λ_j::FT = CM1.lambda(prs, type_j, qj, ρ)
-        _λ_i::FT = lambda(param_set, type_i, qi, ρ, N_i, Dmin, Dmax; μ=μ_i) # use our lambda from terminal_velocity.jl
-        _λ_j::FT = lambda(param_set, type_j, qj, ρ, N_j, Dmin, Dmax; μ=μ_j) # use our lambda from terminal_velocity.jl
+        _λ_i::FT = lambda(param_set, type_i, qi, ρ, N_i, Dmin, Dmax; μ = μ_i) # use our lambda from terminal_velocity.jl
+        _λ_j::FT = lambda(param_set, type_j, qj, ρ, N_j, Dmin, Dmax; μ = μ_j) # use our lambda from terminal_velocity.jl
 
 
 
         accr_rate =
-            FT(π) / ρ *
-            _n0_i *
-            _n0_j *
-            _m0_j *
-            _χm_j *
-            E *
-            abs(term_vel_i - term_vel_j) / _r0_j^(_me_j + _Δm_j) * (
-                FT(2) * CM1.SF.gamma(_me_j + _Δm_j + FT(1)) / _λ_i^FT(3) /
-                _λ_j^(_me_j + _Δm_j + FT(1)) +
-                FT(2) * CM1.SF.gamma(_me_j + _Δm_j + FT(2)) / _λ_i^FT(2) /
-                _λ_j^(_me_j + _Δm_j + FT(2)) +
-                CM1.SF.gamma(_me_j + _Δm_j + FT(3)) / _λ_i /
-                _λ_j^(_me_j + _Δm_j + FT(3))
+            FT(π) / ρ * _n0_i * _n0_j * _m0_j * _χm_j * E * abs(term_vel_i - term_vel_j) / _r0_j^(_me_j + _Δm_j) * (
+                FT(2) * CM1.SF.gamma(_me_j + _Δm_j + FT(1)) / _λ_i^FT(3) / _λ_j^(_me_j + _Δm_j + FT(1)) +
+                FT(2) * CM1.SF.gamma(_me_j + _Δm_j + FT(2)) / _λ_i^FT(2) / _λ_j^(_me_j + _Δm_j + FT(2)) +
+                CM1.SF.gamma(_me_j + _Δm_j + FT(3)) / _λ_i / _λ_j^(_me_j + _Δm_j + FT(3))
             )
     end
     # return accr_rate # we shouldnt need resolve nan bc we're using the cm_1 values which shouldn't blow up? but just to be safe
@@ -1059,19 +1337,10 @@ function my_accretion_snow_rain(
         _v_tj = term_vel_j
 
         accr_rate =
-            FT(π) / ρ *
-            _n0_i *
-            _n0_j *
-            _m0_j *
-            _χm_j *
-            _E_ij *
-            abs(_v_ti - _v_tj) / _r0_j^(_me_j + _Δm_j) * (
-                FT(2) * CM1.SF.gamma(_me_j + _Δm_j + FT(1)) / _λ_i^FT(3) /
-                _λ_j^(_me_j + _Δm_j + FT(1)) +
-                FT(2) * CM1.SF.gamma(_me_j + _Δm_j + FT(2)) / _λ_i^FT(2) /
-                _λ_j^(_me_j + _Δm_j + FT(2)) +
-                CM1.SF.gamma(_me_j + _Δm_j + FT(3)) / _λ_i /
-                _λ_j^(_me_j + _Δm_j + FT(3))
+            FT(π) / ρ * _n0_i * _n0_j * _m0_j * _χm_j * _E_ij * abs(_v_ti - _v_tj) / _r0_j^(_me_j + _Δm_j) * (
+                FT(2) * CM1.SF.gamma(_me_j + _Δm_j + FT(1)) / _λ_i^FT(3) / _λ_j^(_me_j + _Δm_j + FT(1)) +
+                FT(2) * CM1.SF.gamma(_me_j + _Δm_j + FT(2)) / _λ_i^FT(2) / _λ_j^(_me_j + _Δm_j + FT(2)) +
+                CM1.SF.gamma(_me_j + _Δm_j + FT(3)) / _λ_i / _λ_j^(_me_j + _Δm_j + FT(3))
             )
     end
     # return accr_rate # we shouldnt need resolve nan bc we're using the cm_1 values which shouldn't blow up? but just to be safe
@@ -1145,8 +1414,8 @@ function cross_domain_self_collection_or_autoconversion(
 
     # _n0_i::FT = CM1.n0(prs, q_s, ρ, type_s)
     # _n0_o::FT = CM1.n0(prs, q_o, ρ, type_o)
-    _n0_s::FT = isnan(N_s) ? n0(prs, q_s, ρ, type_s) : n0(param_set, q_s, ρ, type_s, N_s; μ=μ_s) # use wanted N_s If given
-    _n0_o::FT = isnan(N_o) ? n0(prs, q_o, ρ, type_o) : n0(param_set, q_o, ρ, type_o, N_o; μ=μ_o) # use wanted N_o If given
+    _n0_s::FT = isnan(N_s) ? n0(prs, q_s, ρ, type_s) : n0(param_set, q_s, ρ, type_s, N_s; μ = μ_s) # use wanted N_s If given
+    _n0_o::FT = isnan(N_o) ? n0(prs, q_o, ρ, type_o) : n0(param_set, q_o, ρ, type_o, N_o; μ = μ_o) # use wanted N_o If given
     _r0_o::FT = r0(prs, type_o)
     _m0_o::FT = m0(prs, type_o)
     _me_o::FT = me(prs, type_o)
@@ -1156,8 +1425,8 @@ function cross_domain_self_collection_or_autoconversion(
 
     # _λ_s::FT = CM1.lambda(prs, type_s, q_s, ρ)
     # _λ_o::FT = CM1.lambda(prs, type_o, q_o, ρ)
-    _λ_s::FT = lambda(param_set, type_s, q_s, ρ, N_s, Dmin_s, Dmax_s; μ=μ_s) # use our lambda from terminal_velocity.jl
-    _λ_o::FT = lambda(param_set, type_o, q_o, ρ, N_o, Dmin_o, Dmax_o; μ=μ_o) # use our lambda from terminal_velocity.jl
+    _λ_s::FT = lambda(param_set, type_s, q_s, ρ, N_s, Dmin_s, Dmax_s; μ = μ_s) # use our lambda from terminal_velocity.jl
+    _λ_o::FT = lambda(param_set, type_o, q_o, ρ, N_o, Dmin_o, Dmax_o; μ = μ_o) # use our lambda from terminal_velocity.jl
 
     # unlike normal collisions, these things don't really coexist so we'll only have collisions `self` terminal velocity is faster than `other`
     # dv = if term_vel_s > 0 # we are falling, so the other one should be falling slower or rising
@@ -1170,19 +1439,10 @@ function cross_domain_self_collection_or_autoconversion(
     dv = abs(term_vel_s - term_vel_o) # this is the relative velocity, so we can use it to define the self collection rate
 
     accr_rate =
-        FT(π) / ρ *
-        _n0_s *
-        _n0_o *
-        _m0_o *
-        _χm_o *
-        E *
-        dv / _r0_o^(_me_o + _Δm_o) * (
-            FT(2) * CM1.SF.gamma(_me_o + _Δm_o + FT(1)) / _λ_s^FT(3) /
-            _λ_o^(_me_o + _Δm_o + FT(1)) +
-            FT(2) * CM1.SF.gamma(_me_o + _Δm_o + FT(2)) / _λ_s^FT(2) /
-            _λ_o^(_me_o + _Δm_o + FT(2)) +
-            CM1.SF.gamma(_me_o + _Δm_o + FT(3)) / _λ_s /
-            _λ_o^(_me_o + _Δm_o + FT(3))
+        FT(π) / ρ * _n0_s * _n0_o * _m0_o * _χm_o * E * dv / _r0_o^(_me_o + _Δm_o) * (
+            FT(2) * CM1.SF.gamma(_me_o + _Δm_o + FT(1)) / _λ_s^FT(3) / _λ_o^(_me_o + _Δm_o + FT(1)) +
+            FT(2) * CM1.SF.gamma(_me_o + _Δm_o + FT(2)) / _λ_s^FT(2) / _λ_o^(_me_o + _Δm_o + FT(2)) +
+            CM1.SF.gamma(_me_o + _Δm_o + FT(3)) / _λ_s / _λ_o^(_me_o + _Δm_o + FT(3))
         )
 
     # return accr_rate # we shouldnt need resolve nan bc we're using the cm_1 values which shouldn't blow up? but just to be safe
@@ -1193,7 +1453,7 @@ function cross_domain_self_collection_or_autoconversion(
     else # we only care if we acnv, self collection does nothing given we don't have prognostic N
 
         # estimate acnv probability based on how close each is to its own threshold (a measure of existing r...)
-        
+
         # this really ought to asymptote to 1 or something, no?
         # also  for small acnv powers, this makes them bigger, not smaller...
         # if ((q_s / q_thresh_s) = .001, and acnv_power = 1/3, we get (.001 * .001)^(1/3 / 6) = 0.46, which is perhaps less than ideal...
@@ -1259,11 +1519,11 @@ function tke_eddy_diffusivity_driven_acnv(
 
         # proportional to area which goes as r^2 * w, w here comes from (sqrt TKE)
         # r = r_from_qN(param_set, q_type, q, N; monodisperse = true)
-        r = r_from_qN(param_set, q_type, q, N; monodisperse = false, ρ=ρ_a, Dmax=Dmax) # ρ=ρ_a, Dmax=Dmax)  # rn monodisperse is fine i think...? hopefully it's even a little pessimistic bc i think it's smaller than the real one? 
+        r = r_from_qN(param_set, q_type, q, N; monodisperse = false, ρ = ρ_a, Dmax = Dmax) # ρ=ρ_a, Dmax=Dmax)  # rn monodisperse is fine i think...? hopefully it's even a little pessimistic bc i think it's smaller than the real one? 
 
         # Note Saffman-Turner should only work at small scales, but we're at massive scales
         ϵ = tke_var # saffman-turner uses TKE dissipation rate
-        w_tke = sqrt(2tke_var/ρ_a) # assuming tke is 1/2 ρ_a * w^2 per cubic meter, this solves the vertical velocity.
+        w_tke = sqrt(2tke_var / ρ_a) # assuming tke is 1/2 ρ_a * w^2 per cubic meter, this solves the vertical velocity.
         # K_st = C * w_tke * (2r)^2 # saffman would be (2r^3) but we only care about area, mostly and vertical coherent motions, not isotropic volume like they care about for turbulence
         # coll_rate = FT(0.5) * K_st * N^2
 
@@ -1283,7 +1543,7 @@ function tke_eddy_diffusivity_driven_acnv(
         - The resulting r_out distribution is approximated as also being exponential with mean:
             r_mean_out = (2 * ⟨r³⟩)^(1/3) = (12 / λ⁴)^(1/3),  since ⟨r³⟩ = 6 / λ⁴
             i.e. two particles of average mass colliding (working in mass space is fairly weighted for this question)
-            
+
         - No collision kernel or sticking efficiency
 
         Then, we can observe these results:
@@ -1330,12 +1590,12 @@ function tke_eddy_diffusivity_driven_acnv(
             =#
 
         r_is = CMP.r_ice_snow(microphys_params)
-        μ = μ_from_qN(param_set, q_type, q, N; ρ=ρ_a)
+        μ = μ_from_qN(param_set, q_type, q, N; ρ = ρ_a)
         # _n0::FT = isnan(N) ? n0(microphys_params, q, ρ_a, q_type) : n0(param_set, q, ρ_a, q_type, N; μ=μ, Dmax=Dmax) # use wanted Nt If given
         # λ = lambda(microphys_params, q_type, q, ρ_a, N, μ; Dmin=FT(0), Dmax=Dmax, _n0=_n0)
         # mean_r_out = cbrt(FT(12)/ λ^4) # this is the mean radius of the output particle, assuming self-collisions combine volumes and follow MP distribution
         # P_acnv = exp(-r_is / mean_r_out) # gpt derivation...
-        F_acnv = acnv_mass_fraction(r, r_is; μ=μ)
+        F_acnv = acnv_mass_fraction(r, r_is; μ = μ)
         F_acnv = resolve_nan(F_acnv, FT(0)) # just to be safe, though it should be fine (the gammma can underfly at vry large values) Γ(4, 1e70) = 0 and Γ(4, 1e80) = NaN for rexample
 
         # now we need to go from coll_rate to acnv_rate
@@ -1358,7 +1618,22 @@ function tke_eddy_diffusivity_driven_acnv(
         =#
 
         # keep q so the distribution is the same, technically the collision rate will be about a factor of 4 too high, so /4
-        acnv_rate = my_collision_coalescence(param_set, q_type, q_type, q, q, ρ_a, FT(sqrt(2)/2) * w_tke, -FT(sqrt(2)/2)*w_tke, N, N, Dmax, C; add_dry_aerosol_mass=true) * F_acnv # assume these are all tke-fueled (bc they're falling at the same speed) and one has -w_tke and the other w_tke speed
+        acnv_rate =
+            my_collision_coalescence(
+                param_set,
+                q_type,
+                q_type,
+                q,
+                q,
+                ρ_a,
+                FT(sqrt(2) / 2) * w_tke,
+                -FT(sqrt(2) / 2) * w_tke,
+                N,
+                N,
+                Dmax,
+                C;
+                add_dry_aerosol_mass = true,
+            ) * F_acnv # assume these are all tke-fueled (bc they're falling at the same speed) and one has -w_tke and the other w_tke speed
     end
 
     return resolve_nan(acnv_rate, FT(0))
@@ -1376,7 +1651,7 @@ function compute_domain_interaction_microphysics_tendencies!(
     Δt::Real,
     param_set::APS,
     use_fallback_tendency_limiters::Bool,
-) 
+)
     grid = Grid(state)
     FT = float_type(state)
     thermo_params = TCP.thermodynamics_params(param_set)
@@ -1397,8 +1672,9 @@ function compute_domain_interaction_microphysics_tendencies!(
 
     cloud_sedimentation_model = edmf.cloud_sedimentation_model
     # rain_formation_model = edmf.rain_formation_model
-    snow_formation_model = edmf.snow_formation_model    
-    precipitation_tendency_limiter = get_tendency_limiter(edmf.tendency_limiters, Val(:precipitation), use_fallback_tendency_limiters)
+    snow_formation_model = edmf.snow_formation_model
+    precipitation_tendency_limiter =
+        get_tendency_limiter(edmf.tendency_limiters, Val(:precipitation), use_fallback_tendency_limiters)
 
 
 
@@ -1430,44 +1706,75 @@ function compute_domain_interaction_microphysics_tendencies!(
     _area_bottom = isa(area, FT) ? area : area[kc_surf]
     C2Fa = CCO.InterpolateC2F(; bottom = CCO.SetValue(FT(_area_bottom)), top = CCO.SetValue(FT(_area_top)))
     ∇a = aux_tc.temporary_1
-    @. ∇a =  ∇c(wvec(C2Fa(area))) # seems stable w/ either sign w...? (Left bias this?)
+    @. ∇a = ∇c(wvec(C2Fa(area))) # seems stable w/ either sign w...? (Left bias this?)
 
 
 
     @inbounds for k in real_center_indices(grid)
         kf = CCO.PlusHalf(k.i)
-        dz = grid.zf.z[kf+1] - grid.zf.z[kf]  # this is how it'z defined
+        dz = grid.zf.z[kf + 1] - grid.zf.z[kf]  # this is how it'z defined
 
 
 
         if (aux_bulk.area[k] > FT(0)) && (aux_bulk.qi_tendency_sedimentation_other[k] > FT(0))
-            
-            
+
+
             # env -> bulk means env area increases with z, da/dz > 0 
             interface_area = ∇a[k] * (∇a[k] > 0) * dz[k] # the real area where these collisions can happen...
 
-            w_i = (edmf.cloud_sedimentation_model.ice_terminal_velocity_model isa CloudSedimentationModel) ? aux_en.term_vel_ice[k] : FT(0)
-            w_i_bulk = (edmf.cloud_sedimentation_model.ice_terminal_velocity_model isa CloudSedimentationModel) ? aux_bulk.term_vel_ice[k] : FT(0)
+            w_i =
+                (edmf.cloud_sedimentation_model.ice_terminal_velocity_model isa CloudSedimentationModel) ?
+                aux_en.term_vel_ice[k] : FT(0)
+            w_i_bulk =
+                (edmf.cloud_sedimentation_model.ice_terminal_velocity_model isa CloudSedimentationModel) ?
+                aux_bulk.term_vel_ice[k] : FT(0)
 
 
             # we do env -> bulk, the bulk part can be divided among each updraft (bc to_other is only calculated for bulk)
             qi_tendency_sedimentation_other_blk = aux_bulk.qi_tendency_sedimentation_other[k] / aux_bulk.area[k] # de-area weight
-            S_qt_snow_ice_agg_other_env_blk = cross_domain_self_collection_or_autoconversion(microphys_params,
-                ice_type, ice_type,
+            S_qt_snow_ice_agg_other_env_blk = cross_domain_self_collection_or_autoconversion(
+                microphys_params,
+                ice_type,
+                ice_type,
                 qi_tendency_sedimentation_other_blk, # flux from env to bulk
-                aux_en.q_ice[k], aux_bulk.q_ice[k],
-                get_q_threshold_acnv(param_set, ice_type; N = aux_en.N_i[k], assume_N_is = false, r_acnv_scaling_factor = r_ice_acnv_scaling_factor),
-                get_q_threshold_acnv(param_set, ice_type; N = aux_bulk.N_i[k], assume_N_is = false, r_acnv_scaling_factor = r_ice_acnv_scaling_factor),
-                aux_en.T[k], ρ_c[k], # air density
-                w_i - w_en[k], w_i_bulk - w_up[k],
-                aux_en.N_i[k], aux_bulk.N_i[k],
-                Dmin, Dmax, Dmin, Dmax,
-                E_ii, ice_acnv_power,
-                )
-            S_qt_snow_ice_agg_other_env_blk = limit_tendency(precipitation_tendency_limiter, -S_qt_snow_ice_agg_other_env_blk, aux_bulk.q_ice[k] + qi_tendency_sedimentation_other_blk*Δt, Δt) # based on growth but threshold is fixed [ needs a scaling factor for how much is over the thresh]
-        
+                aux_en.q_ice[k],
+                aux_bulk.q_ice[k],
+                get_q_threshold_acnv(
+                    param_set,
+                    ice_type;
+                    N = aux_en.N_i[k],
+                    assume_N_is = false,
+                    r_acnv_scaling_factor = r_ice_acnv_scaling_factor,
+                ),
+                get_q_threshold_acnv(
+                    param_set,
+                    ice_type;
+                    N = aux_bulk.N_i[k],
+                    assume_N_is = false,
+                    r_acnv_scaling_factor = r_ice_acnv_scaling_factor,
+                ),
+                aux_en.T[k],
+                ρ_c[k], # air density
+                w_i - w_en[k],
+                w_i_bulk - w_up[k],
+                aux_en.N_i[k],
+                aux_bulk.N_i[k],
+                Dmin,
+                Dmax,
+                Dmin,
+                Dmax,
+                E_ii,
+                ice_acnv_power,
+            )
+            S_qt_snow_ice_agg_other_env_blk = limit_tendency(
+                precipitation_tendency_limiter,
+                -S_qt_snow_ice_agg_other_env_blk,
+                aux_bulk.q_ice[k] + qi_tendency_sedimentation_other_blk * Δt,
+                Δt,
+            ) # based on growth but threshold is fixed [ needs a scaling factor for how much is over the thresh]
+
             # Agg cross-domain acnv || Env --> Bulk
-            qi_tendency_agg_acnv_other_env_blk = S_qt_snow_ice_agg_other_env_blk 
+            qi_tendency_agg_acnv_other_env_blk = S_qt_snow_ice_agg_other_env_blk
             @inbounds for i in 1:N_up # split the env->bulk over the updrafts
                 qi_tendency_agg_acnv_other_env_blk_i = S_qt_snow_ice_agg_other_env_blk # already should be area weighted
                 Π_m = TD.exner(thermo_params, aux_up[i].ts[k])
@@ -1475,20 +1782,27 @@ function compute_domain_interaction_microphysics_tendencies!(
                 L_s = TD.latent_heat_sublim(thermo_params, aux_up[i].ts[k])
                 θ_liq_ice_tendency_agg_acnv_other_env_blk = S_qt_snow_ice_agg_other_env_blk / Π_m / c_pm * L_s
 
-                aux_up[i].qi_tendency_acnv_agg_other[k] += qi_tendency_agg_acnv_other_env_blk * interface_area / aux_up[i].area[k] # add back area weight
+                aux_up[i].qi_tendency_acnv_agg_other[k] +=
+                    qi_tendency_agg_acnv_other_env_blk * interface_area / aux_up[i].area[k] # add back area weight
                 aux_up[i].qi_tendency_acnv[k] += qi_tendency_agg_acnv_other_env_blk * interface_area / aux_up[i].area[k] # add back area weight
-                aux_up[i].qt_tendency_precip_formation[k] += qi_tendency_agg_acnv_other_env_blk * interface_area / aux_up[i].area[k] # add back area weight
-                aux_up[i].θ_liq_ice_tendency_precip_formation[k] += θ_liq_ice_tendency_agg_acnv_other_env_blk * interface_area / aux_up[i].area[k] # add back area weight
-                aux_bulk.θ_liq_ice_tendency_precip_formation[k]  += θ_liq_ice_tendency_agg_acnv_other_env_blk * interface_area / aux_up[i].area[k]  # this one is T depdendent so add here
+                aux_up[i].qt_tendency_precip_formation[k] +=
+                    qi_tendency_agg_acnv_other_env_blk * interface_area / aux_up[i].area[k] # add back area weight
+                aux_up[i].θ_liq_ice_tendency_precip_formation[k] +=
+                    θ_liq_ice_tendency_agg_acnv_other_env_blk * interface_area / aux_up[i].area[k] # add back area weight
+                aux_bulk.θ_liq_ice_tendency_precip_formation[k] +=
+                    θ_liq_ice_tendency_agg_acnv_other_env_blk * interface_area / aux_up[i].area[k]  # this one is T depdendent so add here
                 if edmf.moisture_model isa NonEquilibriumMoisture
                     aux_up[i].qi_tendency_precip_formation[k] += qi_tendency_agg_acnv_other_env_blk * aux_up[i].area[k] # this is the same as qt_tendency_precip_formation
                 end
             end
-            aux_bulk.qi_tendency_acnv_agg_other[k] += qi_tendency_agg_acnv_other_env_blk * interface_area / aux_bulk.area[k] # this is the total tendency for the bulk
+            aux_bulk.qi_tendency_acnv_agg_other[k] +=
+                qi_tendency_agg_acnv_other_env_blk * interface_area / aux_bulk.area[k] # this is the total tendency for the bulk
             aux_bulk.qi_tendency_acnv[k] += qi_tendency_agg_acnv_other_env_blk * interface_area / aux_bulk.area[k] # this is the total tendency for the bulk
-            aux_bulk.qt_tendency_precip_formation[k] += qi_tendency_agg_acnv_other_env_blk * interface_area / aux_bulk.area[k] # this is the total tendency for the bulk
+            aux_bulk.qt_tendency_precip_formation[k] +=
+                qi_tendency_agg_acnv_other_env_blk * interface_area / aux_bulk.area[k] # this is the total tendency for the bulk
             if edmf.moisture_model isa NonEquilibriumMoisture
-                aux_bulk.qi_tendency_precip_formation[k] += qi_tendency_agg_acnv_other_env_blk * interface_area / aux_bulk.area[k] # this is the same as qt_tendency_precip_formation
+                aux_bulk.qi_tendency_precip_formation[k] +=
+                    qi_tendency_agg_acnv_other_env_blk * interface_area / aux_bulk.area[k] # this is the same as qt_tendency_precip_formation
             end
 
             tendencies_pr.q_sno[k] -= qi_tendency_agg_acnv_other_env_blk * interface_area / aux_bulk.area[k] # this is the total tendency for the environment and bulk, so we need to subtract it from the total
@@ -1504,21 +1818,48 @@ function compute_domain_interaction_microphysics_tendencies!(
 
 
             qi_tendency_sedimentation_other_en = aux_en.qi_tendency_sedimentation_other[k] / aux_en.area[k] # de-area weight
-            S_qt_snow_ice_agg_other_blk_env = cross_domain_self_collection_or_autoconversion(microphys_params,
-                ice_type, ice_type,
+            S_qt_snow_ice_agg_other_blk_env = cross_domain_self_collection_or_autoconversion(
+                microphys_params,
+                ice_type,
+                ice_type,
                 qi_tendency_sedimentation_other_en,
-                aux_bulk.q_ice[k], aux_en.q_ice[k],
-                get_q_threshold_acnv(param_set, ice_type; N = aux_bulk.N_i[k], assume_N_is = false, r_acnv_scaling_factor = r_ice_acnv_scaling_factor),
-                get_q_threshold_acnv(param_set, ice_type; N = aux_en.N_i[k], assume_N_is = false, r_acnv_scaling_factor = r_ice_acnv_scaling_factor),
-                aux_bulk.T[k], ρ_c[k], # air density
-                aux_bulk.term_vel_ice[k] - w_up[k], aux_en.term_vel_ice[k] - w_en[k],
-                aux_bulk.N_i[k], aux_en.N_i[k],
-                Dmin, Dmax, Dmin, Dmax,
-                E_ii, ice_acnv_power,
-                )
-            S_qt_snow_ice_agg_other_blk_env = limit_tendency(precipitation_tendency_limiter, -S_qt_snow_ice_agg_other_blk_env, aux_en.q_ice[k] + qi_tendency_sedimentation_other_en*Δt, Δt) # based on growth but threshold is fixed [ needs a scaling factor for how much is over the thresh]
-        
-        
+                aux_bulk.q_ice[k],
+                aux_en.q_ice[k],
+                get_q_threshold_acnv(
+                    param_set,
+                    ice_type;
+                    N = aux_bulk.N_i[k],
+                    assume_N_is = false,
+                    r_acnv_scaling_factor = r_ice_acnv_scaling_factor,
+                ),
+                get_q_threshold_acnv(
+                    param_set,
+                    ice_type;
+                    N = aux_en.N_i[k],
+                    assume_N_is = false,
+                    r_acnv_scaling_factor = r_ice_acnv_scaling_factor,
+                ),
+                aux_bulk.T[k],
+                ρ_c[k], # air density
+                aux_bulk.term_vel_ice[k] - w_up[k],
+                aux_en.term_vel_ice[k] - w_en[k],
+                aux_bulk.N_i[k],
+                aux_en.N_i[k],
+                Dmin,
+                Dmax,
+                Dmin,
+                Dmax,
+                E_ii,
+                ice_acnv_power,
+            )
+            S_qt_snow_ice_agg_other_blk_env = limit_tendency(
+                precipitation_tendency_limiter,
+                -S_qt_snow_ice_agg_other_blk_env,
+                aux_en.q_ice[k] + qi_tendency_sedimentation_other_en * Δt,
+                Δt,
+            ) # based on growth but threshold is fixed [ needs a scaling factor for how much is over the thresh]
+
+
             # Agg cross-domain acnv || Bulk --> Env
             qi_tendency_agg_acnv_other_blk_env = S_qt_snow_ice_agg_other_blk_env # already should be area weighted
             Π_m = TD.exner(thermo_params, aux_en.ts[k])
@@ -1526,12 +1867,15 @@ function compute_domain_interaction_microphysics_tendencies!(
             L_s = TD.latent_heat_sublim(thermo_params, aux_en.ts[k])
             θ_liq_ice_tendency_agg_acnv_other_blk_env = S_qt_snow_ice_agg_other_blk_env / Π_m / c_pm * L_s
 
-            aux_en.qi_tendency_acnv_agg_other[k] += qi_tendency_agg_acnv_other_blk_env * interface_area/ aux_en.area[k] # this is the total tendency for the environment
+            aux_en.qi_tendency_acnv_agg_other[k] += qi_tendency_agg_acnv_other_blk_env * interface_area / aux_en.area[k] # this is the total tendency for the environment
             aux_en.qi_tendency_acnv[k] += qi_tendency_agg_acnv_other_blk_env * interface_area / aux_en.area[k]
-            aux_en.qt_tendency_precip_formation[k] += qi_tendency_agg_acnv_other_blk_env * interface_area/ aux_en.area[k]
-            aux_en.θ_liq_ice_tendency_precip_formation[k] += θ_liq_ice_tendency_agg_acnv_other_blk_env * interface_area / aux_en.area[k]
+            aux_en.qt_tendency_precip_formation[k] +=
+                qi_tendency_agg_acnv_other_blk_env * interface_area / aux_en.area[k]
+            aux_en.θ_liq_ice_tendency_precip_formation[k] +=
+                θ_liq_ice_tendency_agg_acnv_other_blk_env * interface_area / aux_en.area[k]
             if edmf.moisture_model isa NonEquilibriumMoisture
-                aux_en.qi_tendency_precip_formation[k] += qi_tendency_agg_acnv_other_blk_env * interface_area / aux_en.area[k] # this is the same as qt_tendency_precip_formation
+                aux_en.qi_tendency_precip_formation[k] +=
+                    qi_tendency_agg_acnv_other_blk_env * interface_area / aux_en.area[k] # this is the same as qt_tendency_precip_formation
             end
 
             tendencies_pr.q_sno[k] -= qi_tendency_agg_acnv_other_blk_env * interface_area / aux_en.area[k] # this is the total tendency for the environment and bulk, so we need to subtract it from the total
@@ -1547,7 +1891,7 @@ function compute_domain_interaction_microphysics_tendencies!(
 
         # sum total
     end
-    
+
     return nothing
 end
 
@@ -1720,15 +2064,16 @@ function threshold_driven_acnv(
         r_thresh = r_is * r_threshold_scaling_factor
 
         if is_growing
-            r_max = 2*r_is # the MG max value... maybe we should ramp up from something small at r = r_is to max power at 2*r_is
+            r_max = 2 * r_is # the MG max value... maybe we should ramp up from something small at r = r_is to max power at 2*r_is
 
             # we start acnv long before r_max...
             # some factor on r_thresh but yeah instead of letting this go all the way to 2 r_is and then crashing down, we just start siphoning off mass earlier so it's a continous process. Staying near to r_thresh for sublimation acnv is good cause it means things are more continous.
             # in highly supersaturated environments, maybe we tolerate slightly higher <r>... but not that much. at 20% supersat maybe we go halfway to r_max (cubic mean of r^3 and r_thresh^3?, e.g. blend Ns, assuming m_e = 3). at 0% supersat we go to r_thresh Only
-            r_max = ((1 - min(S_i / 0.2, 1)) * r_thresh^3 + min(S_i / 0.2, 1) * ((r_thresh^3 + (2*r_is)^3) / 2))^(1/3)
+            r_max =
+                ((1 - min(S_i / 0.2, 1)) * r_thresh^3 + min(S_i / 0.2, 1) * ((r_thresh^3 + (2 * r_is)^3) / 2))^(1 / 3)
 
 
-            
+
             if ((domain isa UpDomain) || (domain isa BulkDomain)) #  || (domain isa CloakUpDomain)
                 # let's have this converge to r_thresh at S_i = 0+, and to full r_max at S_i = 0.05 (5% supersat)
                 r_target = r_thresh + (r_max - r_thresh) * clamp(S_i / FT(0.05), FT(0), FT(1))
@@ -1740,12 +2085,12 @@ function threshold_driven_acnv(
         end
 
         if isnan(μ)
-            μ = μ_from_qN(param_set, q_type, q, N; ρ=ρ_a)
+            μ = μ_from_qN(param_set, q_type, q, N; ρ = ρ_a)
         end
         if add_dry_aerosol_mass
-            q += mass(param_set, q_type, param_set.user_params.particle_min_radius, N; monodisperse=true) / ρ_a # add the dry aerosol mass to q when calculating λ and n0
+            q += mass(param_set, q_type, param_set.user_params.particle_min_radius, N; monodisperse = true) / ρ_a # add the dry aerosol mass to q when calculating λ and n0
         end
-        r = r_from_qN(param_set, q_type, q, N; monodisperse = false, ρ=ρ_a, Dmax=Dmax, μ=μ)
+        r = r_from_qN(param_set, q_type, q, N; monodisperse = false, ρ = ρ_a, Dmax = Dmax, μ = μ)
 
 
         # == Undo Boost == # [[ Prolly shouldn't do it for the cloak... ]] The idea is that the boost is small particles coming down in dryer air and maybe aren't the bulk of the threshold acnv, but .... debatable lol. you could also argue theyre the ones drying out more and autoconverting... maybe we should just deprecate this.
@@ -1754,12 +2099,12 @@ function threshold_driven_acnv(
             if !is_growing
                 r_boost = r
                 N_i_boost = max(N - N_i_no_boost, FT(0)) # if subsat, any imported N_i should be large...
-                q_boost = (N_i_boost/N) * q
-                q_no_boost = (N_i_no_boost/N) * q
+                q_boost = (N_i_boost / N) * q
+                q_no_boost = (N_i_no_boost / N) * q
                 r_no_boost = r
             else
                 # in supersaturated regimers, it's harder to know what r is. we'll assume it's smaller than the current r, catching up to r_i_acnv at 5% supersat
-                
+
                 if !use_cloak
                     # Basically the downwelling particles are dryer, so maybe don't grow as much (there's some supersaturation deficit)
                     # We observe PITOSN at almost any RH, I think any real MF should engender r_boost to hit r_thresh regardless of supersat
@@ -1773,10 +2118,10 @@ function threshold_driven_acnv(
                     # if subsat, any imported N_i should be large...
                     N_i_boost = max(N - N_i_no_boost, FT(0)) # might need to be some fraction of this idk... going from r of say 50 microns to r_boost of 70 microns is a 5x boost in q, might be too extreme.
 
-                    
-                    q_boost = (N_i_boost/N) * q
-                    N_i_boost = N_from_qr(param_set, q_type, q_boost, r_boost; ρ=ρ_a, monodisperse=false) # change (mostly reduce) N_i_boost to match r_boost
-                    q_no_boost = (N_i_no_boost/N) * q
+
+                    q_boost = (N_i_boost / N) * q
+                    N_i_boost = N_from_qr(param_set, q_type, q_boost, r_boost; ρ = ρ_a, monodisperse = false) # change (mostly reduce) N_i_boost to match r_boost
+                    q_no_boost = (N_i_no_boost / N) * q
                     r_no_boost = r
                     # If the above is too strong, maybe try just relaxing the part above r_thresh but keeping N_boost or something idk... or changing the timescale.
                 else # Cloak the boost is inherent, so ignore
@@ -1788,7 +2133,7 @@ function threshold_driven_acnv(
                 end
             end
         end
-        
+
 
         if q_type isa CMT.IceType
             τ = FT(param_set.user_params.τ_acnv_sno_threshold) # use separate timescale bc this should be order timestep scale (in M2005), while real acnv should be like 10^4 seconds.
@@ -1838,18 +2183,18 @@ function threshold_driven_acnv(
                 τ = τ_sub_dep^(1 - f^γ) * τ^(f^γ)
 
                 # Adjustment towards slower τ as S_i → 0+ not needed because growth acnv isn't sub/dep dependent and we have a defiend target that also shrinks as S_i → 0+
-                
-                
+
+
                 # Mass flux (MF) generates fluctuations that *enable* autoconversion. [[ this probably matters more when not cloaking...]] This pushes us towards faster acnv from runaway losses on the dry side... this keeps τ closer to τ_orig, and also might push the target q down a bit...
-                
-               
+
+
                 # Fluctuations [[ fluctuations also do have a target limit, since not all of the particles are susceptible to fluctuations...]]
                 if use_cloak # smaller but still existent fluctuations in env
                     M_norm = clamp(massflux / FT(0.02), FT(0), FT(1)) # At MF=0 → τ=∞ (no acnv), At MF=0.02 → τ=τ (normal, fast), Clamp ensures saturation at MF=0.02
                     S_i_max = FT(0.05) * M_norm  # vanish at 5% supersat for MF=0.02, linearly less for smaller MF
                     S_norm = clamp(one(FT) - S_i / max(S_i_max, eps(FT)), FT(0), FT(1)) # at S_i = S_i_max, S_norm = 0, so τ → ∞, at S_i = 0, S_norm = 1, so τ = τ
                     τ_fluc = τ / max(M_norm * S_norm, eps(FT)) # as MF→0, τ→∞; as MF→0.02, τ→τ]
-                    
+
                 else # Entertain more MF based fluctuations when not cloaking. Here we update acnv_rate_fluc
                     M_norm = clamp(massflux / FT(0.02), FT(0), FT(1)) # At MF=0 → τ=∞ (no acnv), At MF=0.02 → τ=τ (normal, fast), Clamp ensures saturation at MF=0.02
                     S_i_max = FT(0.05) * M_norm  # vanish at 5% supersat for MF=0.02, linearly less for smaller MF
@@ -1891,7 +2236,7 @@ function threshold_driven_acnv(
 
         λ_thresh = (μ + FT(1)) / r_thresh # this is the λ for the threshold radius, so we can use it to scale the acnv rate
         λ_target = (μ + FT(1)) / r_target
-        _, λ = get_n0_lambda(microphys_params, q_type, q, ρ_a, N, μ; Dmax=Dmax)
+        _, λ = get_n0_lambda(microphys_params, q_type, q, ρ_a, N, μ; Dmax = Dmax)
 
 
 
@@ -1907,7 +2252,19 @@ function threshold_driven_acnv(
                 acnv_rate = q / τ
                 # q_target = FT(0) # we go all the way to 0 in subsaturated regions
 
-                q_below_r_max = get_fraction_below_or_above_thresh_from_qN(param_set, ice_type, q, N, ρ_a, 2*r_is; return_N = false, below_thresh = true, return_fraction = false, μ=μ, Dmax=FT(Inf)) # we'll only allow losing the particles above 2*r_max, at some point we'll run out of large particles to acnv and then <r> won't go up anymore...
+                q_below_r_max = get_fraction_below_or_above_thresh_from_qN(
+                    param_set,
+                    ice_type,
+                    q,
+                    N,
+                    ρ_a,
+                    2 * r_is;
+                    return_N = false,
+                    below_thresh = true,
+                    return_fraction = false,
+                    μ = μ,
+                    Dmax = FT(Inf),
+                ) # we'll only allow losing the particles above 2*r_max, at some point we'll run out of large particles to acnv and then <r> won't go up anymore...
                 q_target = q_below_r_max * exp(-Δt / τ) # target at end of timestep
             else
                 # We're not big enough but could get there...
@@ -1920,7 +2277,19 @@ function threshold_driven_acnv(
                 τ_eff = τ_sub_dep^(1 - f^γ_λ) * τ^(f^γ_λ)
                 acnv_rate = q / τ_eff
                 # q_target = FT(0) # we go all the way to 0 in subsaturated regions
-                q_below_r_max = get_fraction_below_or_above_thresh_from_qN(param_set, ice_type, q, N, ρ_a, 2*r_is; return_N = false, below_thresh = true, return_fraction = false, μ=μ, Dmax=FT(Inf)) # we'll only allow losing the particles above 2*r_max, at some point we'll run out of large particles to acnv and then <r> won't go up anymore...
+                q_below_r_max = get_fraction_below_or_above_thresh_from_qN(
+                    param_set,
+                    ice_type,
+                    q,
+                    N,
+                    ρ_a,
+                    2 * r_is;
+                    return_N = false,
+                    below_thresh = true,
+                    return_fraction = false,
+                    μ = μ,
+                    Dmax = FT(Inf),
+                ) # we'll only allow losing the particles above 2*r_max, at some point we'll run out of large particles to acnv and then <r> won't go up anymore...
                 q_target = q_below_r_max * exp(-Δt / τ) # target at end of timestep
 
             end
@@ -1930,15 +2299,16 @@ function threshold_driven_acnv(
 
             if ((domain isa UpDomain) || (domain isa BulkDomain)) # just direct acnv... since we're supersaturated though, no runaway, just go to target
                 if λ < λ_target
-                    acnv_rate = (1 - (λ/λ_target)^3) * (q / τ) # q goes as λ^-4, this is variable N, fixed n_0 intercept
-                    q_target = (λ/λ_target)^3 * q # q goes as λ^-4, this is variable N, fixed n_0 intercept
+                    acnv_rate = (1 - (λ / λ_target)^3) * (q / τ) # q goes as λ^-4, this is variable N, fixed n_0 intercept
+                    q_target = (λ / λ_target)^3 * q # q goes as λ^-4, this is variable N, fixed n_0 intercept
                 end
             else
-            
+
                 if !use_cloak # Entertain more MF based fluctuations when not cloaking. Here we update acnv_rate_fluc
                     # Boost
-                    _, λ_boost = get_n0_lambda(microphys_params, q_type, q_boost, ρ_a, N_i_boost, μ; Dmax=Dmax)
-                    _, λ_no_boost = get_n0_lambda(microphys_params, q_type, q_no_boost, ρ_a, N_i_no_boost, μ; Dmax=Dmax)
+                    _, λ_boost = get_n0_lambda(microphys_params, q_type, q_boost, ρ_a, N_i_boost, μ; Dmax = Dmax)
+                    _, λ_no_boost =
+                        get_n0_lambda(microphys_params, q_type, q_no_boost, ρ_a, N_i_no_boost, μ; Dmax = Dmax)
 
                     # if do_print
                     #     @warn("Boost region: r_boost = $r_boost; N_i_boost = $N_i_boost; q_boost = $q_boost; λ_boost = $λ_boost; τ_boost = $τ_boost;")
@@ -1946,12 +2316,12 @@ function threshold_driven_acnv(
                     # end
 
                     if (λ_boost < λ_target) && (q_boost > 0)
-                        acnv_rate += (1 - (λ_boost/λ_target)^3) * (q_boost / τ_boost) # q goes as λ^-4, this is variable N, fixed n_0 intercept (we're losing particles without new generation, so not fixed N)
-                        q_target_boost = (λ_boost/λ_target)^3 * q_boost # q goes as λ^-4, this is variable N, fixed n_0 intercept
+                        acnv_rate += (1 - (λ_boost / λ_target)^3) * (q_boost / τ_boost) # q goes as λ^-4, this is variable N, fixed n_0 intercept (we're losing particles without new generation, so not fixed N)
+                        q_target_boost = (λ_boost / λ_target)^3 * q_boost # q goes as λ^-4, this is variable N, fixed n_0 intercept
 
-                        # if do_print
-                        #     @warn("Boost region: λ_boost = $λ_boost; λ_target = $λ_target; q_boost = $q_boost; N_i_boost = $N_i_boost; acnv_rate contribution = $((1 - (λ_boost/λ_target)^3) * (q_boost / τ_boost)); q_target_boost = $q_target_boost; S_i = $S_i; τ_boost = $τ_boost; r_boost = $r_boost;")
-                        # end
+                    # if do_print
+                    #     @warn("Boost region: λ_boost = $λ_boost; λ_target = $λ_target; q_boost = $q_boost; N_i_boost = $N_i_boost; acnv_rate contribution = $((1 - (λ_boost/λ_target)^3) * (q_boost / τ_boost)); q_target_boost = $q_target_boost; S_i = $S_i; τ_boost = $τ_boost; r_boost = $r_boost;")
+                    # end
 
                     else
                         q_target_boost = FT(q_boost) # no acnv in boost region
@@ -1959,12 +2329,12 @@ function threshold_driven_acnv(
 
 
                     if (λ_no_boost < λ_target) && (q_no_boost > 0)
-                        acnv_rate += (1 - (λ_no_boost/λ_target)^3) * (q_no_boost / τ) # q goes as λ^-4, this is variable N, fixed n_0 intercept (we're losing particles without new generation, so not fixed N)
-                        q_target_no_boost = (λ_no_boost/λ_target)^3 * q_no_boost # q goes as λ^-4, this is variable N, fixed n_0 intercept
+                        acnv_rate += (1 - (λ_no_boost / λ_target)^3) * (q_no_boost / τ) # q goes as λ^-4, this is variable N, fixed n_0 intercept (we're losing particles without new generation, so not fixed N)
+                        q_target_no_boost = (λ_no_boost / λ_target)^3 * q_no_boost # q goes as λ^-4, this is variable N, fixed n_0 intercept
 
-                        # if do_print
-                        #     @warn("No-boost region: λ_no_boost = $λ_no_boost; λ_target = $λ_target; q_no_boost = $q_no_boost; N_i_no_boost = $N_i_no_boost; acnv_rate contribution = $((1 - (λ_no_boost/λ_target)^3) * (q_no_boost / τ)); q_target_no_boost = $q_target_no_boost; S_i = $S_i; τ = $τ; r_no_boost = $r_no_boost;")
-                        # end
+                    # if do_print
+                    #     @warn("No-boost region: λ_no_boost = $λ_no_boost; λ_target = $λ_target; q_no_boost = $q_no_boost; N_i_no_boost = $N_i_no_boost; acnv_rate contribution = $((1 - (λ_no_boost/λ_target)^3) * (q_no_boost / τ)); q_target_no_boost = $q_target_no_boost; S_i = $S_i; τ = $τ; r_no_boost = $r_no_boost;")
+                    # end
 
                     else
                         q_target_no_boost = FT(q_no_boost) # no acnv in no boost region
@@ -1973,14 +2343,14 @@ function threshold_driven_acnv(
                     q_target = q_target_boost + q_target_no_boost
 
                 else # regular growth, stop at threshold
-                   
+
                     if λ < λ_target
-                        acnv_rate = ( 1 - (λ/λ_target)^3) * (q / τ) # q goes as λ^-4, this is variable N, fixed n_0 intercept
-                        q_target = (λ/λ_target)^3 * q # q goes as λ^-4, this is variable N, fixed n_0 intercept
+                        acnv_rate = (1 - (λ / λ_target)^3) * (q / τ) # q goes as λ^-4, this is variable N, fixed n_0 intercept
+                        q_target = (λ / λ_target)^3 * q # q goes as λ^-4, this is variable N, fixed n_0 intercept
                     end
                 end
 
-                 # Fluctuations
+                # Fluctuations
                 # acnv_rate_fluc = q/τ_fluc
                 # This is hard because yes the target should go down but it's not clear how much... We need to estimate how much of the original mass i guess was susceptible to fluctuations into subsat...
                 # Maybe one could use `get_qs_from_saturation_excesses()` and a closure but that's a bit complex...
@@ -1989,7 +2359,7 @@ function threshold_driven_acnv(
                 q_target_fluc = q * clamp(1 + S_i / FT(0.1), FT(0), one(FT))
 
                 acnv_rate_fluc = (q - q_target_fluc) / τ_fluc # just setting acnv_rate to this (0) seemed to work ok lol
-                acnv_rate_fluc = min(acnv_rate_fluc, (q - q_target)/Δt) # ensure we don't go slower than the main acnv rate
+                acnv_rate_fluc = min(acnv_rate_fluc, (q - q_target) / Δt) # ensure we don't go slower than the main acnv rate
 
                 # if do_print
                 #     @warn("S_i = $S_i")
@@ -2043,20 +2413,22 @@ function threshold_driven_acnv(
         q_vap_sat = qt / (one(FT) + S_i)
         q_subsat = q_vap_sat * 0.9  # 10% subsat
         qt_std = sqrt(qt_var)
-        frac_sub10 = (qt_std > 0) ? Distributions.cdf(Distributions.Normal(qt, qt_std), q_subsat) : ((qt < q_subsat) ? one(FT) : zero(FT))
-        
-        qt_std_min = FT(.01) * qt
+        frac_sub10 =
+            (qt_std > 0) ? Distributions.cdf(Distributions.Normal(qt, qt_std), q_subsat) :
+            ((qt < q_subsat) ? one(FT) : zero(FT))
+
+        qt_std_min = FT(0.01) * qt
         frac_0_to_10 = Distributions.cdf(Distributions.Normal(qt, max(qt_std, qt_std_min)), q_vap_sat) - frac_sub10
 
 
 
         if (domain isa EnvDomain) || (domain isa CloakDownDomain) # only do this in env/cloak env
-            f_r  = clamp((r - r_thresh) / (1.05*r_thresh - r_thresh), FT(0), FT(1))
+            f_r = clamp((r - r_thresh) / (1.05 * r_thresh - r_thresh), FT(0), FT(1))
             f_Si = clamp(-S_i / FT(0.1), FT(0), one(FT)) # -10% full force to match LES behavior
             acnv_rate = FT(0)
             # acnv_rate_addit = dqdt_sed * f_r * f_Si # / (N/100)
         else # 
-            f_r  = clamp((r - r_thresh) / (1.05*r_thresh - r_thresh), FT(0), FT(1))
+            f_r = clamp((r - r_thresh) / (1.05 * r_thresh - r_thresh), FT(0), FT(1))
             f_Si = clamp(-S_i / FT(0.1), FT(0), one(FT))
             # acnv_rate_addit = dqdt_sed * f_r * f_Si
         end
@@ -2068,7 +2440,7 @@ function threshold_driven_acnv(
 
         # This should probably be calibrated somehow?  or at least taper the timescale from S = 0 to S = -10? we also have the S scaling though so maybe it's fine... idk...
         acnv_rate += (dqdt_sed + q) * f_r * f_Si * frac_0_to_10 / (FT(5) * τ) # weaker acnv for 0-10% subsat region
-        q_target = (1-frac_sub10) * q 
+        q_target = (1 - frac_sub10) * q
 
 
 
@@ -2086,7 +2458,7 @@ function threshold_driven_acnv(
         # # acnv_rate /= (N/100)
 
 
-    
+
     end
     return resolve_nan(acnv_rate, FT(0)), q_target # also return q_target for limiters
 end
@@ -2154,11 +2526,7 @@ where  Γ(s,x)  is the upper incomplete gamma function.
 """
 
 
-function acnv_mass_fraction(
-    mean_r::FT,
-    r_is::FT;
-    μ::FT = FT(0)    
-) where {FT <: Real}
+function acnv_mass_fraction(mean_r::FT, r_is::FT; μ::FT = FT(0)) where {FT <: Real}
     if isnan(μ)
         μ = FT(0)
     end
@@ -2177,8 +2545,8 @@ function acnv_mass_fraction(
     v_thresh = r_is^3
 
     # Numerator: upper incomplete gamma Γ(s,x) = CM1.SF.gamma(s,x)
-    numer = CM1.SF.gamma(2*k_v + 1, v_thresh / θ_v)
-    denom = 2 * k_v * CM1.SF.gamma(2*k_v)
+    numer = CM1.SF.gamma(2 * k_v + 1, v_thresh / θ_v)
+    denom = 2 * k_v * CM1.SF.gamma(2 * k_v)
 
     F_acnv = numer / denom
 

@@ -43,11 +43,7 @@ function mixing_length(mix_len_params, param_set, ml_model::MinDisspLen{FT}, con
     c_neg = c_d * tke * sqrt(tke)
     b_lin = ml_model.b_exch # + convective_tke_production # this seems to break things since the closure assumes shorter mixing lengths to counter larger production for a given tke amount...
     if abs(a_pd) > eps(FT) && 4 * a_pd * c_neg > -b_lin * b_lin
-        l_TKE = max(
-            -b_lin / (2 * a_pd) +
-            sqrt(b_lin * b_lin + 4 * a_pd * c_neg) / (2 * a_pd),
-            0,
-        )
+        l_TKE = max(-b_lin / (2 * a_pd) + sqrt(b_lin * b_lin + 4 * a_pd * c_neg) / (2 * a_pd), 0)
     elseif abs(a_pd) < eps(FT) && abs(b_lin) > eps(FT)
         l_TKE = c_neg / b_lin
     else
@@ -80,7 +76,7 @@ function mixing_length(mix_len_params, param_set, ml_model::MinDisspLen{FT}, con
         sqrt(∂b∂z_ref) * (1 / unstable_ref_factor + ∂b∂z / ∂b∂z_ref * (1 - 1 / unstable_ref_factor)) # Linearly scales from (1/factor) at 0 up to (1.0) at ∂b∂z_ref
     else # ∂b∂z < 0
         # extrapolate
-            # sqrt(∂b∂z_ref) * (1 / factor + ∂b∂z / ∂b∂z_ref * (1 - 1 / unstable_ref_factor)) # Linearly scales from (1/factor) at 0 up to (1.0) at ∂b∂z_ref
+        # sqrt(∂b∂z_ref) * (1 / factor + ∂b∂z / ∂b∂z_ref * (1 - 1 / unstable_ref_factor)) # Linearly scales from (1/factor) at 0 up to (1.0) at ∂b∂z_ref
         max(sqrt(∂b∂z_ref) * (1 / unstable_ref_factor + ∂b∂z / ∂b∂z_ref * (1 - 1 / unstable_ref_factor)), eps(FT))
     end
 

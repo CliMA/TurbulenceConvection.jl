@@ -3,7 +3,10 @@
 FT = Float64
 
 reload_TC = false
-if reload_TC || !isdefined(Main, :TurbulenceConvection) || !isdefined(Main, :param_set) || !isdefined(Main, :thermo_params)
+if reload_TC ||
+   !isdefined(Main, :TurbulenceConvection) ||
+   !isdefined(Main, :param_set) ||
+   !isdefined(Main, :thermo_params)
     Pkg.activate(expanduser("~/Research_Schneider/CliMA/TurbulenceConvection.jl/integration_tests/"))
     # Pkg.activate(expanduser("~/Research_Schneider/CliMA/TurbulenceConvection.jl/"))
     tc_dir = expanduser("~/Research_Schneider/CliMA/TurbulenceConvection.jl")
@@ -48,7 +51,7 @@ p_c = 98960.9332762119;
 q = TD.PhasePartition(q_tot, q_liq, q_ice)
 
 
-ts1 = TD.PhaseNonEquil_ρθq(thermo_params, ρ_c, θ_liq_ice  , q)
+ts1 = TD.PhaseNonEquil_ρθq(thermo_params, ρ_c, θ_liq_ice, q)
 println("ts1 = $ts1")
 p_c2 = TD.air_pressure(thermo_params, ts)
 ts2 = TC.thermo_state_pθq(param_set, p_c2, θ_liq_ice, q_tot, q_liq, q_ice)
@@ -59,7 +62,7 @@ println("ts = $ts")
 
 
 ts = ts1
-T  = TD.air_temperature(thermo_params, ts)
+T = TD.air_temperature(thermo_params, ts)
 println("T = $T;")
 
 T1 = TD.air_temperature(thermo_params, ts1)
@@ -71,10 +74,23 @@ println("T2 = $T2;")
 
 
 
-ts4 = TD.PhaseNonEquil{Float64}(35818.442110822296, 1.1163156887380072, TD.PhasePartition(0.004500078958881517, 0.0, 0.0)); q = TD.PhasePartition(0.004500078958881517, 0.0, 0.0); T = 308.0380948417583; p = 98960.93327621189; ρ = 1.240569830292043; w = 0.0; z = 23.96
+ts4 =
+    TD.PhaseNonEquil{Float64}(35818.442110822296, 1.1163156887380072, TD.PhasePartition(0.004500078958881517, 0.0, 0.0));
+q = TD.PhasePartition(0.004500078958881517, 0.0, 0.0);
+T = 308.0380948417583;
+p = 98960.93327621189;
+ρ = 1.240569830292043;
+w = 0.0;
+z = 23.96;
 
 
 
-ts5 = TD.PhaseNonEquil(12979.93376715246, 1.2355507018081924, TD.PhasePartition(0.00436904618444261, 0.0, 0.0)); q = TD.PhasePartition(0.00436904618444261, 0.0, 0.0); T = 276.7751427474668; p = 98406.88158043097; ρ = 1.2357025148253538; w = 0.0; z = 69.56
+ts5 = TD.PhaseNonEquil(12979.93376715246, 1.2355507018081924, TD.PhasePartition(0.00436904618444261, 0.0, 0.0));
+q = TD.PhasePartition(0.00436904618444261, 0.0, 0.0);
+T = 276.7751427474668;
+p = 98406.88158043097;
+ρ = 1.2357025148253538;
+w = 0.0;
+z = 69.56;
 θ_liq_ice5 = TD.liquid_ice_pottemp(thermo_params, ts5)
 println("θ_liq_ice5 = $θ_liq_ice5")

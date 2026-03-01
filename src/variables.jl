@@ -20,7 +20,7 @@ supersat_variables(FT, ::NonEquilibriumMoisture) = (;
 
 
 
-cloud_sedimentation_variables(FT, ::CloudNoSedimentationModel) =  (;
+cloud_sedimentation_variables(FT, ::CloudNoSedimentationModel) = (;
     N_i = FT(0), # [[ These are here instead of in supersat variables so that they exist even in EquilibriumMoisture ]]
     N_l = FT(0), # [[ These are here instead of in supersat variables so that they exist even in EquilibriumMoisture ]]
     r_i_mean = FT(0), # mean ice radius
@@ -40,13 +40,19 @@ cloud_sedimentation_variables(FT, cloud_sedimentation_model::CloudSedimentationM
     term_vel_ice = FT(0),
     cloud_sedimentation_variables(FT, CloudNoSedimentationModel(cloud_sedimentation_model))...,
 )
-cloud_sedimentation_variables(FT, ::Nothing) =  NamedTuple()
+cloud_sedimentation_variables(FT, ::Nothing) = NamedTuple()
 
-cloak_variables(FT, ::Nothing, ::Val{calibrate_io}) where {calibrate_io} =  NamedTuple()
-cloak_variables(FT, ::Nothing, ::AbstractMoistureModel, ::Val{calibrate_io}) where {calibrate_io} =  NamedTuple()
+cloak_variables(FT, ::Nothing, ::Val{calibrate_io}) where {calibrate_io} = NamedTuple()
+cloak_variables(FT, ::Nothing, ::AbstractMoistureModel, ::Val{calibrate_io}) where {calibrate_io} = NamedTuple()
 cloak_variables(FT, ::StandardAreaPartitionModel, ::Val{calibrate_io}) where {calibrate_io} = NamedTuple()
-cloak_variables(FT, ::StandardAreaPartitionModel, ::AbstractMoistureModel, ::Val{calibrate_io}) where {calibrate_io} = NamedTuple()
-cloak_variables(FT, ::CoreCloakAreaPartitionModel, moisture_model::AbstractMoistureModel, ::Val{calibrate_io}) where {calibrate_io} = (;
+cloak_variables(FT, ::StandardAreaPartitionModel, ::AbstractMoistureModel, ::Val{calibrate_io}) where {calibrate_io} =
+    NamedTuple()
+cloak_variables(
+    FT,
+    ::CoreCloakAreaPartitionModel,
+    moisture_model::AbstractMoistureModel,
+    ::Val{calibrate_io},
+) where {calibrate_io} = (;
     a_cloak_up = FT(0), # env area in updraft cloak
     a_cloak_dn = FT(0), # env area in downdraft cloak
     a_en_remaining = FT(0), # env area not in cloak
@@ -76,14 +82,17 @@ cloak_variables(FT, ::CoreCloakAreaPartitionModel, moisture_model::AbstractMoist
     ts_cloak_dn = thermo_state(FT, moisture_model),
 
     # temporary
-    (calibrate_io ? (; ) : (;
-        RH_liq_cloak_up = FT(0), # env liquid relative humidity in updraft cloak
-        RH_liq_cloak_dn = FT(0), # env liquid relative humidity in downdraft cloak
-        RH_ice_cloak_up = FT(0), # env ice relative humidity in updraft cloak
-        RH_ice_cloak_dn = FT(0), # env ice relative humidity in downdraft cloak
-        RH_liq_en_remaining = FT(0), # env liquid relative humidity not in cloak
-        RH_ice_en_remaining = FT(0), # env ice relative humidity not in cloak
-    ))...,
+    (
+        calibrate_io ? (;) :
+        (;
+            RH_liq_cloak_up = FT(0), # env liquid relative humidity in updraft cloak
+            RH_liq_cloak_dn = FT(0), # env liquid relative humidity in downdraft cloak
+            RH_ice_cloak_up = FT(0), # env ice relative humidity in updraft cloak
+            RH_ice_cloak_dn = FT(0), # env ice relative humidity in downdraft cloak
+            RH_liq_en_remaining = FT(0), # env liquid relative humidity not in cloak
+            RH_ice_en_remaining = FT(0), # env ice relative humidity not in cloak
+        )
+    )...,
     #
     qi_tendency_sub_dep_cloak_up = FT(0), # tendency due to sublimation/deposition in updraft cloak
     qi_tendency_sub_dep_cloak_dn = FT(0), # tendency due to sublimation/deposition in downdraft cloak
@@ -94,11 +103,10 @@ cloak_variables(FT, ::CoreCloakAreaPartitionModel, moisture_model::AbstractMoist
     q_ice_en_remaining = FT(0), # env ice water not in cloak [[ we have the up and down cloak balance to not change this -- update i think it's better if we relax and include this for super sat reasons ]]
     T_en_remaining = FT(0), # env temperature not in cloak [[ we have the up and down cloak balance to not change this -- update i think it's better if we relax and include this for super sat reasons ]]
     ts_en_remaining = thermo_state(FT, moisture_model), # env thermodynamic state not in cloak [[ we have the up and down cloak balance to not change this -- update i think it's better if we relax and include this for super sat reasons ]]
-
 )
 
-face_cloak_variables(FT, ::Nothing) =  NamedTuple()
-face_cloak_variables(FT, ::StandardAreaPartitionModel) =  NamedTuple()
+face_cloak_variables(FT, ::Nothing) = NamedTuple()
+face_cloak_variables(FT, ::StandardAreaPartitionModel) = NamedTuple()
 face_cloak_variables(FT, ::CoreCloakAreaPartitionModel) = (;
     w_cloak_up = FT(0), # env vertical velocity in updraft cloak
     w_cloak_dn = FT(0), # env vertical velocity in downdraft cloak
@@ -112,12 +120,16 @@ convective_tke_variables(FT, ::ConvectiveTKE) = (;
     tke_convective_advection = FT(0),
     tke_convective_dissipation = FT(0),
 )
-convective_tke_variables(FT, ::ConvectiveTKEProductionAndGraftOnly) = (;
-    tke_convective_production = FT(0),
-)
+convective_tke_variables(FT, ::ConvectiveTKEProductionAndGraftOnly) = (; tke_convective_production = FT(0),)
 
 # consolidate my additions so it's easier to edit. These will exist everywhere... (though they may not be used or defined in eq case...)
-my_microphysics_additions(FT, moisture_model::AbstractMoistureModel, cloud_sedimentation_model::Union{AbstractCloudSedimentationModel, Nothing}, area_partition_model::Union{AbstractAreaPartitionModel, Nothing}, calibrate_io_val::Val{calibrate_io}) where {calibrate_io} = (;
+my_microphysics_additions(
+    FT,
+    moisture_model::AbstractMoistureModel,
+    cloud_sedimentation_model::Union{AbstractCloudSedimentationModel, Nothing},
+    area_partition_model::Union{AbstractAreaPartitionModel, Nothing},
+    calibrate_io_val::Val{calibrate_io},
+) where {calibrate_io} = (;
     #
     ql_tendency_cond_evap = FT(0), # tendency due to condensation/evaporation
     qi_tendency_sub_dep = FT(0), # tendency due to sublimation/deposition
@@ -136,30 +148,33 @@ my_microphysics_additions(FT, moisture_model::AbstractMoistureModel, cloud_sedim
     #
     dTdz = FT(0), # store the vertical gradient of temperature for diagnostic purposes. Store here instead of aux_tc because we maybe want separately for env and up, though we don't do boost in the updraft so idk.
     #
-    (calibrate_io ? (; ) : (;
-        ql_tendency_acnv = FT(0), # tendency due to autoconversion
-        qi_tendency_acnv = FT(0), # tendency due to autoconversion
-        qi_tendency_acnv_dep = FT(0), # tendency due to sublimation/deposition
-        qi_tendency_acnv_dep_is = FT(0), # tendency due to sublimation/deposition, only from crossing r_is.
-        qi_tendency_acnv_dep_above = FT(0), # tendency due to sublimation/deposition, only from particles that were already above r_is
-        qi_tendency_acnv_agg = FT(0), # tendency due to autoconversion aggregation
-        qi_tendency_acnv_agg_other = FT(0), # tendency due to autoconversion aggregation from other updrafts
-        qi_tendency_acnv_agg_mix = FT(0), # tendency due to autoconversion aggregation from other updrafts that goes into snow (i.e. not the one that goes into rain)
-        qi_tendency_acnv_thresh = FT(0), # tendency due to autoconversion aggregation from other updrafts that goes into snow (i.e. not the one that goes into rain) but is thresholded by the microphysics
-        #
-        ql_tendency_accr_liq_rai = FT(0), # tendency due to accretion of liquid by rain
-        ql_tendency_accr_liq_ice = FT(0), # tendency due to accretion of liquid by ice
-        ql_tendency_accr_liq_sno = FT(0), # tendency due to accretion of liquid by snow
-        #
-        qi_tendency_accr_ice_liq = FT(0), # tendency due to accretion of ice by liquid
-        qi_tendency_accr_ice_rai = FT(0), # tendency due to accretion of ice by rain
-        qi_tendency_accr_ice_sno = FT(0), # tendency due to accretion of ice by snow
-        # (liq -> ice)
-        qi_tendency_hom_frz = FT(0), # tendency due to homogeneous freezing
-        qi_tendency_het_frz = FT(0), # tendency due to heterogeneous freezing
-        qi_tendency_het_nuc = FT(0), # tendency due to heterogeneous nucleation
-        qi_tendency_melt = FT(0), # tendency due to melting        
-        ))...,
+    (
+        calibrate_io ? (;) :
+        (;
+            ql_tendency_acnv = FT(0), # tendency due to autoconversion
+            qi_tendency_acnv = FT(0), # tendency due to autoconversion
+            qi_tendency_acnv_dep = FT(0), # tendency due to sublimation/deposition
+            qi_tendency_acnv_dep_is = FT(0), # tendency due to sublimation/deposition, only from crossing r_is.
+            qi_tendency_acnv_dep_above = FT(0), # tendency due to sublimation/deposition, only from particles that were already above r_is
+            qi_tendency_acnv_agg = FT(0), # tendency due to autoconversion aggregation
+            qi_tendency_acnv_agg_other = FT(0), # tendency due to autoconversion aggregation from other updrafts
+            qi_tendency_acnv_agg_mix = FT(0), # tendency due to autoconversion aggregation from other updrafts that goes into snow (i.e. not the one that goes into rain)
+            qi_tendency_acnv_thresh = FT(0), # tendency due to autoconversion aggregation from other updrafts that goes into snow (i.e. not the one that goes into rain) but is thresholded by the microphysics
+            #
+            ql_tendency_accr_liq_rai = FT(0), # tendency due to accretion of liquid by rain
+            ql_tendency_accr_liq_ice = FT(0), # tendency due to accretion of liquid by ice
+            ql_tendency_accr_liq_sno = FT(0), # tendency due to accretion of liquid by snow
+            #
+            qi_tendency_accr_ice_liq = FT(0), # tendency due to accretion of ice by liquid
+            qi_tendency_accr_ice_rai = FT(0), # tendency due to accretion of ice by rain
+            qi_tendency_accr_ice_sno = FT(0), # tendency due to accretion of ice by snow
+            # (liq -> ice)
+            qi_tendency_hom_frz = FT(0), # tendency due to homogeneous freezing
+            qi_tendency_het_frz = FT(0), # tendency due to heterogeneous freezing
+            qi_tendency_het_nuc = FT(0), # tendency due to heterogeneous nucleation
+            qi_tendency_melt = FT(0), # tendency due to melting        
+        )
+    )...,
     #
     # supersat
     supersat_variables(FT, moisture_model)...,
@@ -170,8 +185,14 @@ my_microphysics_additions(FT, moisture_model::AbstractMoistureModel, cloud_sedim
     cloak_variables(FT, area_partition_model, moisture_model, calibrate_io_val)..., # moisture_model is only for ts, so we'll see if we need it...
 )
 
-my_microphysics_additions(FT, mm::AbstractMoistureModel, calibrate_io_val::Val{calibrate_io}) where {calibrate_io} = my_microphysics_additions(FT, mm, nothing, nothing, calibrate_io_val)
-my_microphysics_additions(FT, mm::AbstractMoistureModel, csm::AbstractCloudSedimentationModel, calibrate_io_val::Val{calibrate_io}) where {calibrate_io} = my_microphysics_additions(FT, mm, csm, nothing, calibrate_io_val)
+my_microphysics_additions(FT, mm::AbstractMoistureModel, calibrate_io_val::Val{calibrate_io}) where {calibrate_io} =
+    my_microphysics_additions(FT, mm, nothing, nothing, calibrate_io_val)
+my_microphysics_additions(
+    FT,
+    mm::AbstractMoistureModel,
+    csm::AbstractCloudSedimentationModel,
+    calibrate_io_val::Val{calibrate_io},
+) where {calibrate_io} = my_microphysics_additions(FT, mm, csm, nothing, calibrate_io_val)
 
 # Center only
 cent_aux_vars_en_2m(FT) = (;
@@ -184,16 +205,25 @@ cent_aux_vars_en_2m(FT) = (;
     interdomain = FT(0),
     rain_src = FT(0),
 )
-cent_aux_vars_up_moisture(FT, moisture_model::NonEquilibriumMoisture, cloud_sedimentation_model::AbstractCloudSedimentationModel, calibrate_io_val::Val{calibrate_io}) where {calibrate_io} = (;
+cent_aux_vars_up_moisture(
+    FT,
+    moisture_model::NonEquilibriumMoisture,
+    cloud_sedimentation_model::AbstractCloudSedimentationModel,
+    calibrate_io_val::Val{calibrate_io},
+) where {calibrate_io} = (;
     ql_tendency_precip_formation = FT(0),
     qi_tendency_precip_formation = FT(0),
     ql_tendency_noneq = FT(0),
     qi_tendency_noneq = FT(0),
     my_microphysics_additions(FT, moisture_model, cloud_sedimentation_model, calibrate_io_val)...,
 )
-cent_aux_vars_up_moisture(FT, moisture_model::EquilibriumMoisture, cloud_sedimentation_model::AbstractCloudSedimentationModel, calibrate_io_val::Val{calibrate_io}) where {calibrate_io} = (;
-    my_microphysics_additions(FT, moisture_model, cloud_sedimentation_model, calibrate_io_val)...,
-)
+cent_aux_vars_up_moisture(
+    FT,
+    moisture_model::EquilibriumMoisture,
+    cloud_sedimentation_model::AbstractCloudSedimentationModel,
+    calibrate_io_val::Val{calibrate_io},
+) where {calibrate_io} =
+    (; my_microphysics_additions(FT, moisture_model, cloud_sedimentation_model, calibrate_io_val)...,)
 cent_aux_vars_up(FT, local_geometry, edmf, calibrate_io_val::Val{calibrate_io}) where {calibrate_io} = (;
     ts = thermo_state(FT, edmf.moisture_model),
     q_liq = FT(0),
@@ -202,7 +232,7 @@ cent_aux_vars_up(FT, local_geometry, edmf, calibrate_io_val::Val{calibrate_io}) 
     CAPE = FT(0), # my addition
     p = FT(0), # store this instead of constantly recalculating it [ both phasenonequil and phaseequil store ρ but phaseequil doesn't store p ] -- note typically in our case it should be the same as p_c but better safe than sorry.
     RH = FT(0),
-    (calibrate_io ? (; ) : (; RH_liq = FT(0), RH_ice = FT(0)))..., # RH for liquid and ice, i.e. the ratio of q_vap to q_vap_sat_liq/ice
+    (calibrate_io ? (;) : (; RH_liq = FT(0), RH_ice = FT(0)))..., # RH for liquid and ice, i.e. the ratio of q_vap to q_vap_sat_liq/ice
     s = FT(0),
     buoy = FT(0),
     area = FT(0),
@@ -227,38 +257,68 @@ cent_aux_vars_up(FT, local_geometry, edmf, calibrate_io_val::Val{calibrate_io}) 
     asp_ratio = FT(0),
     Π_groups = ntuple(i -> FT(0), n_Π_groups(edmf)),
 )
-cent_aux_vars_edmf_bulk_moisture(FT, moisture_model::NonEquilibriumMoisture, calibrate_io_val::Val{calibrate_io}) where {calibrate_io} = (;
+cent_aux_vars_edmf_bulk_moisture(
+    FT,
+    moisture_model::NonEquilibriumMoisture,
+    calibrate_io_val::Val{calibrate_io},
+) where {calibrate_io} = (;
     ql_tendency_precip_formation = FT(0),
     qi_tendency_precip_formation = FT(0),
     ql_tendency_noneq = FT(0),
     qi_tendency_noneq = FT(0),
     my_microphysics_additions(FT, moisture_model, calibrate_io_val)..., # don't need sedimentation in bulk
 )
-cent_aux_vars_edmf_bulk_moisture(FT, moisture_model::NonEquilibriumMoisture, cloud_sedimentation_model::AbstractCloudSedimentationModel, calibrate_io_val::Val{calibrate_io}) where {calibrate_io} = (;
+cent_aux_vars_edmf_bulk_moisture(
+    FT,
+    moisture_model::NonEquilibriumMoisture,
+    cloud_sedimentation_model::AbstractCloudSedimentationModel,
+    calibrate_io_val::Val{calibrate_io},
+) where {calibrate_io} = (;
     ql_tendency_precip_formation = FT(0),
     qi_tendency_precip_formation = FT(0),
     ql_tendency_noneq = FT(0),
     qi_tendency_noneq = FT(0),
     my_microphysics_additions(FT, moisture_model, cloud_sedimentation_model, calibrate_io_val)..., # added sedimentation to bulk for storing N_i etc...
 )
-cent_aux_vars_edmf_bulk_moisture(FT, moisture_model::EquilibriumMoisture, calibrate_io_val::Val{calibrate_io}) where {calibrate_io} = (;
+cent_aux_vars_edmf_bulk_moisture(
+    FT,
+    moisture_model::EquilibriumMoisture,
+    calibrate_io_val::Val{calibrate_io},
+) where {calibrate_io} = (;
     my_microphysics_additions(FT, moisture_model, calibrate_io_val)..., # don't need sedimentation in bulk
 )
-cent_aux_vars_edmf_bulk_moisture(FT, moisture_model::EquilibriumMoisture, cloud_sedimentation_model::AbstractCloudSedimentationModel, calibrate_io_val::Val{calibrate_io}) where {calibrate_io} = (;
+cent_aux_vars_edmf_bulk_moisture(
+    FT,
+    moisture_model::EquilibriumMoisture,
+    cloud_sedimentation_model::AbstractCloudSedimentationModel,
+    calibrate_io_val::Val{calibrate_io},
+) where {calibrate_io} = (;
     my_microphysics_additions(FT, moisture_model, cloud_sedimentation_model, calibrate_io_val)..., # added sedimentation to bulk for storing N_i etc...
 )
-cent_aux_vars_edmf_en_moisture(FT, moisture_model::NonEquilibriumMoisture, cloud_sedimentation_model::AbstractCloudSedimentationModel, area_partition_model::AbstractAreaPartitionModel, calibrate_io_val::Val{calibrate_io}) where {calibrate_io} = (;
+cent_aux_vars_edmf_en_moisture(
+    FT,
+    moisture_model::NonEquilibriumMoisture,
+    cloud_sedimentation_model::AbstractCloudSedimentationModel,
+    area_partition_model::AbstractAreaPartitionModel,
+    calibrate_io_val::Val{calibrate_io},
+) where {calibrate_io} = (;
     ql_tendency_precip_formation = FT(0),
     qi_tendency_precip_formation = FT(0),
     ql_tendency_noneq = FT(0),
     qi_tendency_noneq = FT(0),
     my_microphysics_additions(FT, moisture_model, cloud_sedimentation_model, area_partition_model, calibrate_io_val)..., # area partition for environment
 )
-cent_aux_vars_edmf_en_moisture(FT, moisture_model::EquilibriumMoisture, cloud_sedimentation_model::AbstractCloudSedimentationModel, area_partition_model::AbstractAreaPartitionModel, calibrate_io_val::Val{calibrate_io}) where {calibrate_io} = (;
+cent_aux_vars_edmf_en_moisture(
+    FT,
+    moisture_model::EquilibriumMoisture,
+    cloud_sedimentation_model::AbstractCloudSedimentationModel,
+    area_partition_model::AbstractAreaPartitionModel,
+    calibrate_io_val::Val{calibrate_io},
+) where {calibrate_io} = (;
     my_microphysics_additions(FT, moisture_model, cloud_sedimentation_model, area_partition_model, calibrate_io_val)..., # area partition for environment
 )
 cent_aux_vars_edmf_moisture(FT, ::NonEquilibriumMoisture, ::Val{calibrate_io}) where {calibrate_io} = (;
-    # moved mass & diffusive ql,qi fluxes so is always there even for eq so can put in diagnostics output
+# moved mass & diffusive ql,qi fluxes so is always there even for eq so can put in diagnostics output
 )
 cent_aux_vars_edmf_moisture(FT, ::EquilibriumMoisture, ::Val{calibrate_io}) where {calibrate_io} = NamedTuple()
 cent_aux_vars_edmf(::Type{FT}, local_geometry, edmf, calibrate_io_val::Val{calibrate_io}) where {FT, calibrate_io} = (;
@@ -275,7 +335,7 @@ cent_aux_vars_edmf(::Type{FT}, local_geometry, edmf, calibrate_io_val::Val{calib
             area = FT(0),
             θ_liq_ice = FT(0),
             RH = FT(0),
-            (calibrate_io ? (; ) : (; RH_liq = FT(0), RH_ice = FT(0)))...,
+            (calibrate_io ? (;) : (; RH_liq = FT(0), RH_ice = FT(0)))...,
             buoy = FT(0),
             q_tot = FT(0),
             q_liq = FT(0),
@@ -286,7 +346,12 @@ cent_aux_vars_edmf(::Type{FT}, local_geometry, edmf, calibrate_io_val::Val{calib
             θ_liq_ice_tendency_precip_formation = FT(0),
             qt_tendency_precip_formation = FT(0),
             # cent_aux_vars_edmf_bulk_moisture(FT, edmf.moisture_model)...,
-            cent_aux_vars_edmf_bulk_moisture(FT, edmf.moisture_model, edmf.cloud_sedimentation_model, calibrate_io_val)..., # add sedimentation to bulk for storing N_i etc...
+            cent_aux_vars_edmf_bulk_moisture(
+                FT,
+                edmf.moisture_model,
+                edmf.cloud_sedimentation_model,
+                calibrate_io_val,
+            )..., # add sedimentation to bulk for storing N_i etc...
             # tendencies = cent_prognostic_vars_up(FT, edmf), # storage for tendencies limiter so we can reuse same memory
             # tendencies_adjustments = cent_prognostic_vars_up(FT, edmf), # storage for tendencies limiter so we can reuse same memory
             # prognostic = cent_prognostic_vars_up(FT, edmf), # storage for prognostic bulk w/ no clippings so we can be sure we have the true bulk for limiting
@@ -303,7 +368,7 @@ cent_aux_vars_edmf(::Type{FT}, local_geometry, edmf, calibrate_io_val::Val{calib
             θ_virt = FT(0),
             θ_dry = FT(0),
             RH = FT(0),
-            (calibrate_io ? (; ) : (; RH_liq = FT(0), RH_ice = FT(0)))...,
+            (calibrate_io ? (;) : (; RH_liq = FT(0), RH_ice = FT(0)))...,
             MSE = FT(0), # my addition
             ∂MSE∂z = FT(0), # my addition
             CAPE = FT(0), # my addition
@@ -314,7 +379,7 @@ cent_aux_vars_edmf(::Type{FT}, local_geometry, edmf, calibrate_io_val::Val{calib
             cloud_fraction = FT(0),
             tke = FT(0),
             # tke_transport = FT(0),
-            (calibrate_io ? (; ) : (; tke_transport = FT(0), ))...,
+            (calibrate_io ? (;) : (; tke_transport = FT(0),))...,
             # Convert to convective TKE model soon
             convective_tke_variables(FT, edmf.convective_tke_handler)...,
             # tke_convective = FT(0),
@@ -333,9 +398,23 @@ cent_aux_vars_edmf(::Type{FT}, local_geometry, edmf, calibrate_io_val::Val{calib
             HQTcov = FT(0),
             θ_liq_ice_tendency_precip_formation = FT(0),
             qt_tendency_precip_formation = FT(0),
-            cent_aux_vars_edmf_en_moisture(FT, edmf.moisture_model, edmf.cloud_sedimentation_model, edmf.area_partition_model, calibrate_io_val)...,
+            cent_aux_vars_edmf_en_moisture(
+                FT,
+                edmf.moisture_model,
+                edmf.cloud_sedimentation_model,
+                edmf.area_partition_model,
+                calibrate_io_val,
+            )...,
             unsat = (; q_tot = FT(0), θ_dry = FT(0), θ_virt = FT(0)),
-            sat = (; T = FT(0), q_vap = FT(0), q_tot = FT(0), θ_dry = FT(0), θ_liq_ice = FT(0), q_liq = FT(0), q_ice = FT(0)), # added liq and ice
+            sat = (;
+                T = FT(0),
+                q_vap = FT(0),
+                q_tot = FT(0),
+                θ_dry = FT(0),
+                θ_liq_ice = FT(0),
+                q_liq = FT(0),
+                q_ice = FT(0),
+            ), # added liq and ice
             Hvar_rain_dt = FT(0),
             QTvar_rain_dt = FT(0),
             HQTcov_rain_dt = FT(0),
@@ -365,16 +444,19 @@ cent_aux_vars_edmf(::Type{FT}, local_geometry, edmf, calibrate_io_val::Val{calib
         dqvdt = FT(0), # store the tendency of water vapor for diagnostic purposes [[ grid mean only ]]
         dTdt = FT(0), # store the tendency of temperature for diagnostic purposes [[ grid mean only ]]
         ∂b∂z = FT(0), # store this so we can try to use it to generate tke even if there's not existing tke
-        (calibrate_io ? (; ) : (;
-            qs_tendency_accr_rai_sno = FT(0), # tendency due to accretion QR by QS [QR -> QS]  (we store it this way, it's always to snow below freezing and [QS -> QR] above freezing.) Just for storage...
-            #
-            diffusive_tendency_h = FT(0),
-            diffusive_tendency_qt = FT(0),
-            diffusive_tendency_ql = FT(0), # my addition [ this is the diffusive tendency of ql, not including  massflux tendency ]
-            diffusive_tendency_qi = FT(0), # my addition [ this is the
-            diffusive_tendency_qr = FT(0), # my addition [ this is the diffusive tendency of qr, not including  massflux tendency ]
-            diffusive_tendency_qs = FT(0), # my addition [ this is the diffusive tendency of qs, not including  massflux tendency ]
-        ))...,
+        (
+            calibrate_io ? (;) :
+            (;
+                qs_tendency_accr_rai_sno = FT(0), # tendency due to accretion QR by QS [QR -> QS]  (we store it this way, it's always to snow below freezing and [QS -> QR] above freezing.) Just for storage...
+                #
+                diffusive_tendency_h = FT(0),
+                diffusive_tendency_qt = FT(0),
+                diffusive_tendency_ql = FT(0), # my addition [ this is the diffusive tendency of ql, not including  massflux tendency ]
+                diffusive_tendency_qi = FT(0), # my addition [ this is the
+                diffusive_tendency_qr = FT(0), # my addition [ this is the diffusive tendency of qr, not including  massflux tendency ]
+                diffusive_tendency_qs = FT(0), # my addition [ this is the diffusive tendency of qs, not including  massflux tendency ]
+            )
+        )...,
         massflux = FT(0),
         massflux_tendency_h = FT(0),
         massflux_tendency_qt = FT(0),
@@ -383,13 +465,16 @@ cent_aux_vars_edmf(::Type{FT}, local_geometry, edmf, calibrate_io_val::Val{calib
         massflux_tendency_qr = FT(0), # moving to here so they're always there even for eq so can put in diagnostics output
         massflux_tendency_qs = FT(0), # moving to here so they're always there even for eq so can put in diagnostics output
         #
-        (calibrate_io ? (;) : (;
-            qt_tendency_ls_vert_adv = FT(0), # my addition
-            ql_tendency_ls_vert_adv = FT(0), # my addition
-            qi_tendency_ls_vert_adv = FT(0), # my addition
-            qr_tendency_ls_vert_adv = FT(0), # my addition [[ not sure how relevant this one is but ]]
-            qs_tendency_ls_vert_adv = FT(0), # my addition [[ not sure how relevant this one is but ]]
-        ))...,
+        (
+            calibrate_io ? (;) :
+            (;
+                qt_tendency_ls_vert_adv = FT(0), # my addition
+                ql_tendency_ls_vert_adv = FT(0), # my addition
+                qi_tendency_ls_vert_adv = FT(0), # my addition
+                qr_tendency_ls_vert_adv = FT(0), # my addition [[ not sure how relevant this one is but ]]
+                qs_tendency_ls_vert_adv = FT(0), # my addition [[ not sure how relevant this one is but ]]
+            )
+        )...,
 
         #
         #
@@ -417,7 +502,7 @@ cent_aux_vars_edmf(::Type{FT}, local_geometry, edmf, calibrate_io_val::Val{calib
         ϕ_gm = FT(0), # temporary for grid-mean variables
         ϕ_gm_cov = FT(0), # temporary for grid-mean covariance variables
         ϕ_en_cov = FT(0), # temporary for environmental covariance variables
-        (calibrate_io ? (;) : (; 
+        (calibrate_io ? (;) : (;
             ϕ_up_cubed = FT(0), # temporary for cubed updraft variables in grid mean 3rd moment functions
         ))...,
         #
@@ -430,7 +515,7 @@ cent_aux_vars_edmf(::Type{FT}, local_geometry, edmf, calibrate_io_val::Val{calib
         #     mixing_length = FT(0),         # Mixing length
         #     wstar = FT(0),                 # Convective velocity scale
         #     tscale = FT(0),                # Convective time scale
-            
+
         #     # TKE and second moments
         #     tke_eff = FT(0),               # Effective TKE (max of TKE, MINTKE)
         #     w2 = FT(0),                    # Vertical velocity variance (2/3 * TKE)
@@ -440,11 +525,11 @@ cent_aux_vars_edmf(::Type{FT}, local_geometry, edmf, calibrate_io_val::Val{calib
         #     thl_qt_cov = FT(0),            # Covariance between thl and qt
         #     wthl_sec = FT(0),              # Liquid potential temperature flux
         #     wqw_sec = FT(0),               # Total water flux
-            
+
         #     # Diffusivities
         #     Km = FT(0),                    # Momentum diffusivity
         #     Kh = FT(0),                    # Heat/moisture diffusivity
-            
+
         #     # PDF and cloud outputs
         #     cloud_fraction = FT(0),        # Cloud fraction from PDF
         #     ql_mean = FT(0),               # Mean liquid water from PDF
@@ -453,14 +538,14 @@ cent_aux_vars_edmf(::Type{FT}, local_geometry, edmf, calibrate_io_val::Val{calib
         #     wqls = FT(0),                  # Condensate flux from PDF
         #     wthv_sec = FT(0),              # Virtual potential temperature flux (buoyancy flux)
         #     ql_var = FT(0),                # Liquid water variance from PDF
-            
+
         #     # PDF diagnostic inputs
         #     pdf_qt_mean = FT(0),           # Mean total water fed to PDF
         #     pdf_thl_mean = FT(0),          # Mean liquid potential temperature fed to PDF
         #     pdf_qt_var_input = FT(0),      # Qt variance fed to PDF
         #     pdf_thl_var_input = FT(0),     # Thl variance fed to PDF
         #     pdf_thl_qt_cov_input = FT(0),  # Thl-qt covariance fed to PDF
-            
+
         #     # PDF plume state diagnostics
         #     pdf_thl1_1 = FT(0),            # Liquid potential temperature in plume 1a
         #     pdf_thl1_2 = FT(0),            # Liquid potential temperature in plume 1b
@@ -469,14 +554,14 @@ cent_aux_vars_edmf(::Type{FT}, local_geometry, edmf, calibrate_io_val::Val{calib
         #     pdf_w1_1 = FT(0),              # Vertical velocity in plume 1a
         #     pdf_w1_2 = FT(0),              # Vertical velocity in plume 1b
         #     pdf_area_frac = FT(0),         # Bimodal area fraction (a)
-            
+
         #     # PDF saturation diagnostics (SIGNED - can be negative for undersaturation)
         #     pdf_qs1 = FT(0),               # Saturation mixing ratio in plume 1a
         #     pdf_qs2 = FT(0),               # Saturation mixing ratio in plume 1b
         #     pdf_s1_signed = FT(0),         # Saturation deficit in plume 1a (qt - qs, can be negative)
         #     pdf_s2_signed = FT(0),         # Saturation deficit in plume 1b (qt - qs, can be negative)
         #     pdf_qsat_mean = FT(0),         # Mean saturation water vapor feed to PDF
-            
+
         #     # get_qc_stats_from_moments outputs for debugging
         #     ql_from_moments = FT(0),       # Cloud liquid from Gaussian PDF (get_qc_stats_from_moments)
         #     qi_from_moments = FT(0),       # Cloud ice from Gaussian PDF (get_qc_stats_from_moments)
@@ -484,7 +569,7 @@ cent_aux_vars_edmf(::Type{FT}, local_geometry, edmf, calibrate_io_val::Val{calib
         #     w_qi_from_moments = FT(0),     # Vertical flux of qi from moments
         #     cov_ql_qt_from_moments = FT(0), # Covariance between ql and qt from moments
         #     cov_ql_h_from_moments = FT(0),  # Covariance between ql and θ_li from moments
-            
+
         #     # Standard deviations of qt in cloudy regions
         #     ql_qt_sd = FT(0),              # Std dev of qt where ql > 0
         #     qi_qt_sd = FT(0),              # Std dev of qt where qi > 0
@@ -493,7 +578,7 @@ cent_aux_vars_edmf(::Type{FT}, local_geometry, edmf, calibrate_io_val::Val{calib
         #     w_qc_cov_pdf = FT(0),          # Covariance between w and qc from PDF (for debugging against wqls
         #     ql_pdf = FT(0),                # PDF of ql (for debugging against ql_mean and ql_var
         #     qi_pdf = FT(0),                # PDF of qi (for debugging against qi_mean and qi_var
-            
+
         #     # Intermediate diagnostics for debugging w_qi_cov spike
         #     pdf_cloud_frac = FT(0),        # Φ - Cloud fraction from Gaussian CDF
         #     pdf_alpha = FT(0),             # α - Normalized saturation deficit (s_mean/s_std)
@@ -529,7 +614,7 @@ cent_aux_vars_edmf(::Type{FT}, local_geometry, edmf, calibrate_io_val::Val{calib
         #     csigma_corr_qs_qt = FT(0),     # Correlation: qs - qt
         #     csigma_corr_qs_h = FT(0),      # Correlation: qs - h
         #     csigma_corr_qt_h = FT(0),      # Correlation: qt - h
-            
+
         #     # cSigma covariance matrix elements (diagonal and off-diagonal)
         #     csigma_cov_w = FT(0),          # Covariance: var(w)
         #     csigma_cov_ql = FT(0),         # Covariance: var(ql)
@@ -583,19 +668,18 @@ face_aux_vars_edmf_moisture(FT, ::NonEquilibriumMoisture) = (;
 face_aux_vars_edmf_moisture(FT, ::EquilibriumMoisture) = NamedTuple()
 face_aux_vars_edmf(::Type{FT}, local_geometry, edmf, ::Val{calibrate_io}) where {FT, calibrate_io} = (;
     turbconv = (;
-        bulk = (; w = FT(0), a_up = FT(0), 
-        # tendencies = face_prognostic_vars_up(FT, local_geometry), # storage for tendencies limiter so we can reuse same memory
-        # tendencies_adjustments = face_prognostic_vars_up(FT, local_geometry), # storage for tendencies limiter so we can reuse same memory
-        # prognostic = face_prognostic_vars_up(FT, local_geometry), # storage for prognostic bulk w/ no clippings so we can be sure we have the true bulk for limiting. This can differ from aux_bulk bc of clippings a la minimum_area etc...
+        bulk = (;
+            w = FT(0),
+            a_up = FT(0),
+            # tendencies = face_prognostic_vars_up(FT, local_geometry), # storage for tendencies limiter so we can reuse same memory
+            # tendencies_adjustments = face_prognostic_vars_up(FT, local_geometry), # storage for tendencies limiter so we can reuse same memory
+            # prognostic = face_prognostic_vars_up(FT, local_geometry), # storage for prognostic bulk w/ no clippings so we can be sure we have the true bulk for limiting. This can differ from aux_bulk bc of clippings a la minimum_area etc...
         ),
         ρ_ae_KM = FT(0),
         ρ_ae_KH = FT(0),
         ρ_ae_KQ = FT(0),
         ρ_ae_K = FT(0),
-        en = (;
-            w = FT(0),
-            face_cloak_variables(FT, edmf.area_partition_model)...,
-        ),
+        en = (; w = FT(0), face_cloak_variables(FT, edmf.area_partition_model)...),
         up = ntuple(i -> face_aux_vars_up(FT, local_geometry), Val(n_updrafts(edmf))),
         massflux = FT(0),
         massflux_en = FT(0), # TODO: is this the right place for this?
@@ -652,7 +736,8 @@ face_diagnostic_vars_edmf(FT, local_geometry, edmf, ::Val{calibrate_io}) where {
 
 # Single value per column diagnostic variables
 single_value_per_col_diagnostic_vars_edmf(FT, edmf, ::Val{calibrate_io}) where {calibrate_io} = (;
-    turbconv = calibrate_io ? (;) : (;
+    turbconv = calibrate_io ? (;) :
+               (;
         env_cloud_base = FT(0),
         env_cloud_top = FT(0),
         env_cloud_cover = FT(0),

@@ -34,13 +34,16 @@ cent_aux_vars_gm(FT, local_geometry, edmf, calibrate_io_val::Val{calibrate_io}) 
     q_liq = FT(0),
     q_ice = FT(0),
     RH = FT(0),
-    (calibrate_io ? (;) : (;
-        RH_liq = FT(0),
-        RH_ice = FT(0), # RH for ice, i.e. the ratio of q_vap to q_vap_sat_ice
-        QT_third_m = FT(0),
-        H_third_m = FT(0),
-        W_third_m = FT(0),
-    ) )...,
+    (
+        calibrate_io ? (;) :
+        (;
+            RH_liq = FT(0),
+            RH_ice = FT(0), # RH for ice, i.e. the ratio of q_vap to q_vap_sat_ice
+            QT_third_m = FT(0),
+            H_third_m = FT(0),
+            W_third_m = FT(0),
+        )
+    )...,
     s = FT(0),
     T = FT(0),
     buoy = FT(0),
@@ -81,15 +84,16 @@ cent_aux_vars_gm(FT, local_geometry, edmf, calibrate_io_val::Val{calibrate_io}) 
     TC.cloud_sedimentation_variables(FT, edmf.cloud_sedimentation_model)..., # no need for area partition stuff in grid mean.
     f_ice_mult = FT(1),
 )
-cent_aux_vars(FT, local_geometry, edmf, calibrate_io_val::Val{calibrate_io}) where {calibrate_io} =
-    (; cent_aux_vars_gm(FT, local_geometry, edmf, calibrate_io_val)..., TC.cent_aux_vars_edmf(FT, local_geometry, edmf, calibrate_io_val)...)
+cent_aux_vars(FT, local_geometry, edmf, calibrate_io_val::Val{calibrate_io}) where {calibrate_io} = (;
+    cent_aux_vars_gm(FT, local_geometry, edmf, calibrate_io_val)...,
+    TC.cent_aux_vars_edmf(FT, local_geometry, edmf, calibrate_io_val)...,
+)
 
 # Face only
-face_aux_vars_gm_moisture(FT, ::TC.NonEquilibriumMoisture, calibrate_io_val::Val{calibrate_io}) where {calibrate_io} = (;
-    sgs_flux_q_liq = FT(0),
-    sgs_flux_q_ice = FT(0),
-)
-face_aux_vars_gm_moisture(FT, ::TC.EquilibriumMoisture, calibrate_io_val::Val{calibrate_io}) where {calibrate_io} = NamedTuple()
+face_aux_vars_gm_moisture(FT, ::TC.NonEquilibriumMoisture, calibrate_io_val::Val{calibrate_io}) where {calibrate_io} =
+    (; sgs_flux_q_liq = FT(0), sgs_flux_q_ice = FT(0))
+face_aux_vars_gm_moisture(FT, ::TC.EquilibriumMoisture, calibrate_io_val::Val{calibrate_io}) where {calibrate_io} =
+    NamedTuple()
 face_aux_vars_gm(FT, local_geometry, edmf, calibrate_io_val::Val{calibrate_io}) where {calibrate_io} = (;
     massflux_s = FT(0),
     diffusive_flux_s = FT(0),
@@ -104,20 +108,26 @@ face_aux_vars_gm(FT, local_geometry, edmf, calibrate_io_val::Val{calibrate_io}) 
     p = FT(0),
     ρ = FT(0),
 )
-face_aux_vars(FT, local_geometry, edmf, calibrate_io_val::Val{calibrate_io}) where {calibrate_io} =
-    (; face_aux_vars_gm(FT, local_geometry, edmf, calibrate_io_val)..., TC.face_aux_vars_edmf(FT, local_geometry, edmf, calibrate_io_val)...)
+face_aux_vars(FT, local_geometry, edmf, calibrate_io_val::Val{calibrate_io}) where {calibrate_io} = (;
+    face_aux_vars_gm(FT, local_geometry, edmf, calibrate_io_val)...,
+    TC.face_aux_vars_edmf(FT, local_geometry, edmf, calibrate_io_val)...,
+)
 
 ##### Diagnostic fields
 
 # Center only
 cent_diagnostic_vars_gm(FT, local_geometry) = NamedTuple()
-cent_diagnostic_vars(FT, local_geometry, edmf, calibrate_io_val::Val{calibrate_io}) where {calibrate_io} =
-    (; cent_diagnostic_vars_gm(FT, local_geometry,)..., TC.cent_diagnostic_vars_edmf(FT, local_geometry, edmf, calibrate_io_val)...)
+cent_diagnostic_vars(FT, local_geometry, edmf, calibrate_io_val::Val{calibrate_io}) where {calibrate_io} = (;
+    cent_diagnostic_vars_gm(FT, local_geometry)...,
+    TC.cent_diagnostic_vars_edmf(FT, local_geometry, edmf, calibrate_io_val)...,
+)
 
 # Face only
 face_diagnostic_vars_gm(FT, local_geometry) = NamedTuple()
-face_diagnostic_vars(FT, local_geometry, edmf, calibrate_io_val::Val{calibrate_io}) where {calibrate_io} =
-    (; face_diagnostic_vars_gm(FT, local_geometry)..., TC.face_diagnostic_vars_edmf(FT, local_geometry, edmf, calibrate_io_val)...)
+face_diagnostic_vars(FT, local_geometry, edmf, calibrate_io_val::Val{calibrate_io}) where {calibrate_io} = (;
+    face_diagnostic_vars_gm(FT, local_geometry)...,
+    TC.face_diagnostic_vars_edmf(FT, local_geometry, edmf, calibrate_io_val)...,
+)
 
 # Single value per column diagnostic variables
 single_value_per_col_diagnostic_vars_gm(FT, ::Val{calibrate_io}) where {calibrate_io} = (;
@@ -131,23 +141,28 @@ single_value_per_col_diagnostic_vars_gm(FT, ::Val{calibrate_io}) where {calibrat
     rwp_mean = FT(0),
     swp_mean = FT(0),
     #
-    (calibrate_io ? (;) : (;
-        cutoff_precipitation_rate = FT(0),
-        cloud_base_mean = FT(0),
-        cloud_top_mean = FT(0),
-        cloud_cover_mean = FT(0),
-        integ_total_flux_qt = FT(0),
-        integ_total_flux_s = FT(0),
-    ))...,
+    (
+        calibrate_io ? (;) :
+        (;
+            cutoff_precipitation_rate = FT(0),
+            cloud_base_mean = FT(0),
+            cloud_top_mean = FT(0),
+            cloud_cover_mean = FT(0),
+            integ_total_flux_qt = FT(0),
+            integ_total_flux_s = FT(0),
+        )
+    )...,
 )
-single_value_per_col_diagnostic_vars(FT, edmf, calibrate_io_val::Val{calibrate_io}) where {calibrate_io} =
-    (; single_value_per_col_diagnostic_vars_gm(FT, calibrate_io_val)..., TC.single_value_per_col_diagnostic_vars_edmf(FT, edmf, calibrate_io_val)...)
+single_value_per_col_diagnostic_vars(FT, edmf, calibrate_io_val::Val{calibrate_io}) where {calibrate_io} = (;
+    single_value_per_col_diagnostic_vars_gm(FT, calibrate_io_val)...,
+    TC.single_value_per_col_diagnostic_vars_edmf(FT, edmf, calibrate_io_val)...,
+)
 
 ##### Prognostic fields
 
 # Center only
 cent_prognostic_vars(::Type{FT}, local_geometry, edmf, ::Val{calibrate_io}) where {FT, calibrate_io} =
-    (; cent_prognostic_vars_gm(FT, local_geometry, edmf)..., TC.cent_prognostic_vars_edmf(FT, edmf)...,)
+    (; cent_prognostic_vars_gm(FT, local_geometry, edmf)..., TC.cent_prognostic_vars_edmf(FT, edmf)...)
 cent_prognostic_vars_gm_moisture(::Type{FT}, ::TC.NonEquilibriumMoisture) where {FT} = (; q_liq = FT(0), q_ice = FT(0))
 cent_prognostic_vars_gm_moisture(::Type{FT}, ::TC.EquilibriumMoisture) where {FT} = NamedTuple()
 cent_prognostic_vars_gm(::Type{FT}, local_geometry, edmf) where {FT} = (;

@@ -10,8 +10,9 @@ we can reweight the processes to account for the possibility that the true extre
 
 =#
 
-has_extrema(x_lo::FT, x_mid::FT, x_hi::FT) where {FT} = ((x_mid < x_lo) & (x_mid < x_hi)) || ((x_mid > x_lo) & (x_mid > x_hi))
-has_extrema(x::Tuple{FT,FT,FT}) where {FT} = has_extrema(x[1], x[2], x[3])
+has_extrema(x_lo::FT, x_mid::FT, x_hi::FT) where {FT} =
+    ((x_mid < x_lo) & (x_mid < x_hi)) || ((x_mid > x_lo) & (x_mid > x_hi))
+has_extrema(x::Tuple{FT, FT, FT}) where {FT} = has_extrema(x[1], x[2], x[3])
 
 """
 
@@ -38,7 +39,7 @@ function reweight_noneq_moisture_sources_for_grid(
     ;
     reweight_extrema_only::Bool = true, # should we pass this in or get it from param_set? maybe make it explicity so you can cache it slash it's more viislbe in the code
     region::AbstractDomain = Env,
-    ) where {FT}
+) where {FT}
 
     microphys_params = TCP.microphysics_params(param_set)
 
@@ -112,13 +113,18 @@ function reweight_noneq_moisture_sources_for_grid(
             ts = aux_domain.ts_cloak_up[k]
             ts_kp1 = aux_domain.ts_cloak_up[k + 1]
             #
-            q_vap_sat_liq_km1 = TD.q_vap_saturation_generic(thermo_params, T_km1, TD.air_density(thermo_params, ts_km1), TD.Liquid())
-            q_vap_sat_liq = TD.q_vap_saturation_generic(thermo_params, T, TD.air_density(thermo_params, ts), TD.Liquid())
-            q_vap_sat_liq_kp1 = TD.q_vap_saturation_generic(thermo_params, T_kp1, TD.air_density(thermo_params, ts_kp1), TD.Liquid())
+            q_vap_sat_liq_km1 =
+                TD.q_vap_saturation_generic(thermo_params, T_km1, TD.air_density(thermo_params, ts_km1), TD.Liquid())
+            q_vap_sat_liq =
+                TD.q_vap_saturation_generic(thermo_params, T, TD.air_density(thermo_params, ts), TD.Liquid())
+            q_vap_sat_liq_kp1 =
+                TD.q_vap_saturation_generic(thermo_params, T_kp1, TD.air_density(thermo_params, ts_kp1), TD.Liquid())
             #
-            q_vap_sat_ice_km1 = TD.q_vap_saturation_generic(thermo_params, T_km1, TD.air_density(thermo_params, ts_km1), TD.Ice())
+            q_vap_sat_ice_km1 =
+                TD.q_vap_saturation_generic(thermo_params, T_km1, TD.air_density(thermo_params, ts_km1), TD.Ice())
             q_vap_sat_ice = TD.q_vap_saturation_generic(thermo_params, T, TD.air_density(thermo_params, ts), TD.Ice())
-            q_vap_sat_ice_kp1 = TD.q_vap_saturation_generic(thermo_params, T_kp1, TD.air_density(thermo_params, ts_kp1), TD.Ice())
+            q_vap_sat_ice_kp1 =
+                TD.q_vap_saturation_generic(thermo_params, T_kp1, TD.air_density(thermo_params, ts_kp1), TD.Ice())
         elseif (region isa CloakDownDomain) # cloak down
             q_tot_km1 = aux_domain.q_tot_cloak_dn[k - 1]
             q_tot = aux_domain.q_tot_cloak_dn[k]
@@ -144,13 +150,18 @@ function reweight_noneq_moisture_sources_for_grid(
             ts = aux_domain.ts_cloak_dn[k]
             ts_kp1 = aux_domain.ts_cloak_dn[k + 1]
             #
-            q_vap_sat_liq_km1 = TD.q_vap_saturation_generic(thermo_params, T_km1, TD.air_density(thermo_params, ts_km1), TD.Liquid())
-            q_vap_sat_liq = TD.q_vap_saturation_generic(thermo_params, T, TD.air_density(thermo_params, ts), TD.Liquid())
-            q_vap_sat_liq_kp1 = TD.q_vap_saturation_generic(thermo_params, T_kp1, TD.air_density(thermo_params, ts_kp1), TD.Liquid())
+            q_vap_sat_liq_km1 =
+                TD.q_vap_saturation_generic(thermo_params, T_km1, TD.air_density(thermo_params, ts_km1), TD.Liquid())
+            q_vap_sat_liq =
+                TD.q_vap_saturation_generic(thermo_params, T, TD.air_density(thermo_params, ts), TD.Liquid())
+            q_vap_sat_liq_kp1 =
+                TD.q_vap_saturation_generic(thermo_params, T_kp1, TD.air_density(thermo_params, ts_kp1), TD.Liquid())
             #
-            q_vap_sat_ice_km1 = TD.q_vap_saturation_generic(thermo_params, T_km1, TD.air_density(thermo_params, ts_km1), TD.Ice())
+            q_vap_sat_ice_km1 =
+                TD.q_vap_saturation_generic(thermo_params, T_km1, TD.air_density(thermo_params, ts_km1), TD.Ice())
             q_vap_sat_ice = TD.q_vap_saturation_generic(thermo_params, T, TD.air_density(thermo_params, ts), TD.Ice())
-            q_vap_sat_ice_kp1 = TD.q_vap_saturation_generic(thermo_params, T_kp1, TD.air_density(thermo_params, ts_kp1), TD.Ice())
+            q_vap_sat_ice_kp1 =
+                TD.q_vap_saturation_generic(thermo_params, T_kp1, TD.air_density(thermo_params, ts_kp1), TD.Ice())
         end
     end
 
@@ -159,29 +170,42 @@ function reweight_noneq_moisture_sources_for_grid(
     # we would still need to recalculate q_vap_sat_liq and q_vap_sat_ice, but we can do that in the extrapolation step.
 
     # we can't be withn one grid point of surf or top of atm
-    
+
 
     # reweight [if we reweight everywhere] OR [if we reweight extrema only, we're not at the surface or top of atm, and we have extrema in the prognostic variables]
-    if (!reweight_extrema_only) || 
-        (reweight_extrema_only &&  !((k == kc_surf) || (k == kc_toa))  && any(has_extrema, (
-            # (aux_domain.θ_liq_ice[k - 1], aux_domain.θ_liq_ice[k], aux_domain.θ_liq_ice[k + 1]),
-            # (aux_domain.q_tot[k - 1], aux_domain.q_tot[k], aux_domain.q_tot[k + 1]),
-            # (aux_domain.q_liq[k - 1], aux_domain.q_liq[k], aux_domain.q_liq[k + 1]), # idk if this really matters, doesn't impact thermo/supersat
-            # (aux_domain.q_ice[k - 1], aux_domain.q_ice[k], aux_domain.q_ice[k + 1]), # idk if this really matters, doesn't impact thermo/supersat
-            # (aux_domain.T[k - 1], aux_domain.T[k], aux_domain.T[k + 1]),
-            # (TD.vapor_specific_humidity(thermo_params, aux_domain.ts[k-1]) - aux_domain.q_vap_sat_liq[k - 1],  TD.vapor_specific_humidity(thermo_params, aux_domain.ts[k]) - aux_domain.q_vap_sat_liq[k],  TD.vapor_specific_humidity(thermo_params, aux_domain.ts[k+1]) - aux_domain.q_vap_sat_liq[k + 1]), # liq supersat (bc both q_vap_sat and T are prolly falling off pretty fast, we can have supersat peaks even w/o peaks in q, T, esp bc theta has even fewer peaks than T)
-            # (TD.vapor_specific_humidity(thermo_params, aux_domain.ts[k-1]) - aux_domain.q_vap_sat_ice[k - 1],  TD.vapor_specific_humidity(thermo_params, aux_domain.ts[k]) - aux_domain.q_vap_sat_ice[k],  TD.vapor_specific_humidity(thermo_params, aux_domain.ts[k+1]) - aux_domain.q_vap_sat_ice[k + 1]), # ice supersat
-            #
-            (θ_liq_ice_km1, θ_liq_ice, θ_liq_ice_kp1),
-            (q_tot_km1, q_tot, q_tot_kp1),
-            (q_liq_km1, q_liq, q_liq_kp1),
-            (q_ice_km1, q_ice, q_ice_kp1),
-            (T_km1, T, T_kp1),
-            (TD.vapor_specific_humidity(thermo_params, ts_km1) - q_vap_sat_liq_km1,  TD.vapor_specific_humidity(thermo_params, ts) - q_vap_sat_liq,  TD.vapor_specific_humidity(thermo_params, ts_kp1) - q_vap_sat_liq_kp1),
-            (TD.vapor_specific_humidity(thermo_params, ts_km1) - q_vap_sat_ice_km1,  TD.vapor_specific_humidity(thermo_params, ts) - q_vap_sat_ice,  TD.vapor_specific_humidity(thermo_params, ts_kp1) - q_vap_sat_ice_kp1)
-            #
-            ))
-        )   
+    if (!reweight_extrema_only) || (
+        reweight_extrema_only &&
+        !((k == kc_surf) || (k == kc_toa)) &&
+        any(
+            has_extrema,
+            (
+                # (aux_domain.θ_liq_ice[k - 1], aux_domain.θ_liq_ice[k], aux_domain.θ_liq_ice[k + 1]),
+                # (aux_domain.q_tot[k - 1], aux_domain.q_tot[k], aux_domain.q_tot[k + 1]),
+                # (aux_domain.q_liq[k - 1], aux_domain.q_liq[k], aux_domain.q_liq[k + 1]), # idk if this really matters, doesn't impact thermo/supersat
+                # (aux_domain.q_ice[k - 1], aux_domain.q_ice[k], aux_domain.q_ice[k + 1]), # idk if this really matters, doesn't impact thermo/supersat
+                # (aux_domain.T[k - 1], aux_domain.T[k], aux_domain.T[k + 1]),
+                # (TD.vapor_specific_humidity(thermo_params, aux_domain.ts[k-1]) - aux_domain.q_vap_sat_liq[k - 1],  TD.vapor_specific_humidity(thermo_params, aux_domain.ts[k]) - aux_domain.q_vap_sat_liq[k],  TD.vapor_specific_humidity(thermo_params, aux_domain.ts[k+1]) - aux_domain.q_vap_sat_liq[k + 1]), # liq supersat (bc both q_vap_sat and T are prolly falling off pretty fast, we can have supersat peaks even w/o peaks in q, T, esp bc theta has even fewer peaks than T)
+                # (TD.vapor_specific_humidity(thermo_params, aux_domain.ts[k-1]) - aux_domain.q_vap_sat_ice[k - 1],  TD.vapor_specific_humidity(thermo_params, aux_domain.ts[k]) - aux_domain.q_vap_sat_ice[k],  TD.vapor_specific_humidity(thermo_params, aux_domain.ts[k+1]) - aux_domain.q_vap_sat_ice[k + 1]), # ice supersat
+                #
+                (θ_liq_ice_km1, θ_liq_ice, θ_liq_ice_kp1),
+                (q_tot_km1, q_tot, q_tot_kp1),
+                (q_liq_km1, q_liq, q_liq_kp1),
+                (q_ice_km1, q_ice, q_ice_kp1),
+                (T_km1, T, T_kp1),
+                (
+                    TD.vapor_specific_humidity(thermo_params, ts_km1) - q_vap_sat_liq_km1,
+                    TD.vapor_specific_humidity(thermo_params, ts) - q_vap_sat_liq,
+                    TD.vapor_specific_humidity(thermo_params, ts_kp1) - q_vap_sat_liq_kp1,
+                ),
+                (
+                    TD.vapor_specific_humidity(thermo_params, ts_km1) - q_vap_sat_ice_km1,
+                    TD.vapor_specific_humidity(thermo_params, ts) - q_vap_sat_ice,
+                    TD.vapor_specific_humidity(thermo_params, ts_kp1) - q_vap_sat_ice_kp1,
+                ),
+                #
+            ),
+        )
+    )
 
         #=
         For anything in the `hi` region, the effect inside our cell is the same. Similarly inside the `lo` region. (the continued extrapolation doesn't impact inside this cell, only the next one.)
@@ -200,38 +224,54 @@ function reweight_noneq_moisture_sources_for_grid(
         kf = CCO.PlusHalf(k.i)
 
         if !(k == kc_toa)
-            zc_hi = FT(grid.zc[k+1].z)
+            zc_hi = FT(grid.zc[k + 1].z)
         end
 
-        zf_hi = FT(grid.zf[kf+1].z)
+        zf_hi = FT(grid.zf[kf + 1].z)
         zc = FT(grid.zc[k].z)
         zf_lo = FT(grid.zf[kf].z)
 
         if !(k == kc_surf)
-            zc_lo = FT(grid.zc[k-1].z)
+            zc_lo = FT(grid.zc[k - 1].z)
         end
 
-            
+
         if k == kc_surf # No extrema, and you can only extrapolate from above... so you have one move
             # these are no longer probabilities of where the extrema are but just 
-            scenarios = (
-                (; top_extrap = (;ks=(k, k+1), zs=(zc, zc_hi)), bottom_extrap = (;ks=(k, k+1), zs=(zc, zc_hi)), prob = FT(1) ), # extreme in top
-                )
+            scenarios = ((;
+                top_extrap = (; ks = (k, k + 1), zs = (zc, zc_hi)),
+                bottom_extrap = (; ks = (k, k + 1), zs = (zc, zc_hi)),
+                prob = FT(1),
+            ),)
         elseif k == kc_toa # No extrema, and you can only extrapolate from below... so you have one move
-            scenarios = (
-                (; top_extrap = (;ks=(k-1, k), zs=(zc_lo, zc)), bottom_extrap = (;ks=(k-1, k), zs=(zc_lo, zc)), prob = FT(1) ), # extreme in bottom
-                )
+            scenarios = ((;
+                top_extrap = (; ks = (k - 1, k), zs = (zc_lo, zc)),
+                bottom_extrap = (; ks = (k - 1, k), zs = (zc_lo, zc)),
+                prob = FT(1),
+            ),)
         else
             scenarios = (
-                (; top_extrap = (;ks=(k-1, k), zs=(zc_lo, zc)), bottom_extrap = (;ks=(k-1, k), zs=(zc_lo, zc)), prob = (zc_hi - zf_hi) / (zc_hi - zc_lo) ), # extreme in top / extrap from bottom and center always
-                (; top_extrap = (;ks=(k, k+1), zs=(zc, zc_hi)), bottom_extrap = (;ks=(k-1, k), zs=(zc_lo, zc)), prob = (zf_hi - zf_lo) / (zc_hi - zc_lo)), # extreme in center / extrap from middle out
-                (; top_extrap = (;ks=(k, k+1), zs=(zc, zc_hi)), bottom_extrap = (;ks=(k, k+1), zs=(zc, zc_hi)), prob = (zf_lo - zc_lo) / (zc_hi - zc_lo)), # extreme in bottom / extrap from top and center always
-                )
+                (;
+                    top_extrap = (; ks = (k - 1, k), zs = (zc_lo, zc)),
+                    bottom_extrap = (; ks = (k - 1, k), zs = (zc_lo, zc)),
+                    prob = (zc_hi - zf_hi) / (zc_hi - zc_lo),
+                ), # extreme in top / extrap from bottom and center always
+                (;
+                    top_extrap = (; ks = (k, k + 1), zs = (zc, zc_hi)),
+                    bottom_extrap = (; ks = (k - 1, k), zs = (zc_lo, zc)),
+                    prob = (zf_hi - zf_lo) / (zc_hi - zc_lo),
+                ), # extreme in center / extrap from middle out
+                (;
+                    top_extrap = (; ks = (k, k + 1), zs = (zc, zc_hi)),
+                    bottom_extrap = (; ks = (k, k + 1), zs = (zc, zc_hi)),
+                    prob = (zf_lo - zc_lo) / (zc_hi - zc_lo),
+                ), # extreme in bottom / extrap from top and center always
+            )
         end
 
         # (isone(sum(scenario->scenario.prob, scenarios))) || error("Probabilities do not sum to 1") # for debugging but we're good now
 
-        area_weight = (;lo = FT(0.25), mid = FT(0.5), hi = FT(0.25)) # we'll keep this both for extrema and otherwise, as well as for top and bottom value of each face should count as much as each center in the end, really just an implied res doubling.
+        area_weight = (; lo = FT(0.25), mid = FT(0.5), hi = FT(0.25)) # we'll keep this both for extrema and otherwise, as well as for top and bottom value of each face should count as much as each center in the end, really just an implied res doubling.
 
         qi_tendency = FT(0)
         ql_tendency = FT(0)
@@ -259,33 +299,105 @@ function reweight_noneq_moisture_sources_for_grid(
                 q_ice = aux_domain.q_ice_cloak_dn
             end
 
-            θ_liq_ice_lo = positive_linear_interpolate_extrapolate(zf_lo, scenario.bottom_extrap.zs, (θ_liq_ice[scenario.bottom_extrap.ks[1]], θ_liq_ice[scenario.bottom_extrap.ks[2]]))
-            θ_liq_ice_hi = positive_linear_interpolate_extrapolate(zf_hi, scenario.top_extrap.zs, (θ_liq_ice[scenario.top_extrap.ks[1]], θ_liq_ice[scenario.top_extrap.ks[2]]))
-            q_tot_lo = positive_linear_interpolate_extrapolate(zf_lo, scenario.bottom_extrap.zs, (q_tot[scenario.bottom_extrap.ks[1]], q_tot[scenario.bottom_extrap.ks[2]]))
-            q_tot_hi = positive_linear_interpolate_extrapolate(zf_hi, scenario.top_extrap.zs, (q_tot[scenario.top_extrap.ks[1]], q_tot[scenario.top_extrap.ks[2]]))
-            q_liq_lo = positive_linear_interpolate_extrapolate(zf_lo, scenario.bottom_extrap.zs, (q_liq[scenario.bottom_extrap.ks[1]], q_liq[scenario.bottom_extrap.ks[2]]))
-            q_liq_hi = positive_linear_interpolate_extrapolate(zf_hi, scenario.top_extrap.zs, (q_liq[scenario.top_extrap.ks[1]], q_liq[scenario.top_extrap.ks[2]]))
-            q_ice_lo = positive_linear_interpolate_extrapolate(zf_lo, scenario.bottom_extrap.zs, (q_ice[scenario.bottom_extrap.ks[1]], q_ice[scenario.bottom_extrap.ks[2]]))
-            q_ice_hi = positive_linear_interpolate_extrapolate(zf_hi, scenario.top_extrap.zs, (q_ice[scenario.top_extrap.ks[1]], q_ice[scenario.top_extrap.ks[2]]))
+            θ_liq_ice_lo = positive_linear_interpolate_extrapolate(
+                zf_lo,
+                scenario.bottom_extrap.zs,
+                (θ_liq_ice[scenario.bottom_extrap.ks[1]], θ_liq_ice[scenario.bottom_extrap.ks[2]]),
+            )
+            θ_liq_ice_hi = positive_linear_interpolate_extrapolate(
+                zf_hi,
+                scenario.top_extrap.zs,
+                (θ_liq_ice[scenario.top_extrap.ks[1]], θ_liq_ice[scenario.top_extrap.ks[2]]),
+            )
+            q_tot_lo = positive_linear_interpolate_extrapolate(
+                zf_lo,
+                scenario.bottom_extrap.zs,
+                (q_tot[scenario.bottom_extrap.ks[1]], q_tot[scenario.bottom_extrap.ks[2]]),
+            )
+            q_tot_hi = positive_linear_interpolate_extrapolate(
+                zf_hi,
+                scenario.top_extrap.zs,
+                (q_tot[scenario.top_extrap.ks[1]], q_tot[scenario.top_extrap.ks[2]]),
+            )
+            q_liq_lo = positive_linear_interpolate_extrapolate(
+                zf_lo,
+                scenario.bottom_extrap.zs,
+                (q_liq[scenario.bottom_extrap.ks[1]], q_liq[scenario.bottom_extrap.ks[2]]),
+            )
+            q_liq_hi = positive_linear_interpolate_extrapolate(
+                zf_hi,
+                scenario.top_extrap.zs,
+                (q_liq[scenario.top_extrap.ks[1]], q_liq[scenario.top_extrap.ks[2]]),
+            )
+            q_ice_lo = positive_linear_interpolate_extrapolate(
+                zf_lo,
+                scenario.bottom_extrap.zs,
+                (q_ice[scenario.bottom_extrap.ks[1]], q_ice[scenario.bottom_extrap.ks[2]]),
+            )
+            q_ice_hi = positive_linear_interpolate_extrapolate(
+                zf_hi,
+                scenario.top_extrap.zs,
+                (q_ice[scenario.top_extrap.ks[1]], q_ice[scenario.top_extrap.ks[2]]),
+            )
 
-            p_c_lo = positive_linear_interpolate_extrapolate(zf_lo, scenario.bottom_extrap.zs, (p_c[scenario.bottom_extrap.ks[1]], p_c[scenario.bottom_extrap.ks[2]]))
-            p_c_hi = positive_linear_interpolate_extrapolate(zf_hi, scenario.top_extrap.zs, (p_c[scenario.top_extrap.ks[1]], p_c[scenario.top_extrap.ks[2]]))
+            p_c_lo = positive_linear_interpolate_extrapolate(
+                zf_lo,
+                scenario.bottom_extrap.zs,
+                (p_c[scenario.bottom_extrap.ks[1]], p_c[scenario.bottom_extrap.ks[2]]),
+            )
+            p_c_hi = positive_linear_interpolate_extrapolate(
+                zf_hi,
+                scenario.top_extrap.zs,
+                (p_c[scenario.top_extrap.ks[1]], p_c[scenario.top_extrap.ks[2]]),
+            )
 
 
-            p_lo = positive_linear_interpolate_extrapolate(zf_lo, scenario.bottom_extrap.zs, (aux_domain.p[scenario.bottom_extrap.ks[1]], aux_domain.p[scenario.bottom_extrap.ks[2]]))
-            p_hi = positive_linear_interpolate_extrapolate(zf_hi, scenario.top_extrap.zs, (aux_domain.p[scenario.top_extrap.ks[1]], aux_domain.p[scenario.top_extrap.ks[2]]))
+            p_lo = positive_linear_interpolate_extrapolate(
+                zf_lo,
+                scenario.bottom_extrap.zs,
+                (aux_domain.p[scenario.bottom_extrap.ks[1]], aux_domain.p[scenario.bottom_extrap.ks[2]]),
+            )
+            p_hi = positive_linear_interpolate_extrapolate(
+                zf_hi,
+                scenario.top_extrap.zs,
+                (aux_domain.p[scenario.top_extrap.ks[1]], aux_domain.p[scenario.top_extrap.ks[2]]),
+            )
 
             # ρ_lo = positive_linear_interpolate_extrapolate(zf_lo, scenario.bottom_extrap.zs, (ρ[scenario.bottom_extrap.ks[1]], ρ[scenario.bottom_extrap.ks[2]]))
             # ρ_hi = positive_linear_interpolate_extrapolate(zf_hi, scenario.top_extrap.zs, (ρ[scenario.top_extrap.ks[1]], ρ[scenario.top_extrap.ks[2]]))
 
-            area_lo = positive_linear_interpolate_extrapolate(zf_lo, scenario.bottom_extrap.zs, (area[scenario.bottom_extrap.ks[1]], area[scenario.bottom_extrap.ks[2]]))
-            area_hi = positive_linear_interpolate_extrapolate(zf_hi, scenario.top_extrap.zs, (area[scenario.top_extrap.ks[1]], area[scenario.top_extrap.ks[2]]))
+            area_lo = positive_linear_interpolate_extrapolate(
+                zf_lo,
+                scenario.bottom_extrap.zs,
+                (area[scenario.bottom_extrap.ks[1]], area[scenario.bottom_extrap.ks[2]]),
+            )
+            area_hi = positive_linear_interpolate_extrapolate(
+                zf_hi,
+                scenario.top_extrap.zs,
+                (area[scenario.top_extrap.ks[1]], area[scenario.top_extrap.ks[2]]),
+            )
 
-            dqvdt_lo = positive_linear_interpolate_extrapolate(zf_lo, scenario.bottom_extrap.zs, (dqvdt[scenario.bottom_extrap.ks[1]], dqvdt[scenario.bottom_extrap.ks[2]]))
-            dqvdt_hi = positive_linear_interpolate_extrapolate(zf_hi, scenario.top_extrap.zs, (dqvdt[scenario.top_extrap.ks[1]], dqvdt[scenario.top_extrap.ks[2]]))
+            dqvdt_lo = positive_linear_interpolate_extrapolate(
+                zf_lo,
+                scenario.bottom_extrap.zs,
+                (dqvdt[scenario.bottom_extrap.ks[1]], dqvdt[scenario.bottom_extrap.ks[2]]),
+            )
+            dqvdt_hi = positive_linear_interpolate_extrapolate(
+                zf_hi,
+                scenario.top_extrap.zs,
+                (dqvdt[scenario.top_extrap.ks[1]], dqvdt[scenario.top_extrap.ks[2]]),
+            )
 
-            dTdt_lo = positive_linear_interpolate_extrapolate(zf_lo, scenario.bottom_extrap.zs, (dTdt[scenario.bottom_extrap.ks[1]], dTdt[scenario.bottom_extrap.ks[2]]))
-            dTdt_hi = positive_linear_interpolate_extrapolate(zf_hi, scenario.top_extrap.zs, (dTdt[scenario.top_extrap.ks[1]], dTdt[scenario.top_extrap.ks[2]]))
+            dTdt_lo = positive_linear_interpolate_extrapolate(
+                zf_lo,
+                scenario.bottom_extrap.zs,
+                (dTdt[scenario.bottom_extrap.ks[1]], dTdt[scenario.bottom_extrap.ks[2]]),
+            )
+            dTdt_hi = positive_linear_interpolate_extrapolate(
+                zf_hi,
+                scenario.top_extrap.zs,
+                (dTdt[scenario.top_extrap.ks[1]], dTdt[scenario.top_extrap.ks[2]]),
+            )
 
 
             # if θ or qt are 0, set them back to the k value
@@ -305,7 +417,7 @@ function reweight_noneq_moisture_sources_for_grid(
 
             # For w we do not extrapolate because we have it on the faces already
             w_lo = aux_domain_f.w[kf]
-            w_hi = aux_domain_f.w[kf+1]
+            w_hi = aux_domain_f.w[kf + 1]
 
 
 
@@ -319,7 +431,7 @@ function reweight_noneq_moisture_sources_for_grid(
 
 
 
-        
+
             # These are extrapolated points so we need to recalculate...
             q_vap_sat_liq_lo = TD.q_vap_saturation_generic(thermo_params, T_lo, ρ_lo, TD.Liquid())
             q_vap_sat_ice_lo = TD.q_vap_saturation_generic(thermo_params, T_lo, ρ_lo, TD.Ice())
@@ -329,12 +441,54 @@ function reweight_noneq_moisture_sources_for_grid(
             # for the NN we could consider extrapolating but if it's expnential maybe you want a geometric mean or something? idk. [[ now that we only apply at low resolution now, it's better... ]]
             q_lo = TD.PhasePartition(q_tot_lo, q_liq_lo, q_ice_lo)
             q_hi = TD.PhasePartition(q_tot_hi, q_liq_hi, q_ice_hi)
-            τ_liq_lo, τ_ice_lo =  get_τs(param_set, microphys_params, nonequilibrium_moisture_scheme, q_lo, T_lo, p_lo, ρ_lo, w_lo)
-            τ_liq_hi, τ_ice_hi =  get_τs(param_set, microphys_params, nonequilibrium_moisture_scheme, q_hi, T_hi, p_hi, ρ_hi, w_hi)
+            τ_liq_lo, τ_ice_lo =
+                get_τs(param_set, microphys_params, nonequilibrium_moisture_scheme, q_lo, T_lo, p_lo, ρ_lo, w_lo)
+            τ_liq_hi, τ_ice_hi =
+                get_τs(param_set, microphys_params, nonequilibrium_moisture_scheme, q_hi, T_hi, p_hi, ρ_hi, w_hi)
             # end
 
-            mph_neq_lo = noneq_moisture_sources(param_set, nonequilibrium_moisture_scheme, moisture_sources_limiter, area_lo, ρ_lo, p_c_lo, T_lo, Δt + ε, ts_lo, w_lo, q_vap_sat_liq_lo, q_vap_sat_ice_lo, dqvdt_lo, dTdt_lo, τ_liq_lo, τ_ice_lo, aux_domain.cloud_fraction[k], aux_domain.cloud_fraction[k], aux_domain.cloud_fraction[k])
-            mph_neq_hi = noneq_moisture_sources(param_set, nonequilibrium_moisture_scheme, moisture_sources_limiter, area_hi, ρ_hi, p_c_hi, T_hi, Δt + ε, ts_hi, w_hi, q_vap_sat_liq_hi, q_vap_sat_ice_hi, dqvdt_hi, dTdt_hi, τ_liq_hi, τ_ice_hi, aux_domain.cloud_fraction[k], aux_domain.cloud_fraction[k], aux_domain.cloud_fraction[k])
+            mph_neq_lo = noneq_moisture_sources(
+                param_set,
+                nonequilibrium_moisture_scheme,
+                moisture_sources_limiter,
+                area_lo,
+                ρ_lo,
+                p_c_lo,
+                T_lo,
+                Δt + ε,
+                ts_lo,
+                w_lo,
+                q_vap_sat_liq_lo,
+                q_vap_sat_ice_lo,
+                dqvdt_lo,
+                dTdt_lo,
+                τ_liq_lo,
+                τ_ice_lo,
+                aux_domain.cloud_fraction[k],
+                aux_domain.cloud_fraction[k],
+                aux_domain.cloud_fraction[k],
+            )
+            mph_neq_hi = noneq_moisture_sources(
+                param_set,
+                nonequilibrium_moisture_scheme,
+                moisture_sources_limiter,
+                area_hi,
+                ρ_hi,
+                p_c_hi,
+                T_hi,
+                Δt + ε,
+                ts_hi,
+                w_hi,
+                q_vap_sat_liq_hi,
+                q_vap_sat_ice_hi,
+                dqvdt_hi,
+                dTdt_hi,
+                τ_liq_hi,
+                τ_ice_hi,
+                aux_domain.cloud_fraction[k],
+                aux_domain.cloud_fraction[k],
+                aux_domain.cloud_fraction[k],
+            )
 
             #=
                 There's an argument that we should weigh [mph_neq_lo, mph, mph_neq_hi] by the some fraction of [area_lo, area, area_hi]...  so that in the end multiplying by area gives a weighted answer
@@ -347,9 +501,19 @@ function reweight_noneq_moisture_sources_for_grid(
             =#
 
             # Area and density weight. Essentially it's (ρ_hi*a_hi*q_hi * a_weight_hi + ρaq * a_weigh_mid + ρ_lo*a_lo*q_lo * a_weight_lo) / (ρ*a), but we did the other weights before..
-            ql_tendency += scenario.prob * (mph_neq_lo.ql_tendency * area_weight.lo + mph_neq.ql_tendency * area_weight.mid + mph_neq_hi.ql_tendency * area_weight.hi) # area and density weight
-            qi_tendency += scenario.prob * (mph_neq_lo.qi_tendency * area_weight.lo + mph_neq.qi_tendency * area_weight.mid + mph_neq_hi.qi_tendency * area_weight.hi) # area and density weight
-            
+            ql_tendency +=
+                scenario.prob * (
+                    mph_neq_lo.ql_tendency * area_weight.lo +
+                    mph_neq.ql_tendency * area_weight.mid +
+                    mph_neq_hi.ql_tendency * area_weight.hi
+                ) # area and density weight
+            qi_tendency +=
+                scenario.prob * (
+                    mph_neq_lo.qi_tendency * area_weight.lo +
+                    mph_neq.qi_tendency * area_weight.mid +
+                    mph_neq_hi.qi_tendency * area_weight.hi
+                ) # area and density weight
+
 
             if any(!isfinite, (ql_tendency, qi_tendency))
                 @error "Non-equilibrium moisture sources returned non-finite values: $mph_neq; from inputs; w = $(w[k]); zc = $zc; q_vap_sat_liq = $(aux_domain.q_vap_sat_liq[k]); q_vap_sat_ice = $(aux_domain.q_vap_sat_ice[k]); ρ_c = $(ρ_c[k]); aux_domain.area = $(aux_domain.area[k])"
@@ -382,7 +546,7 @@ function reweight_equilibrium_saturation_adjustment_for_grid(
     ;
     reweight_extrema_only::Bool = true, # should we pass this in or get it from param_set? maybe make it explicity so you can cache it slash it's more viislbe in the code
     region::AbstractDomain = Env,
-    )
+)
 
     FT = eltype(param_set)
 
@@ -443,16 +607,18 @@ function reweight_equilibrium_saturation_adjustment_for_grid(
 
 
     # reweight [if we reweight everywhere] OR [if we reweight extrema only, we're not at the surface or top of atm, and we have extrema in the prognostic variables]
-    if (!reweight_extrema_only) || 
-        (reweight_extrema_only &&  !((k == kc_surf) || (k == kc_toa))  && any(has_extrema, (
+    if (!reweight_extrema_only) || (
+        reweight_extrema_only &&
+        !((k == kc_surf) || (k == kc_toa)) &&
+        any(has_extrema, (
             # (aux_domain.θ_liq_ice[k - 1], aux_domain.θ_liq_ice[k], aux_domain.θ_liq_ice[k + 1]),
             # (aux_domain.q_tot[k - 1], aux_domain.q_tot[k], aux_domain.q_tot[k + 1]),
             # (aux_domain.T[k - 1], aux_domain.T[k], aux_domain.T[k + 1])),
             (θ_liq_ice_km1, θ_liq_ice, θ_liq_ice_kp1),
             (q_tot_km1, q_tot, q_tot_kp1),
-            (T_km1, T, T_kp1)
-            ),
-        ) )
+            (T_km1, T, T_kp1),
+        ))
+    )
 
         #=
         For anything in the `hi` region, the effect inside our cell is the same. Similarly inside the `lo` region. (the continued extrapolation doesn't impact inside this cell, only the next one.)
@@ -471,38 +637,54 @@ function reweight_equilibrium_saturation_adjustment_for_grid(
         kf = CCO.PlusHalf(k.i)
 
         if !(k == kc_toa)
-            zc_hi = FT(grid.zc[k+1].z)
+            zc_hi = FT(grid.zc[k + 1].z)
         end
 
-        zf_hi = FT(grid.zf[kf+1].z)
+        zf_hi = FT(grid.zf[kf + 1].z)
         zc = FT(grid.zc[k].z)
         zf_lo = FT(grid.zf[kf].z)
 
         if !(k == kc_surf)
-            zc_lo = FT(grid.zc[k-1].z)
+            zc_lo = FT(grid.zc[k - 1].z)
         end
 
-            
+
         if k == kc_surf # No extrema, and you can only extrapolate from above... so you have one move
             # these are no longer probabilities of where the extrema are but just 
-            scenarios = (
-                (; top_extrap = (;ks=(k, k+1), zs=(zc, zc_hi)), bottom_extrap = (;ks=(k, k+1), zs=(zc, zc_hi)), prob = FT(1) ), # extreme in top
-                )
+            scenarios = ((;
+                top_extrap = (; ks = (k, k + 1), zs = (zc, zc_hi)),
+                bottom_extrap = (; ks = (k, k + 1), zs = (zc, zc_hi)),
+                prob = FT(1),
+            ),)
         elseif k == kc_toa # No extrema, and you can only extrapolate from below... so you have one move
-            scenarios = (
-                (; top_extrap = (;ks=(k-1, k), zs=(zc_lo, zc)), bottom_extrap = (;ks=(k-1, k), zs=(zc_lo, zc)), prob = FT(1) ), # extreme in bottom
-                )
+            scenarios = ((;
+                top_extrap = (; ks = (k - 1, k), zs = (zc_lo, zc)),
+                bottom_extrap = (; ks = (k - 1, k), zs = (zc_lo, zc)),
+                prob = FT(1),
+            ),)
         else
             scenarios = (
-                (; top_extrap = (;ks=(k-1, k), zs=(zc_lo, zc)), bottom_extrap = (;ks=(k-1, k), zs=(zc_lo, zc)), prob = (zc_hi - zf_hi) / (zc_hi - zc_lo) ), # extreme in top / extrap from bottom and center always
-                (; top_extrap = (;ks=(k, k+1), zs=(zc, zc_hi)), bottom_extrap = (;ks=(k-1, k), zs=(zc_lo, zc)), prob = (zf_hi - zf_lo) / (zc_hi - zc_lo)), # extreme in center / extrap from middle out
-                (; top_extrap = (;ks=(k, k+1), zs=(zc, zc_hi)), bottom_extrap = (;ks=(k, k+1), zs=(zc, zc_hi)), prob = (zf_lo - zc_lo) / (zc_hi - zc_lo)), # extreme in bottom / extrap from top and center always
-                )
+                (;
+                    top_extrap = (; ks = (k - 1, k), zs = (zc_lo, zc)),
+                    bottom_extrap = (; ks = (k - 1, k), zs = (zc_lo, zc)),
+                    prob = (zc_hi - zf_hi) / (zc_hi - zc_lo),
+                ), # extreme in top / extrap from bottom and center always
+                (;
+                    top_extrap = (; ks = (k, k + 1), zs = (zc, zc_hi)),
+                    bottom_extrap = (; ks = (k - 1, k), zs = (zc_lo, zc)),
+                    prob = (zf_hi - zf_lo) / (zc_hi - zc_lo),
+                ), # extreme in center / extrap from middle out
+                (;
+                    top_extrap = (; ks = (k, k + 1), zs = (zc, zc_hi)),
+                    bottom_extrap = (; ks = (k, k + 1), zs = (zc, zc_hi)),
+                    prob = (zf_lo - zc_lo) / (zc_hi - zc_lo),
+                ), # extreme in bottom / extrap from top and center always
+            )
         end
 
         # (isone(sum(scenario->scenario.prob, scenarios))) || error("Probabilities do not sum to 1") # for debugging but we're good now
 
-        area_weight = (;lo = FT(0.25), mid = FT(0.5), hi = FT(0.25)) # we'll keep this both for extrema and otherwise, as well as for top and bottom value of each face should count as much as each center in the end, really just an implied res doubling.
+        area_weight = (; lo = FT(0.25), mid = FT(0.5), hi = FT(0.25)) # we'll keep this both for extrema and otherwise, as well as for top and bottom value of each face should count as much as each center in the end, really just an implied res doubling.
 
         ql = FT(0)
         qi = FT(0)
@@ -524,18 +706,50 @@ function reweight_equilibrium_saturation_adjustment_for_grid(
             end
 
 
-            θ_liq_ice_lo = linear_interpolate_extrapolate(zf_lo,  scenario.bottom_extrap.zs, (θ_liq_ice[scenario.bottom_extrap.ks[1]], θ_liq_ice[scenario.bottom_extrap.ks[2]]))
-            θ_liq_ice_hi = linear_interpolate_extrapolate(zf_hi,  scenario.top_extrap.zs, (θ_liq_ice[scenario.top_extrap.ks[1]], θ_liq_ice[scenario.top_extrap.ks[2]]))
-            q_tot_lo = linear_interpolate_extrapolate(zf_lo, scenario.bottom_extrap.zs, (q_tot[scenario.bottom_extrap.ks[1]], q_tot[scenario.bottom_extrap.ks[2]]))
-            q_tot_hi = linear_interpolate_extrapolate(zf_hi, scenario.top_extrap.zs, (q_tot[scenario.top_extrap.ks[1]], q_tot[scenario.top_extrap.ks[2]]))
+            θ_liq_ice_lo = linear_interpolate_extrapolate(
+                zf_lo,
+                scenario.bottom_extrap.zs,
+                (θ_liq_ice[scenario.bottom_extrap.ks[1]], θ_liq_ice[scenario.bottom_extrap.ks[2]]),
+            )
+            θ_liq_ice_hi = linear_interpolate_extrapolate(
+                zf_hi,
+                scenario.top_extrap.zs,
+                (θ_liq_ice[scenario.top_extrap.ks[1]], θ_liq_ice[scenario.top_extrap.ks[2]]),
+            )
+            q_tot_lo = linear_interpolate_extrapolate(
+                zf_lo,
+                scenario.bottom_extrap.zs,
+                (q_tot[scenario.bottom_extrap.ks[1]], q_tot[scenario.bottom_extrap.ks[2]]),
+            )
+            q_tot_hi = linear_interpolate_extrapolate(
+                zf_hi,
+                scenario.top_extrap.zs,
+                (q_tot[scenario.top_extrap.ks[1]], q_tot[scenario.top_extrap.ks[2]]),
+            )
 
-            p_c_lo = linear_interpolate_extrapolate(zf_lo, scenario.bottom_extrap.zs, (p_c[scenario.bottom_extrap.ks[1]], p_c[scenario.bottom_extrap.ks[2]]))
-            p_c_hi = linear_interpolate_extrapolate(zf_hi, scenario.top_extrap.zs, (p_c[scenario.top_extrap.ks[1]], p_c[scenario.top_extrap.ks[2]]))
+            p_c_lo = linear_interpolate_extrapolate(
+                zf_lo,
+                scenario.bottom_extrap.zs,
+                (p_c[scenario.bottom_extrap.ks[1]], p_c[scenario.bottom_extrap.ks[2]]),
+            )
+            p_c_hi = linear_interpolate_extrapolate(
+                zf_hi,
+                scenario.top_extrap.zs,
+                (p_c[scenario.top_extrap.ks[1]], p_c[scenario.top_extrap.ks[2]]),
+            )
 
 
 
-            area_lo = linear_interpolate_extrapolate(zf_lo, scenario.bottom_extrap.zs, (area[scenario.bottom_extrap.ks[1]], area[scenario.bottom_extrap.ks[2]]))
-            area_hi = linear_interpolate_extrapolate(zf_hi, scenario.top_extrap.zs, (area[scenario.top_extrap.ks[1]], area[scenario.top_extrap.ks[2]]))
+            area_lo = linear_interpolate_extrapolate(
+                zf_lo,
+                scenario.bottom_extrap.zs,
+                (area[scenario.bottom_extrap.ks[1]], area[scenario.bottom_extrap.ks[2]]),
+            )
+            area_hi = linear_interpolate_extrapolate(
+                zf_hi,
+                scenario.top_extrap.zs,
+                (area[scenario.top_extrap.ks[1]], area[scenario.top_extrap.ks[2]]),
+            )
 
 
             ts_lo = thermo_state_pθq(param_set, p_c_lo, θ_liq_ice_lo, q_tot_lo)
@@ -548,19 +762,19 @@ function reweight_equilibrium_saturation_adjustment_for_grid(
             q_lo = TD.PhasePartition(thermo_params, ts_lo) # we have to construct the phase partition based on q_tot in Eq
             q_hi = TD.PhasePartition(thermo_params, ts_hi) # we have to construct the phase partition based on q_tot in Eq
 
-            
-             #=
-                There's an argument that we should weigh by the some fraction of [area_lo, area, area_hi]...  so that in the end multiplying by area gives a weighted answer
-                I guess you could also argue that they're just local relative rates and do compose normally... but i think that fals apart as the gradients get sharper, e.g. right below an upddraft spike the are areally does matter...
 
-                This scaling can backfire. if aux_domain.area[k] is near 0 but nonzero (common), and next to a large area, the implied tendency from this rescaling could be massive!
-                this would be most common in the updraft. Our best bet, then, is to ignore the part that comes from changes in area, and assume area is constant.
+            #=
+               There's an argument that we should weigh by the some fraction of [area_lo, area, area_hi]...  so that in the end multiplying by area gives a weighted answer
+               I guess you could also argue that they're just local relative rates and do compose normally... but i think that fals apart as the gradients get sharper, e.g. right below an upddraft spike the are areally does matter...
 
-                The question of if we should still bother with the density weighting still remains... for now we are not, even though the problem there is less severe.
+               This scaling can backfire. if aux_domain.area[k] is near 0 but nonzero (common), and next to a large area, the implied tendency from this rescaling could be massive!
+               this would be most common in the updraft. Our best bet, then, is to ignore the part that comes from changes in area, and assume area is constant.
+
+               The question of if we should still bother with the density weighting still remains... for now we are not, even though the problem there is less severe.
             =#
 
 
-            
+
             # Area and density weight. Essentially it's (ρ_hi*a_hi*q_hi * a_weight_hi + ρaq * a_weigh_mid + ρ_lo*a_lo*q_lo * a_weight_lo) / (ρ*a), but we did the other weights before..
             ql += scenario.prob * (q_lo.liq * area_weight.lo + q.liq * area_weight.mid + q_hi.liq * area_weight.hi)
             qi += scenario.prob * (q_lo.ice * area_weight.lo + q.ice * area_weight.mid + q_hi.ice * area_weight.hi)
@@ -574,7 +788,7 @@ function reweight_equilibrium_saturation_adjustment_for_grid(
             end
 
         end
-  
+
 
     else
         ql = q.liq

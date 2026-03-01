@@ -36,10 +36,28 @@ forcing_str = forcing_type === :obs_data ? "Obs" : "ERA5"
 nonequilibrium_moisture_scheme = :neural_network_extended
 dt_string = "adapt_dt__dt_min_5.0__dt_max_10.0"
 method = "best_particle_final"
-case_name = "SOCRATES_RF" * string(flight_number, pad=2) * "_" * lowercase(forcing_str) * "_data"
-namelist_path = joinpath(CEDMF_dir, "experiments", "SOCRATES_postprocess_runs_storage", "subexperiments", "SOCRATES_" * string(nonequilibrium_moisture_scheme), "Calibrate_and_Run", "tau_autoconv_noneq", dt_string, "iwp_mean__lwp_mean__qi_mean__qip_mean__ql_mean__qr_mean", "postprocessing", "output", "Atlas_LES", "RFAll_obs", method, "data", "Output.$case_name.1_1", "namelist_SOCRATES.in")
+case_name = "SOCRATES_RF" * string(flight_number, pad = 2) * "_" * lowercase(forcing_str) * "_data"
+namelist_path = joinpath(
+    CEDMF_dir,
+    "experiments",
+    "SOCRATES_postprocess_runs_storage",
+    "subexperiments",
+    "SOCRATES_" * string(nonequilibrium_moisture_scheme),
+    "Calibrate_and_Run",
+    "tau_autoconv_noneq",
+    dt_string,
+    "iwp_mean__lwp_mean__qi_mean__qip_mean__ql_mean__qr_mean",
+    "postprocessing",
+    "output",
+    "Atlas_LES",
+    "RFAll_obs",
+    method,
+    "data",
+    "Output.$case_name.1_1",
+    "namelist_SOCRATES.in",
+)
 
-namelist = JSON.parsefile(namelist_path, dicttype=Dict, inttype=Int64, null=FT(NaN))
+namelist = JSON.parsefile(namelist_path, dicttype = Dict, inttype = Int64, null = FT(NaN))
 namelist["meta"]["forcing_type"] = Symbol(namelist["meta"]["forcing_type"])
 default_namelist = NameList.default_namelist(case_name)
 NameList.convert_namelist_types_to_default!(namelist, default_namelist)
@@ -48,7 +66,7 @@ NameList.convert_namelist_types_to_default!(namelist, default_namelist)
 namelist["user_args"]["nonequilibrium_moisture_scheme"] = :neural_network_extended
 
 
-conservative_interp_kwargs_in = Dict{String,Union{Bool,String,FT}}( # Dict for easier namelist parsing later since that's all a dict.
+conservative_interp_kwargs_in = Dict{String, Union{Bool, String, FT}}( # Dict for easier namelist parsing later since that's all a dict.
     "conservative_interp" => true, # leave off by default (testing leaving off to see if our extrema fix works better w/o it. pointwise is ok if you've a point in each layer...)
     # "conservative_interp" => false, # leave off by default
     "preserve_monotonicity" => false,
@@ -61,7 +79,7 @@ conservative_interp_kwargs_in = Dict{String,Union{Bool,String,FT}}( # Dict for e
     "integrate_method" => "integrate", # this kills layers at low res unless you set reweight_processes_for_grid = true...
 )
 
-conservative_interp_kwargs_out = Dict{String,Union{Bool,String,FT}}( # Dict for easier namelist parsing later since that's all a dict.
+conservative_interp_kwargs_out = Dict{String, Union{Bool, String, FT}}( # Dict for easier namelist parsing later since that's all a dict.
     "conservative_interp" => true, # leave off by default (testing leaving off to see if our extrema fix works better w/o it. pointwise is ok if you've a point in each layer...)
     # "conservative_interp" => false, # leave off by default
     "preserve_monotonicity" => false, # I just don't think we need this, een for downsampling, at k=1...
@@ -73,10 +91,8 @@ conservative_interp_kwargs_out = Dict{String,Union{Bool,String,FT}}( # Dict for 
     "integrate_method" => "invert",
 )
 
-namelist["grid"]["conservative_interp_kwargs"] = Dict(
-    "in" => conservative_interp_kwargs_in,
-    "out" => conservative_interp_kwargs_out
-)
+namelist["grid"]["conservative_interp_kwargs"] =
+    Dict("in" => conservative_interp_kwargs_in, "out" => conservative_interp_kwargs_out)
 
 dz_min = namelist["grid"]["dz_min"]
 if dz_min <= FT(100)
@@ -88,7 +104,19 @@ end
 apply_edits = true
 if apply_edits
     #  namelist["turbulence"]["EDMF_PrognosticTKE"]["convective_tke_model_type"] = "convective_tke"
-     namelist["turbulence"]["EDMF_PrognosticTKE"]["convective_tke_model_type"] = "no_convective_tke"
+    namelist["turbulence"]["EDMF_PrognosticTKE"]["convective_tke_model_type"] = "no_convective_tke"
+
+    # namelist["turbulence"]["EDMF_PrognosticTKE"]["tke_ed_coeff"] = FT(0.1)
+    # namelist["turbulence"]["EDMF_PrognosticTKE"]["unstable_ref_factor"] = FT(1.001) # How much larger mixing is at Neutral (0) vs small stable reference point of (∂b∂z_ref = 1e-5). Prevents sudden jumps to l_max and smooth transition to instability.
+
+    # namelist["turbulence"]["EDMF_PrognosticTKE"]["c_KTKEql"] = FT(0.0)
+    # namelist["turbulence"]["EDMF_PrognosticTKE"]["c_KTKEqt"] = FT(0.0)
+    # namelist["turbulence"]["EDMF_PrognosticTKE"]["c_KTKEh"] = FT(0.05)
+
+    # namelist["turbulence"]["EDMF_PrognosticTKE"]["c_KTKEqs"] = FT(0.0)
+    # namelist["turbulence"]["EDMF_PrognosticTKE"]["c_KTKEqr"] = FT(0.0)
+    # namelist["turbulence"]["EDMF_PrognosticTKE"]["c_KTKEqi"] = FT(0.0)
+
 end
 
 dt = namelist["time_stepping"]["dt_min"]

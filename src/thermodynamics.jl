@@ -26,7 +26,12 @@ end
 
 
 # --------------------------------------------------------------- #
-function relative_humidity_over_phase(thermo_params::TD.APS, T::FT, p::FT, phase::TD.Phase, q::TD.PhasePartition{FT} = TD.q_pt_0(FT),
+function relative_humidity_over_phase(
+    thermo_params::TD.APS,
+    T::FT,
+    p::FT,
+    phase::TD.Phase,
+    q::TD.PhasePartition{FT} = TD.q_pt_0(FT),
 ) where {FT <: Real}
     R_v::FT = TD.TP.R_v(thermo_params)
     q_vap = TD.vapor_specific_humidity(q)
@@ -34,22 +39,43 @@ function relative_humidity_over_phase(thermo_params::TD.APS, T::FT, p::FT, phase
     p_vap_sat = TD.saturation_vapor_pressure(thermo_params, T, phase)
     return p_vap / p_vap_sat
 end
-relative_humidity_over_phase(param_set::APS, T::FT, p::FT, phase::TD.Phase) where {FT <: Real} = relative_humidity_over_phase(TCP.thermodynamics_params(param_set), T, p, phase)
+relative_humidity_over_phase(param_set::APS, T::FT, p::FT, phase::TD.Phase) where {FT <: Real} =
+    relative_humidity_over_phase(TCP.thermodynamics_params(param_set), T, p, phase)
 
-function relative_humidity_over_phase(thermo_params::TD.APS, ts::TD.ThermodynamicState{FT}, phase::TD.Phase) where {FT <: Real}
-    return relative_humidity_over_phase(thermo_params, TD.air_temperature(thermo_params, ts), TD.air_pressure(thermo_params, ts), phase, TD.PhasePartition(thermo_params, ts))
+function relative_humidity_over_phase(
+    thermo_params::TD.APS,
+    ts::TD.ThermodynamicState{FT},
+    phase::TD.Phase,
+) where {FT <: Real}
+    return relative_humidity_over_phase(
+        thermo_params,
+        TD.air_temperature(thermo_params, ts),
+        TD.air_pressure(thermo_params, ts),
+        phase,
+        TD.PhasePartition(thermo_params, ts),
+    )
 end
 # --------------------------------------------------------------- #
 """
 The default assumes over equilibrium phase, or if you provide a q, it could be over that q but it doesnt pass that q to saturation_vapor_pressure anyway...
 """
-relative_humidity_over_ice(param_set::APS, ts::TD.ThermodynamicState{FT}) where {FT <: Real} = relative_humidity_over_ice(TCP.thermodynamics_params(param_set), ts)
-relative_humidity_over_ice(thermo_params::TD.APS, ts::TD.ThermodynamicState{FT}) where {FT <: Real} = relative_humidity_over_phase(thermo_params, ts, TD.Ice())
-relative_humidity_over_ice(param_set::APS, T::FT, p::FT, q::TD.PhasePartition{FT} = TD.q_pt_0(FT)) where {FT <: Real} = relative_humidity_over_phase(TCP.thermodynamics_params(param_set), T, p, TD.Ice(), q)
+relative_humidity_over_ice(param_set::APS, ts::TD.ThermodynamicState{FT}) where {FT <: Real} =
+    relative_humidity_over_ice(TCP.thermodynamics_params(param_set), ts)
+relative_humidity_over_ice(thermo_params::TD.APS, ts::TD.ThermodynamicState{FT}) where {FT <: Real} =
+    relative_humidity_over_phase(thermo_params, ts, TD.Ice())
+relative_humidity_over_ice(param_set::APS, T::FT, p::FT, q::TD.PhasePartition{FT} = TD.q_pt_0(FT)) where {FT <: Real} =
+    relative_humidity_over_phase(TCP.thermodynamics_params(param_set), T, p, TD.Ice(), q)
 
-relative_humidity_over_liquid(param_set::APS, ts::TD.ThermodynamicState{FT}) where {FT <: Real} = relative_humidity_over_liquid(TCP.thermodynamics_params(param_set), ts)
-relative_humidity_over_liquid(thermo_params::TD.APS, ts::TD.ThermodynamicState{FT}) where {FT <: Real} = relative_humidity_over_phase(thermo_params, ts, TD.Liquid())
-relative_humidity_over_liquid(param_set::APS, T::FT, p::FT, q::TD.PhasePartition{FT} = TD.q_pt_0(FT)) where {FT <: Real} = relative_humidity_over_phase(TCP.thermodynamics_params(param_set), T, p, TD.Liquid(), q)
+relative_humidity_over_liquid(param_set::APS, ts::TD.ThermodynamicState{FT}) where {FT <: Real} =
+    relative_humidity_over_liquid(TCP.thermodynamics_params(param_set), ts)
+relative_humidity_over_liquid(thermo_params::TD.APS, ts::TD.ThermodynamicState{FT}) where {FT <: Real} =
+    relative_humidity_over_phase(thermo_params, ts, TD.Liquid())
+relative_humidity_over_liquid(
+    param_set::APS,
+    T::FT,
+    p::FT,
+    q::TD.PhasePartition{FT} = TD.q_pt_0(FT),
+) where {FT <: Real} = relative_humidity_over_phase(TCP.thermodynamics_params(param_set), T, p, TD.Liquid(), q)
 # --------------------------------------------------------------- #
 
 
@@ -90,15 +116,9 @@ function saturation_adjustment_given_pθq_and_liquid_fraction(
             phase_type,
             λ, # use fixed liquid fraction
         )
-        return TD.liquid_ice_pottemp_given_pressure(
-            param_set,
-            T,
-            oftype(T, p),
-            q_pt,
-        )
+        return TD.liquid_ice_pottemp_given_pressure(param_set, T, oftype(T, p), q_pt)
     end
-    q_vap_sat(T) =
-        TD.q_vap_saturation_from_pressure(param_set, q_tot, p, T, phase_type)
+    q_vap_sat(T) = TD.q_vap_saturation_from_pressure(param_set, q_tot, p, T, phase_type)
     T_1 = max(T_min, air_temp(TD.PhasePartition(q_tot))) # Assume all vapor
     q_v_sat_1 = q_vap_sat(T_1)
     unsaturated = q_tot <= q_v_sat_1
@@ -114,15 +134,7 @@ function saturation_adjustment_given_pθq_and_liquid_fraction(
     roots(T) = oftype(T, θ_liq_ice) - θ_liq_ice_closure(T)
     sol = TD.RS.find_zero(
         roots,
-        TD.sa_numerical_method_pθq(
-            sat_adjust_method,
-            param_set,
-            p,
-            θ_liq_ice,
-            q_tot,
-            phase_type,
-            T_guess,
-        ),
+        TD.sa_numerical_method_pθq(sat_adjust_method, param_set, p, θ_liq_ice, q_tot, phase_type, T_guess),
         TD.RS.CompactSolution(),
         tol,
         maxiter,
@@ -173,39 +185,34 @@ PhaseEquil_pθq_given_liquid_fraction(
     relative_temperature_tol::FTT = nothing,
     ::Type{sat_adjust_method} = TD.RS.SecantMethod,
     T_guess::Union{FT, Nothing} = nothing,
-) where {FT <: Real, IT <: TD.ITERTYPE, FTT <: TD.TOLTYPE(FT), sat_adjust_method} =
-    begin
-        maxiter === nothing && (maxiter = 50)
-        relative_temperature_tol === nothing &&
-            (relative_temperature_tol = FT(1e-4))
-        phase_type = TD.PhaseEquil{FT}
-        q_tot_safe = clamp(q_tot, FT(0), FT(1))
-        T = saturation_adjustment_given_pθq_and_liquid_fraction(
-            sat_adjust_method,
-            param_set,
-            p,
-            θ_liq_ice,
-            q_tot_safe,
-            phase_type,
-            maxiter,
-            relative_temperature_tol,
-            λ,
-            T_guess,
-        )
-        q_pt = TD.PhasePartition_equil_given_p(
-            param_set,
-            T,
-            p,
-            q_tot_safe,
-            phase_type,
-            λ,
-        )
-        ρ = TD.air_density(param_set, T, p, q_pt)
-        e_int = TD.internal_energy(param_set, T, q_pt)
-        return TD.PhaseEquil{FT}(ρ, p, e_int, q_tot_safe, T)
-    end
+) where {FT <: Real, IT <: TD.ITERTYPE, FTT <: TD.TOLTYPE(FT), sat_adjust_method} = begin
+    maxiter === nothing && (maxiter = 50)
+    relative_temperature_tol === nothing && (relative_temperature_tol = FT(1e-4))
+    phase_type = TD.PhaseEquil{FT}
+    q_tot_safe = clamp(q_tot, FT(0), FT(1))
+    T = saturation_adjustment_given_pθq_and_liquid_fraction(
+        sat_adjust_method,
+        param_set,
+        p,
+        θ_liq_ice,
+        q_tot_safe,
+        phase_type,
+        maxiter,
+        relative_temperature_tol,
+        λ,
+        T_guess,
+    )
+    q_pt = TD.PhasePartition_equil_given_p(param_set, T, p, q_tot_safe, phase_type, λ)
+    ρ = TD.air_density(param_set, T, p, q_pt)
+    e_int = TD.internal_energy(param_set, T, q_pt)
+    return TD.PhaseEquil{FT}(ρ, p, e_int, q_tot_safe, T)
+end
 
-function PhasePartition_given_liquid_fraction(param_set::TD.APS, ts::TD.AbstractPhaseEquil{FT}, λ::FT) where {FT <: Real}
+function PhasePartition_given_liquid_fraction(
+    param_set::TD.APS,
+    ts::TD.AbstractPhaseEquil{FT},
+    λ::FT,
+) where {FT <: Real}
     T = TD.air_temperature(param_set, ts)
     ρ = TD.air_density(param_set, ts)
     q_tot = TD.total_specific_humidity(param_set, ts)
@@ -218,7 +225,11 @@ function PhasePartition_given_liquid_fraction(param_set::TD.APS, ts::TD.Abstract
 end
 
 liquid_specific_humidity_given_liquid_fraction(q::TD.PhasePartition, λ::FT) where {FT} = q.liq
-liquid_specific_humidity_given_liquid_fraction(param_set::TD.APS, ts::TD.ThermodynamicState{FT}, λ::FT = one(FT)) where{FT} = PhasePartition_given_liquid_fraction(param_set, ts, λ).liq
+liquid_specific_humidity_given_liquid_fraction(
+    param_set::TD.APS,
+    ts::TD.ThermodynamicState{FT},
+    λ::FT = one(FT),
+) where {FT} = PhasePartition_given_liquid_fraction(param_set, ts, λ).liq
 
 
 """
@@ -237,13 +248,22 @@ The function returns the integral of the Gaussian PDF where s > 0.
 
     For sat eq cloud fraction pass in q=q_tot, for supersaturatd fraation pass in q=q_vap
 """
-function sgs_saturated_fraction(thermo_params::TDPS, q::FT, q_sat::FT, var_qt::FT, var_θli::FT, cov_qtθ::FT, dq_sat_dT::FT, p::FT) where {FT}
-    
+function sgs_saturated_fraction(
+    thermo_params::TDPS,
+    q::FT,
+    q_sat::FT,
+    var_qt::FT,
+    var_θli::FT,
+    cov_qtθ::FT,
+    dq_sat_dT::FT,
+    p::FT,
+) where {FT}
+
     # 1. Exner function Π (beta)
     p_ref = TD.TP.p_ref_theta(thermo_params)
-    R_d   = TD.TP.R_d(thermo_params)
-    c_p   = TD.TP.cp_d(thermo_params)
-    Π     = (p / p_ref)^(R_d / c_p) 
+    R_d = TD.TP.R_d(thermo_params)
+    c_p = TD.TP.cp_d(thermo_params)
+    Π = (p / p_ref)^(R_d / c_p)
 
     # 2. Linearization Slope (alpha)
     # α = ∂q_sat/∂T * ∂T/∂θ
@@ -256,7 +276,7 @@ function sgs_saturated_fraction(thermo_params::TDPS, q::FT, q_sat::FT, var_qt::F
     # 4. Variance of Saturation Deficit (σ²_s)
     # Var(qt - α*θ)
     σ2_s = var_qt + (α^2 * var_θli) - (2 * α * cov_qtθ)
-    
+
     # 5. Calculate Fraction (Area where s > 0)
     if σ2_s > eps(FT)
         σ_s = sqrt(σ2_s)

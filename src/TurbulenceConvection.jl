@@ -67,7 +67,7 @@ function safe_clamp(x, lo, hi)
     # current clamp doesn't safely work when min < max.  Because of its order of operations it returns x if lo < x < hi, then if x > hi, returns hi (bad if hi is lo), and if x < lo, returns lo (bad if lo is hi)
     return (lo < hi) ? clamp(x, lo, hi) : clamp(x, hi, lo)
 end # safe_clamp
-safe_clamp(x, lo_hi) =  safe_clamp(x, lo_hi[1], lo_hi[2]) # for convenience
+safe_clamp(x, lo_hi) = safe_clamp(x, lo_hi[1], lo_hi[2]) # for convenience
 
 resolve_nan(x::FT, val = FT(0.0)) where {FT} = isnan(x) ? FT(val) : x # replace nan w/ 0
 function resolve_nan!(x::AbstractArray{FT}, val = FT(0.0)) where {FT}
@@ -81,18 +81,18 @@ function resolve_not_finite!(x::AbstractArray{FT}, val = FT(NaN)) where {FT}
     @inbounds for i in eachindex(x)
         x[i] = resolve_not_finite(x[i], FT(val))
     end
-end 
+end
 
 # resolve_inf(x::FT; val::FT=FT(NaN)) where {FT} = isinf(x) ? val : x # replace inf with NaN
 
 full_print(x) = show(IOContext(stdout, :limit => false), "text/plain", x) # prints directly to io
 # full_print_str(x) = sprint(io -> show(IOContext(io, :limit => false), "text/plain", x));
 function full_print_str(x)
-    io = IOBuffer();
-    ctx = IOContext(stdout, :limit => false);
-    show(IOContext(io, ctx), "text/plain", x);
-    return String(take!(io));
-end;
+    io = IOBuffer()
+    ctx = IOContext(stdout, :limit => false)
+    show(IOContext(io, ctx), "text/plain", x)
+    return String(take!(io))
+end
 # full_print_inline(x) = sprint(io -> show(IOContext(io, :limit => false), "text/plain", x)) # returns string
 # gpt_full_print_inline(x) = Ref(sprint(io -> show(IOContext(io, :limit => false), "text/plain", x)))
 
@@ -152,8 +152,10 @@ end
 
 
 
-@inline linear_interpolate_extrapolate(x::FT, xs::Tuple{FT,FT}, vs::Tuple{FT,FT}) where {FT} = (x - xs[1]) / (xs[2] - xs[1]) * (vs[2] - vs[1]) + vs[1] # fast linear interpolation/extrapolation
-@inline positive_linear_interpolate_extrapolate(x::FT, xs::Tuple{FT,FT}, vs::Tuple{FT,FT}) where {FT} = max(0, linear_interpolate_extrapolate(x, xs, vs)) # fast linear interpolation/extrapolation
+@inline linear_interpolate_extrapolate(x::FT, xs::Tuple{FT, FT}, vs::Tuple{FT, FT}) where {FT} =
+    (x - xs[1]) / (xs[2] - xs[1]) * (vs[2] - vs[1]) + vs[1] # fast linear interpolation/extrapolation
+@inline positive_linear_interpolate_extrapolate(x::FT, xs::Tuple{FT, FT}, vs::Tuple{FT, FT}) where {FT} =
+    max(0, linear_interpolate_extrapolate(x, xs, vs)) # fast linear interpolation/extrapolation
 
 
 
@@ -283,7 +285,7 @@ end
 const Ic = CCO.InterpolateF2C() # no bcs on F2C, this gets used all the time, so define it once here
 const Ifx = CCO.InterpolateC2F(; bottom = CCO.Extrapolate(), top = CCO.Extrapolate()) # C2F with extrapolate bcs, this gets used all the time, so define it once here
 # const Ifw = CCO.InterpolateC2F(; bottom = CCO.SetValue(FT(0)), top = CCO.SetValue(FT(0)))
-const ∇c = CCO.DivergenceF2C() 
+const ∇c = CCO.DivergenceF2C()
 const wvec = CC.Geometry.WVector
 
 
@@ -338,7 +340,7 @@ include("closures/terminal_velocity.jl")
 using PrecompileTools: PrecompileTools   # this is a small dependency
 # PrecompileTools.@setup_workload begin
 #     PrecompileTools.@compile_workload begin
-        include("precompile_workload.jl")
+include("precompile_workload.jl")
 #     end
 # end
 

@@ -32,8 +32,7 @@ function calculate_sedimentation_sources!(
     w_sed::CC.Fields.Field,
     w::CC.Fields.Field,
     area::CC.Fields.Field,
-    grid::Grid
-    ;
+    grid::Grid;
     # ρ_q::FT;  # figure out types for these # not used
     # w::Union{CC.Fields.Field, FT} = 0.0, # background wind... (might still change this to operate inside update_aux or something? idk...)
     differencing_scheme::AbstractIntegrationScheme = UpwindDifferencingScheme(),
@@ -45,9 +44,9 @@ function calculate_sedimentation_sources!(
     scratch3::CF,
     scratch4::CF,
     scratch1F::FF,
-    scratch2F::FF
+    scratch2F::FF,
 ) where {SCF <: CC.Fields.Field, CF <: CC.Fields.Field, FF <: CC.Fields.Field}
- #::Tuple{swap_eltype(CF, NoneqMoistureSources{eltype(CF)}), swap_eltype(CF, NoneqMoistureSources{eltype(CF)})} where {CF<:CC.Fields.Field, FF<:CC.Fields.Field}
+    #::Tuple{swap_eltype(CF, NoneqMoistureSources{eltype(CF)}), swap_eltype(CF, NoneqMoistureSources{eltype(CF)})} where {CF<:CC.Fields.Field, FF<:CC.Fields.Field}
 
 
     #= Note --
@@ -170,12 +169,12 @@ function calculate_sedimentation_sources!(
         # wρaq[kf_toa] = FT(0) # i think the bc has this alraedy
 
         # wvec_wρaq = @. wvec(wρaq) # convert to vector type for divergence [to get back to physical units]
-        wvec_wρaq = @. wvec( UBsed(wvec(-w_sed), ρ * q * area) )
+        wvec_wρaq = @. wvec(UBsed(wvec(-w_sed), ρ * q * area))
         scratch_wvec = wvec_wρaq # alias
         # @warn "typeof(wvec_wρaq) = $(typeof(wvec_wρaq))"
         # wvec_wρaq[kf_surf] = q[kc_surf] * area[kc_surf] * -w_sed[kf_surf]
         wvec_wρaq[kf_surf] = map(x -> ρ[kc_surf] * q[kc_surf] * area[kc_surf] * -w_sed[kf_surf], wvec_wρaq[kf_surf]) # i think this works, following the logic in # /home/jbenjami/.julia/packages/ClimaCore/vJw0m/src/Geometry/axistensors.jl. Also would have worked on the Contravariant3vector but the units would have been wrong (not physical w/o wvec)
-        
+
         ∇wρaq = scratch1 # reuse temporary storage
         @. ∇wρaq = -∇c(wvec_wρaq) # maybe this has to be done after CV32FT for the contravariant 3 vector?
 
@@ -299,7 +298,9 @@ function calculate_sedimentation_velocity(
     if velo_scheme == Chen2022Vel
         w = my_terminal_velocity(param_set, rain_type, velo_scheme, ρ, q; Dmax = Dmax, Nt = Nt) # testing [ this version makes you pass in raintype to avoid creating another object] [ rain_type is avilable from a global]
     elseif velo_scheme == Blk1MVel
-        error("velo_scheme $velo_scheme not implemented for CMT.LiquidType in current CM1 version. If you want liquid sedimentation, use Chen2022Vel (TODO: turn this into an error at namelist construction)")
+        error(
+            "velo_scheme $velo_scheme not implemented for CMT.LiquidType in current CM1 version. If you want liquid sedimentation, use Chen2022Vel (TODO: turn this into an error at namelist construction)",
+        )
         # return FT(0.0) # not implemented in CloudMicrophysics.jl 0.14
     end
 
@@ -327,8 +328,10 @@ function calculate_sedimentation_velocity(
     # Newer versions I believe do but I don't have them..., ask Anna
     elseif velo_scheme == Blk1MVel
         # w = CM1.terminal_velocity(microphys_params, ice_type, velo_scheme, ρ, q) # does this velo_scheme even exist for ice_type?
-        error("velo_scheme $velo_scheme not implemented for ice_type in current CM1 version. If you want ice sedimentation, use Chen2022Vel (TODO: turn this into an error at namelist construction)")
-    # no Dmax for nonchen afaik
+        error(
+            "velo_scheme $velo_scheme not implemented for ice_type in current CM1 version. If you want ice sedimentation, use Chen2022Vel (TODO: turn this into an error at namelist construction)",
+        )
+        # no Dmax for nonchen afaik
     else
         error("velo_scheme $velo_scheme not implemented")
     end
@@ -337,4 +340,3 @@ function calculate_sedimentation_velocity(
     # return isnan(w) ? FT(0.0) : w # nans are bad, also for some really small numbers can return negative values... so just set to 0
 
 end
-

@@ -24,7 +24,25 @@ invalidations = SnoopCompileCore.@snoop_invalidations begin
     CEDMF_dir = expanduser("~/Research_Schneider/CliMA/CalibrateEDMF.jl")
     FT = Float64
     case_name = "SOCRATES_RF" * string(flight_number, pad = 2) * "_" * lowercase(forcing_str) * "_data" # can't recall why it's lower here lol
-    namelist_path = joinpath(CEDMF_dir, "experiments", "SOCRATES_postprocess_runs_storage", "subexperiments","SOCRATES_"*string(nonequilibrium_moisture_scheme), "Calibrate_and_Run", "tau_autoconv_noneq", dt_string, "iwp_mean__lwp_mean__qi_mean__qip_mean__ql_mean__qr_mean", "postprocessing", "output", "Atlas_LES", "RFAll_obs", method, "data", "Output.$case_name.1_1", "namelist_SOCRATES.in")
+    namelist_path = joinpath(
+        CEDMF_dir,
+        "experiments",
+        "SOCRATES_postprocess_runs_storage",
+        "subexperiments",
+        "SOCRATES_" * string(nonequilibrium_moisture_scheme),
+        "Calibrate_and_Run",
+        "tau_autoconv_noneq",
+        dt_string,
+        "iwp_mean__lwp_mean__qi_mean__qip_mean__ql_mean__qr_mean",
+        "postprocessing",
+        "output",
+        "Atlas_LES",
+        "RFAll_obs",
+        method,
+        "data",
+        "Output.$case_name.1_1",
+        "namelist_SOCRATES.in",
+    )
     namelist = JSON.parsefile(namelist_path, dicttype = Dict, inttype = Int64, null = FT(NaN))
     namelist["meta"]["forcing_type"] = Symbol(namelist["meta"]["forcing_type"]) # this gets messed up for some reason...
     default_namelist = default_namelist = NameList.default_namelist(case_name)
@@ -58,7 +76,8 @@ invalidations = SnoopCompileCore.@snoop_invalidations begin
     # simulation_outpath = joinpath(namelist["output"]["output_root"], output_relpath), 
 
     # ============================================================================================================================ #
-    TC.full_print(namelist); println("\n\n")
+    TC.full_print(namelist)
+    println("\n\n")
 
 
     namelist["meta"]["uuid"] = "01_invalidations"
@@ -100,7 +119,7 @@ process_filename_fn = x -> last(split(x, "/"))  # prints just the filename
 using SnoopCompile: SnoopCompile
 SnoopCompile.report_invalidations(
     Base.stdout;
-    invalidations=invalidations,
-    n_rows=20,
-    process_filename=process_filename_fn,
+    invalidations = invalidations,
+    n_rows = 20,
+    process_filename = process_filename_fn,
 )

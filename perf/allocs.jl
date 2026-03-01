@@ -3,7 +3,7 @@
 exhaustive = "exhaustive=true" in ARGS
 @show exhaustive
 
-import ReportMetrics
+# import ReportMetrics
 # const RM = ReportMetrics
 
 # Packages to monitor

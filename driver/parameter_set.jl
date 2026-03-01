@@ -9,16 +9,16 @@ import TurbulenceConvection.Parameters as TCP
 
 leaves_to_tuples(x) = x
 leaves_to_tuples(x::Array) = Tuple(x)
-leaves_to_tuples(x::Dict) = Dict{String, Any}((k => leaves_to_tuples(v) for (k,v) in x))
+leaves_to_tuples(x::Dict) = Dict{String, Any}((k => leaves_to_tuples(v) for (k, v) in x))
 
 leaves_to_Vals(x) = x # this turns leaves that are string into symbols and then all symbols into Vals so that they can be isbits, thus we are allowed to pass in symbols or strings, to extract, use typeof(valitem).parameters[1]
 leaves_to_Vals(x::Symbol) = Val(x)
 leaves_to_Vals(x::String) = Val(Symbol(x))
-leaves_to_Vals(x::Dict) = Dict{String, Any}((k => leaves_to_Vals(v) for (k,v) in x))
+leaves_to_Vals(x::Dict) = Dict{String, Any}((k => leaves_to_Vals(v) for (k, v) in x))
 leaves_to_Vals(x::NamedTuple) = map(leaves_to_Vals, x)
 
-namedtuple_fromdict(x) = x 
-namedtuple_fromdict(d::Dict) = (; (Symbol(k) => namedtuple_fromdict(v) for (k,v) in d)...) # from https://discourse.julialang.org/t/how-to-make-a-named-tuple-from-a-dictionary/10899/46?u=jbphyswx
+namedtuple_fromdict(x) = x
+namedtuple_fromdict(d::Dict) = (; (Symbol(k) => namedtuple_fromdict(v) for (k, v) in d)...) # from https://discourse.julialang.org/t/how-to-make-a-named-tuple-from-a-dictionary/10899/46?u=jbphyswx
 
 #! format: off
 function create_parameter_set(

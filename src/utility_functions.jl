@@ -54,7 +54,7 @@ init_nc_data(data, group, var) = data.group[group][var][:][:, 1]
         594.972 ns (1 allocation: 496 bytes)
 """
 # Scalar version (allocation-free) -- since Dierckx.Spline1D(xp, fp; k = 1) returns . These do not check for xp being sorted or unique or anything else 
-function pyinterp(x::T, xp::AbstractVector{T}, fp::AbstractVector{T}) where {T<:Real}
+function pyinterp(x::T, xp::AbstractVector{T}, fp::AbstractVector{T}) where {T <: Real}
     if x <= xp[1]
         return fp[1]
     elseif x >= xp[end]
@@ -64,21 +64,26 @@ function pyinterp(x::T, xp::AbstractVector{T}, fp::AbstractVector{T}) where {T<:
         if i == length(xp)   # <- handle upper bound
             return fp[end]
         end
-        x0, x1 = xp[i], xp[i+1]
-        y0, y1 = fp[i], fp[i+1]
-        return y0 + (y1 - y0)*(x - x0)/(x1 - x0)
+        x0, x1 = xp[i], xp[i + 1]
+        y0, y1 = fp[i], fp[i + 1]
+        return y0 + (y1 - y0) * (x - x0) / (x1 - x0)
     end
 end
 
 
 # Vector version
-function pyinterp(x::AbstractVector{T}, xp::AbstractVector{T}, fp::AbstractVector{T}) where {T<:Real}
+function pyinterp(x::AbstractVector{T}, xp::AbstractVector{T}, fp::AbstractVector{T}) where {T <: Real}
     y = similar(x)
     pyinterp!(y, x, xp, fp)
     return y
 end
 
-function pyinterp!(y::AbstractVector{T}, x::AbstractVector{T}, xp::AbstractVector{T}, fp::AbstractVector{T}) where {T<:Real}
+function pyinterp!(
+    y::AbstractVector{T},
+    x::AbstractVector{T},
+    xp::AbstractVector{T},
+    fp::AbstractVector{T},
+) where {T <: Real}
     # @assert length(y) == length(x)
     @inbounds for j in eachindex(x)
         y[j] = pyinterp(x[j], xp, fp)
