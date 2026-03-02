@@ -1106,35 +1106,35 @@ function compute_diffusive_fluxes(edmf::EDMFModel, state::State, surf::SurfaceBa
         # # -=-=-=-=-=-=--=-=-=-=-=-=--=-=-=-=-=-=--=-=-=-=-=-=--=-=-=-=-=-=- #
 
 
-        # :: This tries to apply a correction to the flux based on the variance (e.g. if you assume larger variance mostly in the upwards flux)... it is bad though bc the gradient checks lead to upgradeitn flux leads to slight checkerboarding (not too bad bc it can never go truly upgradeint, but that flux shows up in ql, which shows up in ql flux, which shows up in TKE production...
-        # :: Ideally you could have something like `+= corr_w_qt * Ifx(ρ_c * a_en * sqrt(aux_en.tke) * sqrt(max(aux_en.QTvar, zero(FT))))` with no checks but upgradient fluxes will rapidly lead to rapid blowup... Overall it wasnt a bad idea and was stable but those little qt oscillations were intolerable
-        # :: The hard part is the LES does display some countergradient type fluxes esp in the beginning, which are key to terminating cloud top, and to keeping a sharp gradient around the bottom of RF09 esp nearer to simulation beginning.
-        correction_safety_factor = FT(0.9) # leave at least some small down gradient portion
-        # correction but dont allow sign change from down gradient
-        @. aux_tc_f.diffusive_flux_qt += ifelse(
-            aux_tc_f.diffusive_flux_qt > 0,
-            max(
-                corr_w_qt * Ifx(ρ_c * a_en * sqrt(aux_en.tke) * sqrt(max(aux_en.QTvar, zero(FT)))),
-                -aux_tc_f.diffusive_flux_qt * correction_safety_factor,
-            ),
-            min(
-                corr_w_qt * Ifx(ρ_c * a_en * sqrt(aux_en.tke) * sqrt(max(aux_en.QTvar, zero(FT)))),
-                -aux_tc_f.diffusive_flux_qt * correction_safety_factor,
-            ),
-        )
+        # # :: This tries to apply a correction to the flux based on the variance (e.g. if you assume larger variance mostly in the upwards flux)... it is bad though bc the gradient checks lead to upgradeitn flux leads to slight checkerboarding (not too bad bc it can never go truly upgradeint, but that flux shows up in ql, which shows up in ql flux, which shows up in TKE production...
+        # # :: Ideally you could have something like `+= corr_w_qt * Ifx(ρ_c * a_en * sqrt(aux_en.tke) * sqrt(max(aux_en.QTvar, zero(FT))))` with no checks but upgradient fluxes will rapidly lead to rapid blowup... Overall it wasnt a bad idea and was stable but those little qt oscillations were intolerable
+        # # :: The hard part is the LES does display some countergradient type fluxes esp in the beginning, which are key to terminating cloud top, and to keeping a sharp gradient around the bottom of RF09 esp nearer to simulation beginning.
+        # correction_safety_factor = FT(0.9) # leave at least some small down gradient portion
+        # # correction but dont allow sign change from down gradient
+        # @. aux_tc_f.diffusive_flux_qt += ifelse(
+        #     aux_tc_f.diffusive_flux_qt > 0,
+        #     max(
+        #         corr_w_qt * Ifx(ρ_c * a_en * sqrt(aux_en.tke) * sqrt(max(aux_en.QTvar, zero(FT)))),
+        #         -aux_tc_f.diffusive_flux_qt * correction_safety_factor,
+        #     ),
+        #     min(
+        #         corr_w_qt * Ifx(ρ_c * a_en * sqrt(aux_en.tke) * sqrt(max(aux_en.QTvar, zero(FT)))),
+        #         -aux_tc_f.diffusive_flux_qt * correction_safety_factor,
+        #     ),
+        # )
 
-        # correction but dont allow sign change from down gradient
-        @. aux_tc_f.diffusive_flux_h += ifelse(
-            aux_tc_f.diffusive_flux_h > 0,
-            max(
-                corr_w_h * Ifx(ρ_c * a_en * sqrt(aux_en.tke) * sqrt(max(aux_en.Hvar, zero(FT)))),
-                -aux_tc_f.diffusive_flux_h * correction_safety_factor,
-            ),
-            min(
-                corr_w_h * Ifx(ρ_c * a_en * sqrt(aux_en.tke) * sqrt(max(aux_en.Hvar, zero(FT)))),
-                -aux_tc_f.diffusive_flux_h * correction_safety_factor,
-            ),
-        )
+        # # correction but dont allow sign change from down gradient
+        # @. aux_tc_f.diffusive_flux_h += ifelse(
+        #     aux_tc_f.diffusive_flux_h > 0,
+        #     max(
+        #         corr_w_h * Ifx(ρ_c * a_en * sqrt(aux_en.tke) * sqrt(max(aux_en.Hvar, zero(FT)))),
+        #         -aux_tc_f.diffusive_flux_h * correction_safety_factor,
+        #     ),
+        #     min(
+        #         corr_w_h * Ifx(ρ_c * a_en * sqrt(aux_en.tke) * sqrt(max(aux_en.Hvar, zero(FT)))),
+        #         -aux_tc_f.diffusive_flux_h * correction_safety_factor,
+        #     ),
+        # )
 
 
 

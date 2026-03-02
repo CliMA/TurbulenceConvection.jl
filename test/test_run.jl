@@ -636,7 +636,7 @@ for flight_number in flight_numbers
         # namelist["turbulence"]["EDMF_PrognosticTKE"]["c_KTKEql"] = FT(.1)
         # namelist["turbulence"]["EDMF_PrognosticTKE"]["c_KTKEqi"] = FT(.1)
         # namelist["turbulence"]["EDMF_PrognosticTKE"]["c_KTKEqt"] = FT(.1)
-        # namelist["turbulence"]["EDMF_PrognosticTKE"]["c_KTKEh"]  = FT(.1)
+        namelist["turbulence"]["EDMF_PrognosticTKE"]["c_KTKEh"]  = FT(.1)
         # namelist["turbulence"]["EDMF_PrognosticTKE"]["c_KTKEqs"]  = FT(.5)
         # namelist["turbulence"]["EDMF_PrognosticTKE"]["Prandtl_number_0"] = 0.001
 
