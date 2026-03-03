@@ -1,15 +1,10 @@
-import TurbulenceConvection
-const TC = TurbulenceConvection
+using TurbulenceConvection: TurbulenceConvection, TurbulenceConvection as TC
 
-import Dierckx
+using Dierckx: Dierckx
 
-# import OrdinaryDiffEq
-# const ODE = OrdinaryDiffEq
-import OrdinaryDiffEqTsit5
-# import OrdinaryDiffEqLowOrderRK
+using OrdinaryDiffEqTsit5: OrdinaryDiffEqTsit5
 
-import ClimaCore
-const CC = ClimaCore
+using ClimaCore: ClimaCore, ClimaCore as CC
 
 prognostic_vars(FT, n_up) = (; prognostic_vars_gm(FT)..., prognostic_vars_edmf(FT, n_up)...)
 prognostic_vars_gm(FT) = (; U = FT(0), V = FT(0), H = FT(0), QT = FT(0))

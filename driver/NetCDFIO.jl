@@ -1,8 +1,5 @@
-import NCDatasets
-const NC = NCDatasets
-import JSON
-import TurbulenceConvection
-const TC = TurbulenceConvection
+using NCDatasets: NCDatasets as NC
+using TurbulenceConvection: TurbulenceConvection, TurbulenceConvection as TC
 
 # TODO: remove `vars` hack that avoids https://github.com/Alexander-Barth/NCDatasets.jl/issues/135
 

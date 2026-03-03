@@ -2,9 +2,7 @@
 
 import StatsBase
 
-import ClimaCore
-const CC = ClimaCore
-const CCO = CC.Operators
+using ClimaCore: ClimaCore, ClimaCore as CC, Operators as CCO
 
 import CLIMAParameters as CP
 import TurbulenceConvection.Parameters as TCP

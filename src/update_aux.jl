@@ -1498,6 +1498,7 @@ function update_aux!(
 
     #=
      update buoyancy to include SGS condensate transport contribution :: [ Sommeria and Deardorff (1977) (https://doi.org/10.1175/1520-0469(1977)034<0344:SSCIMO>2.0.CO;2) ,Cuijpers and Duynkerke (1993) (https://doi.org/10.1175/1520-0469(1993)050<3894:LESOTW>2.0.CO;2) ]
+        :: See also Eq 9 in SHOC paper (Bogenschutz & Krueger, 2013) [ https://doi.org/10.1002/jame.20018 ]
         w'θ_v' = w'θ_l' + ((1 - ε_o) / ε_o) * θ_o * w'q_t' + χ * [(L_v / c_p) * (p_o / p)^(R_d / c_p) - (1 / ε_o) * θ_o] * w'q_l'
         w'b' = (g/θ_v') w'θ_v'
 

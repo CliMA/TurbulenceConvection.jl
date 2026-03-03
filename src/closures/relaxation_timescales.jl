@@ -2952,9 +2952,9 @@ function adjust_and_clamp_NN_outputs(
     N_i = clamp(N_i, relaxation_timescale.args.min_N_ice, relaxation_timescale.args.max_N_ice)
     if return_no_boost
         N_i_no_boost = clamp(N_i_no_boost, relaxation_timescale.args.min_N_ice, relaxation_timescale.args.max_N_ice)
-        return (; τ_liq, τ_ice, N_liq = N_l, N_ice = N_i, N_ice_no_boost)
+        return (; τ_liq, τ_ice, N_liq=N_l, N_ice=N_i, N_ice_no_boost=N_i_no_boost)
     else
-        return (; τ_liq, τ_ice, N_liq = N_l, N_ice = N_i)
+        return (; τ_liq, τ_ice, N_liq=N_l, N_ice=N_i, N_ice_no_boost=N_i_no_boost) # always return N_ice_no_boost for type stability
     end
 end
 

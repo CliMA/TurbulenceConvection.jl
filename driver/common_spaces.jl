@@ -1,5 +1,4 @@
-import ClimaCore
-const CC = ClimaCore
+using ClimaCore: ClimaCore, ClimaCore as CC
 
 function periodic_line_mesh(; x_max, x_elem)
     domain = CC.Domains.IntervalDomain(CCG.XPoint(zero(x_max)), CCG.XPoint(x_max); periodic = true)

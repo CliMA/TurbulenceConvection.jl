@@ -1,3 +1,6 @@
+using SciMLBase: SciMLBase
+using OrdinaryDiffEqTsit5: OrdinaryDiffEqTsit5
+
 update_radiation(self::RadiationBase, state, t::Real, param_set) = nothing
 initialize(self::RadiationBase{RadiationNone}, state) = nothing
 

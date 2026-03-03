@@ -2,11 +2,10 @@
 ## Keeps test_run.jl untouched.
 using Pkg
 Pkg.activate(expanduser("~/Research_Schneider/CliMA/TurbulenceConvection.jl/"))
-using JLD2
-using Random
-using LinearAlgebra
+using JLD2: JLD2
+using Random: Random
+using LinearAlgebra: LinearAlgebra
 
-using Pkg
 using Revise
 
 Pkg.activate(expanduser("~/Research_Schneider/CliMA/TurbulenceConvection.jl/"))
@@ -169,7 +168,7 @@ namelist["stats_io"]["calibrate_io"] = false
 
 # Put outputs in test/debug with a short uuid.
 Random.seed!()
-namelist["meta"]["uuid"] = randstring(4)
+namelist["meta"]["uuid"] = Random.randstring(4)
 namelist["output"]["output_root"] = expanduser("~/Research_Schneider/CliMA/TurbulenceConvection.jl/test/debug")
 
 @info "Running case" case_name scheme = nonequilibrium_moisture_scheme

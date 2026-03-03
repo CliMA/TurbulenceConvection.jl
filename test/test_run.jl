@@ -1,9 +1,9 @@
 ## Run test on cases and plot relative to LES
 using Pkg
 Pkg.activate(expanduser("~/Research_Schneider/CliMA/TurbulenceConvection.jl/"))
-using JLD2
-using Random
-using LinearAlgebra
+using JLD2: JLD2
+using Random: Random
+using LinearAlgebra: LinearAlgebra
 LinearAlgebra.BLAS.set_num_threads(1) # set to 1 thread for reproducibility and to stop slow bug
 
 function edit_nt_key(nt::NamedTuple, key::Symbol, value)
@@ -699,7 +699,7 @@ for flight_number in flight_numbers
 
         if debug
             Random.seed!() # switch back to random entropy
-            namelist["meta"]["uuid"] = randstring(4) # allow to run multiple simulaitons at once if we're just debugging and wan't to go faster
+            namelist["meta"]["uuid"] = Random.randstring(4) # allow to run multiple simulaitons at once if we're just debugging and wan't to go faster
         else
             namelist["meta"]["uuid"] = "" # no uuid
         end
