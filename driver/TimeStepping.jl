@@ -27,7 +27,7 @@ mutable struct TimeStepping{FT, AT <: Val}
     const use_isoutofdomain_limiter::Bool # whether or not to use isoutofdomain to limit timestepping.
     N_dt_max_edmf_violate_dt_min_remaining::Int # The number of times we allow dt_max_edmf to violate dt_min before we stop allowing violations
     const adaptive_depth_limit::Int # how many recursive calls we allow to recalculate tendencies for new proposed dt
-    const allow_cfl_dt_max_violate_dt_min::Bool # whether to let falling precip violate the cfl (we calculated w/ a max of 5 m/s but maybe that's arbitrary -- rain can in principle go up to 10 or so).
+    # const allow_cfl_dt_max_violate_dt_min::Bool # whether to let falling precip violate the cfl (we calculated w/ a max of 5 m/s but maybe that's arbitrary -- rain can in principle go up to 10 or so). # deprecated, just set N_dt_max_edmf_violate_dt_min_remaining to 0
     use_fallback_tendency_limiters::Bool # check if this could be in a callback or something w/ remake to just remake the ode problem (remake edmf w/ limiters hopefully...)
     const use_fallback_during_spinup::Bool # whether to use fallback limiters during spinup
     const dt_limit_tendencies_factor::FT # whether to calculate tendencies using dt_min or the current dt -- I think we should default to dt_min bc (though there's some risk they dont compose nicely? hopefully fine in steady state... could do dt_max but dt_max could be arbitrarily large and then cold never take shorter steps... could also pick some fixed number...)
@@ -138,8 +138,8 @@ function TimeStepping(::Type{FT}, namelist) where {FT}
     t_max = TC.parse_namelist(namelist, "time_stepping", "t_max"; default = FT(7200.0))
     cfl_limit = TC.parse_namelist(namelist, "time_stepping", "cfl_limit"; default = FT(0.5))
     cfl_dt_max = TC.parse_namelist(namelist, "time_stepping", "cfl_dt_max"; default = dt_max)
-    allow_cfl_dt_max_violate_dt_min =
-        TC.parse_namelist(namelist, "time_stepping", "allow_cfl_dt_max_violate_dt_min"; default = false)
+    # allow_cfl_dt_max_violate_dt_min =
+        # TC.parse_namelist(namelist, "time_stepping", "allow_cfl_dt_max_violate_dt_min"; default = false)
 
     use_fallback_tendency_limiters = false # initialize as false for everything... it'll get set to true later if needed.
     use_fallback_during_spinup =
@@ -207,7 +207,7 @@ function TimeStepping(::Type{FT}, namelist) where {FT}
         use_isoutofdomain_limiter,
         N_dt_max_edmf_violate_dt_min_remaining,
         adaptive_depth_limit,
-        allow_cfl_dt_max_violate_dt_min,
+        # allow_cfl_dt_max_violate_dt_min,
         use_fallback_tendency_limiters,
         use_fallback_during_spinup,
         # dt_limit_tendencies, # for consistency, tendencies are limited by this factor times dt_min (so adapt_dt doesn't oscillate) [ this is bad because as the timestep changes, you can induce instability, e.g., consider you have a dt longer than dt_limit_tendencies, then you've underdone your limiter! Essentially the relative magnitudes of things were constantly changing if the real dt was. if you allowed more adaptivity, this would be even worse.] [ essentially, this gave nice looking consistently smooth tendencies, but the integrated values suffered. the reverse is actually more important.]
