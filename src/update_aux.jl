@@ -384,7 +384,6 @@ function update_aux!(
     @. aux_en.∂MSE∂z = ∇c(wvec(Ifx(aux_en.MSE))) # compute ∂MSE∂z for env
 
     # Calculate CAPE
-    # compute_CAPE_old!(edmf, state, param_set, grid, terminate_on_neg_buoyancy = false)
     compute_CAPE!(edmf, state, param_set, grid; do_quadrature = true, terminate_on_neg_buoyancy = false)
 
 

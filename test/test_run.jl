@@ -454,7 +454,7 @@ for flight_number in flight_numbers
         # namelist["stats_io"]["frequency"] = 30.0
         # namelist["stats_io"]["frequency"] = namelist["time_stepping"]["dt_min"] # 1 timestep
         # namelist["stats_io"]["frequency"] = 60.
-        namelist["stats_io"]["calibrate_io"] = false
+        namelist["stats_io"]["calibrate_io"] = true
         # namelist["stats_io"]["frequency"] = 10.
 
         namelist["stats_io"]["frequency"] = 600.0
