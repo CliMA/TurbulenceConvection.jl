@@ -2347,7 +2347,7 @@ function adjust_ice_N(
     end
 
     if isinf(N_i)
-        N_i = floatmax(FT)
+        N_i = floatmax(FT) / 1e3 # floatmax can get boosted back to inf, so reduce some
     end
 
     N_i_in = N_i  # For debugging

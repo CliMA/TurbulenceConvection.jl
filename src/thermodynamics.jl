@@ -111,12 +111,12 @@ function saturation_adjustment_given_pθq_and_liquid_fraction(
         q_pt = TD.PhasePartition_equil_given_p(
             param_set,
             T,
-            oftype(T, p),
-            oftype(T, q_tot),
+            p,
+            q_tot,
             phase_type,
             λ, # use fixed liquid fraction
         )
-        return TD.liquid_ice_pottemp_given_pressure(param_set, T, oftype(T, p), q_pt)
+        return TD.liquid_ice_pottemp_given_pressure(param_set, T, p, q_pt)
     end
     q_vap_sat(T) = TD.q_vap_saturation_from_pressure(param_set, q_tot, p, T, phase_type)
     T_1 = max(T_min, air_temp(TD.PhasePartition(q_tot))) # Assume all vapor
@@ -131,7 +131,7 @@ function saturation_adjustment_given_pθq_and_liquid_fraction(
     if θ_liq_ice_lower < θ_liq_ice < θ_liq_ice_upper
         return T_freeze
     end
-    roots(T) = oftype(T, θ_liq_ice) - θ_liq_ice_closure(T)
+    roots(T) = θ_liq_ice - θ_liq_ice_closure(T)
     sol = TD.RS.find_zero(
         roots,
         TD.sa_numerical_method_pθq(sat_adjust_method, param_set, p, θ_liq_ice, q_tot, phase_type, T_guess),
