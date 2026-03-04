@@ -737,6 +737,12 @@ function SOCRATES(namelist_defaults; case_name = "SOCRATES_RFXX_XXX_data")
     namelist["microphysics"]["microph_scaling_acnv"] = 1.0
     namelist["microphysics"]["microph_scaling_accr"] = 1.0
 
+    if namelist["thermodynamics"]["moisture_model"] == "nonequilibrium"
+        namelist["relaxation_timescale_params"] = Dict{String, Any}()
+    else
+        namelist["relaxation_timescale_params"] = Dict{String, Any}() # easier to always include this since even if it's not there code looks for it if you manually change moisture_model
+    end
+
     # casename for data
     namelist["meta"]["simname"] = case_name # "SOCRATES" # switched to using case_name cause it's what NetCDFIO.jl uses to name the output file 
     namelist["meta"]["casename"] = "SOCRATES" # switch back to using just socrates as casename to handle dispatch properly # record the specific case name which would be a subtype of SOCRATES supertype (e.g. SOCRATES_RF09_obs) (needs to be case_name for Cases.jl) get_case

@@ -302,6 +302,12 @@ function microphysics!(
                         if (region isa EnvDomain) && !(edmf.convective_tke_handler isa ConvectiveTKE) # if we're doing SDs, associate q with upward motion. We dont have varw, and we're not using convective tke, but at least don't let it be negative. if the mean is -w, the positive side can be
                             w_noneq = w_noneq + moisture_model.condensate_qt_SD * abs(w_noneq) # each SD moves us up in w, so 1 SD, w = 0
                         end
+                    else
+                        qt_liq = q_here.tot
+                        qt_ice = q_here.tot
+                        qt = q_here.tot
+                        θ = TD.liquid_ice_pottemp(thermo_params, ts)
+                        ts = thermo_state_pθq(param_set, p_c[k], θ, qt)
                     end
 
                     (supersat_liq_fraction, q_liq_supersat, q_liq_subsat) = partition_condensate_into_sgs_fractions(
