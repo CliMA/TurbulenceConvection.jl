@@ -1259,13 +1259,13 @@ function compute_diffusive_fluxes(edmf::EDMFModel, state::State, surf::SurfaceBa
             Covariance/bias between updrafts/downdrafts and precip should arise from formation (supersaturation)
             Snow :: Precip should inherently be biased towards the dry downdrafts far more than condensate.
                 So ideally, supersaturated and production has an up bias, subsaturated ok we can assume a downdraft bias, esp when evap
+
+            For rain, frac_supersat isn't super meaningful since we're always near saturation. We assume in supersaturated regions that rain is highly correlated with liquid and updrafts
         =#
         @. aux_tc_f.diffusive_flux_qr +=
             ρ_f * Ifx(
                 a_en *
-                min(sqrt(aux_en.tke) * rain_advection_factor, sqrt(2 * aux_en.CAPE)) *
-                clamp(4*(aux_en.frac_supersat_liq - FT(0.50)), -one(FT), one(FT)) *
-                prog_pr.q_rai,
+                min(sqrt(aux_en.tke) * rain_advection_factor, sqrt(2 * aux_en.CAPE)) * prog_pr.q_rai,
             ) # by 0% supersat, we assume no imbalance, and arguably should even start to lean towards downdrafts. however -0.5 seemed too strong
         @. aux_tc_f.diffusive_flux_qs +=
             ρ_f * Ifx(
