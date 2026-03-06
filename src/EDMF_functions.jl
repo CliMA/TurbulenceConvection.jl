@@ -1260,7 +1260,6 @@ function compute_diffusive_fluxes(edmf::EDMFModel, state::State, surf::SurfaceBa
             Snow :: Precip should inherently be biased towards the dry downdrafts far more than condensate.
                 So ideally, supersaturated and production has an up bias, subsaturated ok we can assume a downdraft bias, esp when evap
         =#
-        @. aux_tc_f.diffusive_flux_qr = zero(FT)
         @. aux_tc_f.diffusive_flux_qr +=
             ρ_f * Ifx(
                 a_en *
