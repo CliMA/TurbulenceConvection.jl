@@ -264,99 +264,71 @@ function microphysics!(
                     dqvdt = max(dqvdt, FT(0)) # give microphysics first right of refusal on vapor usage
                     dTdt = min(dTdt, FT(0)) # give microphysics first right of refusal on cooling usage
 
-                    if (edmf.convective_tke_handler isa ConvectiveTKE) && (region isa EnvDomain)
-                        # assume the condensate is in the tke part going up KE = 1/2 ρ w^2. critical to generating condensate
-                        w_noneq = sqrt(2 * aux_en.tke[k] / ρ)
-                        # Now, we assume liq is biased with covariance, when we add this eddy mixing so we go up and down 1SD, but assume liq is tied to +1 SD
-                    else
-                        w_noneq = w[k]
-                    end
 
                     # TODO :: We can leverage sat-adjust to estimate what q_c (and maybe q_l, q_i) would be from the given q_tot, QTvar, θ_li, Hvar... (linearizing about mean like SHOC).
                     # Then based on how much qc, ql, qi we actually have we might be able to estimate condensate_qt_SD for existing condensate (and uncondensed regions)... idk.
-                    if !iszero(moisture_model.condensate_qt_SD)
-                        # TODO: Consider turning this off for when we are using cloaks.... also set an error in the quadrature branches
-                        qt_liq, _ = condensate_qt_SD(
-                            q_here.tot,
-                            aux_en.QTvar[k],
-                            q_vap_sat_liq,
-                            moisture_model.condensate_qt_SD,
-                        ) #
-                        qt_ice, _ = condensate_qt_SD(
-                            q_here.tot,
-                            aux_en.QTvar[k],
-                            q_vap_sat_ice,
-                            moisture_model.condensate_qt_SD,
-                        ) # technically this should probably have a smaller condensate_qt_SD but...
-                        liq_frac = TD.liquid_fraction(thermo_params, T, typeof(ts), q_here)
-                        qt = liq_frac * qt_liq + (1 - liq_frac) * qt_ice # weighted sum isn't perfect but will have to do for now.
-                        # error("This weighting prevents SGS liq formation...")
-                        # TODO: This is a hack to get the right answer for the test case. We should do this properly.
-                        # qt = q_here.tot + moisture_model.condensate_qt_SD * sqrt(aux_en.QTvar[k]) # fixed assumption
-                        θ = TD.liquid_ice_pottemp(thermo_params, ts)
-                        ts =
-                            (edmf.moisture_model isa NonEquilibriumMoisture) ?
-                            thermo_state_pθq(param_set, p_c[k], θ, qt, q_here.liq, q_here.ice) :
-                            thermo_state_pθq(param_set, p_c[k], θ, qt)
-
-                        if (region isa EnvDomain) && !(edmf.convective_tke_handler isa ConvectiveTKE) # if we're doing SDs, associate q with upward motion. We dont have varw, and we're not using convective tke, but at least don't let it be negative. if the mean is -w, the positive side can be
+                    if (region isa EnvDomain)# && (edmf.convective_tke_handler isa ConvectiveTKE)
+                        # assume the condensate is in the tke part going up KE = 1/2 ρ w^2. critical to generating condensate
+                        w_noneq = sqrt(2 * aux_en.tke[k] / ρ) # Now, we assume liq is biased with covariance, when we add this eddy mixing so we go up and down 1SD, but assume liq is tied to +1 SD
+                    else
+                        w_noneq = w[k]
+                        if (region isa EnvDomain) && !iszero(moisture_model.condensate_qt_SD)
                             w_noneq = w_noneq + moisture_model.condensate_qt_SD * abs(w_noneq) # each SD moves us up in w, so 1 SD, w = 0
                         end
-                    else
-                        qt_liq = q_here.tot
-                        qt_ice = q_here.tot
-                        qt = q_here.tot
-                        θ = TD.liquid_ice_pottemp(thermo_params, ts)
-                        ts = thermo_state_pθq(param_set, p_c[k], θ, qt)
                     end
 
-                    (supersat_liq_fraction, q_liq_supersat, q_liq_subsat) = partition_condensate_into_sgs_fractions(
+                    θ = TD.liquid_ice_pottemp(thermo_params, ts)
+
+                    air_supersaturated_fraction_liq = aux_en.frac_supersat_liq[k]
+                    air_supersaturated_fraction_ice = aux_en.frac_supersat[k]
+                    
+                    liq_stats = get_sgs_fractional_state_from_moments(
                         thermo_params,
                         liq_type,
                         ts,
                         aux_en.QTvar[k],
                         aux_en.Hvar[k],
                         aux_en.HQTcov[k];
-                        supersaturated_fraction_liq = aux_en.frac_supersat_liq[k],
+                        air_supersaturated_fraction = air_supersaturated_fraction_liq,
+                        max_boost_factor = param_set.user_params.max_boost_factor_liq,
+                        σ_max = moisture_model.condensate_qt_SD,
                     )
-                    (supersat_ice_fraction, q_ice_supersat, q_ice_subsat) = partition_condensate_into_sgs_fractions(
+                    
+                    ice_stats = get_sgs_fractional_state_from_moments(
                         thermo_params,
                         ice_type,
                         ts,
                         aux_en.QTvar[k],
                         aux_en.Hvar[k],
                         aux_en.HQTcov[k];
-                        supersaturated_fraction_ice = aux_en.frac_supersat[k],
+                        air_supersaturated_fraction = air_supersaturated_fraction_ice,
+                        max_boost_factor = param_set.user_params.max_boost_factor_ice,
+                        σ_max = moisture_model.condensate_qt_SD,
                     )
-                    liq_frac =
-                        supersat_liq_fraction * (q_liq_supersat > zero(FT)) +
-                        (1 - supersat_liq_fraction) * (q_liq_subsat > zero(FT))
-                    ice_frac =
-                        supersat_ice_fraction * (q_ice_supersat > zero(FT)) +
-                        (1 - supersat_ice_fraction) * (q_ice_subsat > zero(FT))
+                    
+                    liq_frac = air_supersaturated_fraction_liq * (liq_stats.q_supersat > zero(FT)) + (1 - air_supersaturated_fraction_liq) * (liq_stats.q_subsat > zero(FT))
+                    ice_frac = air_supersaturated_fraction_ice * (ice_stats.q_supersat > zero(FT)) + (1 - air_supersaturated_fraction_ice) * (ice_stats.q_subsat > zero(FT))
                     cloud_frac = max(liq_frac, ice_frac)
 
                     #=
                      :: This loop is prolly more accurate but also more expensive... is it worth it?
                      Yes -- bc we can't guaranteee access to SGS sat adjust part so separate just that section out helps
                     =#
-                    if (supersat_liq_fraction > zero(FT)) # Use the subsplit into liquid rich and liquid poor regions to aid in WBF calculations and overlap
-                        q_liq_supliq = q_liq_supersat
+                    if (air_supersaturated_fraction_liq > zero(FT)) # Use the subsplit into liquid rich and liquid poor regions to aid in WBF calculations and overlap
+                        q_liq_supliq = liq_stats.q_supersat
                         # q_ice is a weighted sum, in the supersat area we take ice supersat as much as possible until we run out of area, etc.
                         q_ice_supliq =
-                            q_ice_supersat * min(supersat_liq_fraction, supersat_ice_fraction) +
-                            q_ice_subsat *
-                            max(zero(FT), min(supersat_liq_fraction, supersat_ice_fraction) - supersat_liq_fraction)
-                        qt_supliq = qt_liq
+                            (ice_stats.q_supersat * min(air_supersaturated_fraction_liq, air_supersaturated_fraction_ice) +
+                            ice_stats.q_subsat *
+                            max(zero(FT), air_supersaturated_fraction_liq - air_supersaturated_fraction_ice)) / air_supersaturated_fraction_liq
+                        qt_supliq = liq_stats.qt_supersat
                         _ts = thermo_state_pθq(param_set, p_c[k], θ, qt_supliq, q_liq_supliq, q_ice_supliq)
-                        liq_frac_here =
-                            (q_liq_supersat > zero(FT)) ? supersat_liq_fraction / supersat_liq_fraction : zero(FT)
-                        ice_frac_here =
-                            (q_ice_supersat > zero(FT)) ? supersat_ice_fraction / supersat_liq_fraction : zero(FT)
+                        liq_frac_here = (liq_stats.q_supersat > zero(FT)) ? air_supersaturated_fraction_liq / air_supersaturated_fraction_liq : zero(FT)
+                        ice_frac_here = (ice_stats.q_supersat > zero(FT)) ? air_supersaturated_fraction_ice / air_supersaturated_fraction_ice : zero(FT)
                         cloud_frac_here = max(liq_frac_here, ice_frac_here)
 
                         mph_neq_here =
-                            supersat_liq_fraction * noneq_moisture_sources(
+                            air_supersaturated_fraction_liq * noneq_moisture_sources(
                                 param_set,
                                 nonequilibrium_moisture_scheme,
                                 moisture_sources_limiter,
@@ -377,23 +349,19 @@ function microphysics!(
                                 ice_frac_here,
                                 cloud_frac_here,
                             )
-                        if supersat_liq_fraction < one(FT)
-                            q_liq_here = q_liq_subsat
+                        if air_supersaturated_fraction_liq < one(FT)
+                            q_liq_here = liq_stats.q_subsat
                             # we take the remainder...
                             q_ice_here =
-                                max(q_here.ice - supersat_liq_fraction * q_ice_supliq, zero(FT)) /
-                                (one(FT) - supersat_liq_fraction) # we take the remainder of the ice, scaled up to account for the smaller area
-                            qt_here = (q_here.tot - (qt_supliq * supersat_liq_fraction)) / (1 - supersat_liq_fraction) # we take the remainder of the total, scaled up to account for the smaller area
+                                max(q_here.ice - air_supersaturated_fraction_liq * q_ice_supliq, zero(FT)) /
+                                (one(FT) - air_supersaturated_fraction_liq) # we take the remainder of the ice, scaled up to account for the smaller area
+                            qt_here = liq_stats.qt_subsat
                             _ts = thermo_state_pθq(param_set, p_c[k], θ, qt_here, q_liq_here, q_ice_here)
-                            liq_frac_here =
-                                (q_liq_subsat > zero(FT)) ? (1 - supersat_liq_fraction) / (1 - supersat_liq_fraction) :
-                                zero(FT)
-                            ice_frac_here =
-                                (q_ice_subsat > zero(FT)) ? (1 - supersat_ice_fraction) / (1 - supersat_liq_fraction) :
-                                zero(FT)
+                            liq_frac_here = (liq_stats.q_subsat > zero(FT)) ? (1 - air_supersaturated_fraction_liq) / (1 - air_supersaturated_fraction_liq) : zero(FT)
+                            ice_frac_here = (ice_stats.q_subsat > zero(FT)) ? (1 - air_supersaturated_fraction_ice) / (1 - air_supersaturated_fraction_ice) : zero(FT)
                             cloud_frac_here = max(liq_frac_here, ice_frac_here)
                             mph_neq_here +=
-                                (1 - supersat_liq_fraction) * noneq_moisture_sources(
+                                (1 - air_supersaturated_fraction_liq) * noneq_moisture_sources(
                                     param_set,
                                     nonequilibrium_moisture_scheme,
                                     moisture_sources_limiter,
@@ -453,7 +421,7 @@ function microphysics!(
                                 -(
                                     aux_en.q_liq[k] * (
                                         one(FT) - min(
-                                            (q_liq_supersat * supersat_liq_fraction) / aux_en.q_liq[k],
+                                            (liq_stats.q_supersat * liq_stats.air_supersaturated_fraction) / aux_en.q_liq[k],
                                             one(FT) - aux_en.frac_supersat[k],
                                         )
                                     )
@@ -1393,7 +1361,7 @@ function quad_loop(
                 saturation_excesses_liq,
                 weights .* sqpi_inv,
                 q_liq;
-                max_boost_factor = FT(2.0),
+                max_boost_factor = param_set.user_params.max_boost_factor_liq,
             )
         else
             q_liq_ens .= q_liq
@@ -1403,7 +1371,7 @@ function quad_loop(
                 saturation_excesses_ice,
                 weights .* sqpi_inv,
                 q_ice;
-                max_boost_factor = FT(1.1),
+                max_boost_factor = param_set.user_params.max_boost_factor_ice,
             )
         else
             q_ice_ens .= q_ice

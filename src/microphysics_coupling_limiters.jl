@@ -62,7 +62,8 @@ function calculate_timestep_limited_sources(
     q::TD.PhasePartition,
     q_eq::TD.PhasePartition,
     Δt::FT,
-    ts::TD.ThermodynamicState,
+    ts::TD.ThermodynamicState;
+    kwargs...,
 ) where {FT}
 
     S_ql = (q_vap - q_eq.liq) / τ_liq
@@ -108,7 +109,7 @@ function calculate_timestep_limited_sources(
     Δt::FT,
     ts::TD.ThermodynamicState,
     S_ql::FT,
-    S_qi::FT,
+    S_qi::FT; kwargs...
 ) where {FT}
 
     if iszero(q.liq) && (S_ql < 0) # don't allow evap if there's already no liquid (edge case)
@@ -146,7 +147,7 @@ function calculate_timestep_limited_sources(
     q::TD.PhasePartition,
     q_eq::TD.PhasePartition,
     Δt::FT,
-    ts::TD.ThermodynamicState,
+    ts::TD.ThermodynamicState; kwargs...
 ) where {FT}
     S_ql = (q_vap - q_eq.liq) / τ_liq # | microphys_params.τ_cond_evap | CMNe.conv_q_vap_to_q_liq_ice(microphys_params, liq_type, q_eq, TD.PhasePartition(FT(0),q_vap,FT(0)))  
     S_qi = (q_vap - q_eq.ice) / τ_ice # -(source to vapor) = source to condensate
@@ -190,7 +191,7 @@ function calculate_timestep_limited_sources(
     Δt::FT,
     ts::TD.ThermodynamicState,
     S_ql::FT,
-    S_qi::FT,
+    S_qi::FT; kwargs...
 ) where {FT}
 
     # TODO - handle limiters elswhere (note, these break our allowance for liquid to ice compensation, no?)
@@ -258,8 +259,8 @@ function calculate_timestep_limited_sources(
         q,
         q_eq,
         Δt,
-        ts;
-        opts = MM2015Opts{FT}(
+        ts,
+        MM2015Opts{FT}(
             emit_warnings = false,
             liq_fraction = liq_fraction,
             ice_fraction = ice_fraction,
@@ -340,18 +341,19 @@ function calculate_timestep_limited_sources(
         τ_liq,
         τ_ice,
         q_vap,
-        dqvdt,
-        dTdt,
         q,
         q_eq,
         Δt,
-        ts;
-        opts = MM2015EPAOpts{FT}(
+        ts,
+        MM2015EPAOpts{FT}(;
+            dqvdt = dqvdt,
+            dTdt = dTdt,
             emit_warnings = false,
             fallback_to_standard_supersaturation_limiter = moisture_sources_limiter.fallback_to_standard_supersaturation_limiter,
             liq_fraction = liq_fraction,
             ice_fraction = ice_fraction,
             cld_fraction = cld_fraction,
+            use_fix = true
         ),
     )
 
@@ -434,7 +436,7 @@ end
 
 """
 This is the most basic version of the supersaturation relaxation limiter. It just ensures that we don't consume more of our source than we have available, including not consuming more than the supersaturation we have.
-The logic is more compilcated in WBF regimes and when long enough timesteps would cause regime transitions. Consider using the Morrison-Milbrandt source calculations to elide some of these issues.å
+The logic is more compilcated in WBF regimes and when long enough timesteps would cause regime transitions. Consider using the Morrison-Milbrandt source calculations to elide some of these issues.
 """
 
 
@@ -1117,7 +1119,7 @@ function calculate_timestep_limited_sources(
     q::TD.PhasePartition,
     q_eq::TD.PhasePartition,
     Δt::FT,
-    ts::TD.ThermodynamicState,
+    ts::TD.ThermodynamicState; kwargs...
 ) where {FT}
     δ_0 = q_vap - q_eq.liq
     δ_0i = q_vap - q_eq.ice
@@ -1164,7 +1166,7 @@ function standard_supersaturation_sources(
     q_eq::TD.PhasePartition,
     Δt::FT,
     ts::TD.ThermodynamicState;
-    use_fix::Bool = true,
+    use_fix::Bool = true, kwargs...
 ) where {FT}
 
 
@@ -1204,8 +1206,8 @@ function standard_supersaturation_sources(
         q,
         q_eq,
         Δt,
-        ts;
-        use_fix = use_fix,
+        ts,
+        opts = MM2015EPAOpts{FT}(use_fix = use_fix),
     )
     dδdt_no_S = A_c_func_no_WBF_EPA(q_sl, g, w, c_p, e_sl, dqsl_dT, dqvdt, dTdt, p, ρ)  # Eq C4 no WBF
 

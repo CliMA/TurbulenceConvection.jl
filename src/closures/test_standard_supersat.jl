@@ -60,7 +60,6 @@ call_from_TC = false
 if call_from_TC
     # morrison_milbrandt_2015_style = TC.morrison_milbrandt_2015_style
     # morrison_milbrandt_2015_style_exponential_part_only = TC.morrison_milbrandt_2015_style_exponential_part_only
-    calculate_timestep_limited_sources = TC.calculate_timestep_limited_sources
 else
     # Things to load if we're calling directly form the script rather than TC methods
     # need these types defined before including
@@ -219,7 +218,7 @@ using ProgressMeter
 
     qls[i], qis[i] =
     # (q_vap_0 .* FT(NaN), q_vap_0 * FT(NaN))
-        calculate_timestep_limited_sources(
+        TC.calculate_timestep_limited_sources(
             TC.StandardSupersaturationMoistureSourcesLimiter(),
             param_set,
             area,

@@ -1,5 +1,5 @@
 """
-    condensate_qt_SD(qt::FT, qt_var::FT, q_sat::FT, qc_real::FT, σ_max::FT = FT(1)) where {FT}
+    get_condensate_qt_SD(qt::FT, qt_var::FT, q_sat::FT, qc_real::FT, σ_max::FT = FT(1)) where {FT}
 
 Estimates the condensate-weighted mean total water (`qt_cond`) and calculates 
 how many standard deviations that conditional mean is shifted from the grid mean (`condensate_qt_SD`).
@@ -7,7 +7,7 @@ how many standard deviations that conditional mean is shifted from the grid mean
 The shift is derived from the exact analytical integration of the condensate-weighted 
 1st moment of a Gaussian distribution.
 """
-function condensate_qt_SD(
+function get_condensate_qt_SD(
     qt::FT,
     qt_var::FT,
     q_sat::FT,
@@ -53,26 +53,35 @@ end
 
 function partition_condensate_into_sgs_fractions(
     q::FT,
-    supersaturated_fraction::FT;
+    air_supersaturated_fraction::FT;
     max_boost_factor::FT = FT(1.0),
+    q_max::FT = FT(Inf),
 ) where {FT}
     # partition assuming all liq into supersaturated fraction, not to exceed max_boost_factor
     if !iszero(q)
-        q_supersat = iszero(supersaturated_fraction) ? zero(FT) : min(q / supersaturated_fraction, max_boost_factor * q)
+        q_supersat = iszero(air_supersaturated_fraction) ? zero(FT) : max(q, min(q / air_supersaturated_fraction, max_boost_factor * q, q_max)) # we add a limiter so that the supersat region doesnt become subsat, but must be at least the grid mean q
         q_subsat =
-            isone(supersaturated_fraction) ? zero(FT) :
-            (q - (q_supersat * supersaturated_fraction)) / (1 - supersaturated_fraction)
+            isone(air_supersaturated_fraction) ? zero(FT) :
+            (q - (q_supersat * air_supersaturated_fraction)) / (1 - air_supersaturated_fraction)
     else
         q_supersat = zero(FT)
         q_subsat = zero(FT)
     end
 
-    return (; supersaturated_fraction, q_supersat, q_subsat)
+    condensate_supersaturated_fraction = iszero(q) ? air_supersaturated_fraction : (q_supersat * air_supersaturated_fraction / q) # this is the fraction of the condensate that is in supersaturated air
+
+    return (; condensate_supersaturated_fraction, q_supersat, q_subsat)
 end
 
 """
-    Partitions cloud liquid into supersaturated and subsaturated regions
-    This is a quick fcn for when you dont want to make up an assumed PDF esp given no saturation adjustment.
+    partition_condensate_into_sgs_fractions(thermo_params, ::LiquidType, ts, ...)
+
+Partitions in-cloud liquid water into the conditionally supersaturated fraction.
+Because cloud liquid intimately shares the total water continuous distribution `qt`, 
+its conditionally supersaturated concentration is explicitly bounded by `q_max`
+(the difference between the saturated and actual thermodynamic mixture states).
+This constraint ensures the highly concentrated supersaturated fraction does not 
+become artificially subsaturated via over-assignment.
 """
 function partition_condensate_into_sgs_fractions(
     thermo_params::TDPS,
@@ -83,33 +92,49 @@ function partition_condensate_into_sgs_fractions(
     h_var::FT,
     h_qt_cov::FT,
     ;
-    supersaturated_fraction_liq::FT = FT(NaN),
+    air_supersaturated_fraction_liq::FT = FT(NaN),
     max_boost_factor::FT = FT(2.0),
+    condensate_qt_SD::FT = FT(NaN),
+    σ_max::FT = FT(0),
 ) where {FT}
     q = TD.PhasePartition(thermo_params, ts)
-    if isnan(supersaturated_fraction_liq)
-        T = TD.air_temperature(thermo_params, ts)
-        ρ = TD.air_density(thermo_params, ts)
-        p = TD.air_pressure(thermo_params, ts)
-        q_vap = TD.vapor_specific_humidity(thermo_params, ts)
-        q_sat_l = TD.q_vap_saturation_generic(thermo_params, T, ρ, TD.Liquid())
+    T = TD.air_temperature(thermo_params, ts)
+    ρ = TD.air_density(thermo_params, ts)
+    p = TD.air_pressure(thermo_params, ts)
+    q_vap = TD.vapor_specific_humidity(thermo_params, ts)
+    q_sat_l = TD.q_vap_saturation_generic(thermo_params, T, ρ, TD.Liquid())
+    if isnan(air_supersaturated_fraction_liq)
         dq_sat_dT_l = TD.∂q_vap_sat_∂T(thermo_params, one(FT), T, q_sat_l)  # Calculate derivative
-        supersaturated_fraction_liq =
+        air_supersaturated_fraction_liq =
             sgs_saturated_fraction(thermo_params, q_vap, q_sat_l, qt_var, h_var, h_qt_cov, dq_sat_dT_l, p)
     end
-    return partition_condensate_into_sgs_fractions(q.liq, supersaturated_fraction_liq; max_boost_factor)
+    
+    # Calculate conditional mean unconditionally unless overriden by argument
+    condensate_qt_SD_local = isnan(condensate_qt_SD) ? get_condensate_qt_SD(q.tot, qt_var, q_sat_l, σ_max)[2] : condensate_qt_SD
+    qt_supsat = q.tot + condensate_qt_SD_local * sqrt(qt_var)
+    q_max = max(zero(FT), qt_supsat - q.ice - q_sat_l)
+
+    return partition_condensate_into_sgs_fractions(q.liq, air_supersaturated_fraction_liq; max_boost_factor, q_max)
 end
 partition_condensate_into_sgs_fractions(
     ::CMT.LiquidType,
     ql::FT,
-    supersaturated_fraction_liq::FT;
+    air_supersaturated_fraction_liq::FT;
     max_boost_factor::FT = FT(2.0),
-) where {FT} = partition_condensate_into_sgs_fractions(ql, supersaturated_fraction_liq; max_boost_factor)
+    q_max::FT = FT(Inf),
+) where {FT} = partition_condensate_into_sgs_fractions(ql, air_supersaturated_fraction_liq; max_boost_factor, q_max)
 
 
 
 """
-Like for liquid but τ_i is much slower than τ_l so our max boost factor default is 1.1 (could be calibrated)
+    partition_condensate_into_sgs_fractions(thermo_params, ::IceType, ts, ...)
+
+Partitions in-cloud ice into the conditionally supersaturated fraction.
+Because cloud ice intimately shares the total water continuous distribution `qt`, 
+its conditionally supersaturated concentration is bounded by `q_max`.
+However, because the ice relaxation timescale `τ_i` is considerably slower than `τ_l`, 
+the supersaturated variance limits are relaxed, meaning the `max_boost_factor` default 
+is kept small (1.1 instead of 2.0). 
 """
 function partition_condensate_into_sgs_fractions(
     thermo_params::TDPS,
@@ -120,28 +145,245 @@ function partition_condensate_into_sgs_fractions(
     h_var::FT,
     h_qt_cov::FT,
     ;
-    supersaturated_fraction_ice::FT = FT(NaN),
+    air_supersaturated_fraction_ice::FT = FT(NaN),
     max_boost_factor::FT = FT(1.1),
+    condensate_qt_SD::FT = FT(NaN),
+    σ_max::FT = FT(0),
 ) where {FT}
     q = TD.PhasePartition(thermo_params, ts)
-    if isnan(supersaturated_fraction_ice)
-        T = TD.air_temperature(thermo_params, ts)
-        ρ = TD.air_density(thermo_params, ts)
-        p = TD.air_pressure(thermo_params, ts)
-        q_vap = TD.vapor_specific_humidity(thermo_params, ts)
-        q_sat = TD.q_vap_saturation_generic(thermo_params, T, ρ, TD.Ice())
-        dq_sat_dT = TD.∂q_vap_sat_∂T(thermo_params, zero(FT), T, q_sat)  # Calculate derivative
-        supersaturated_fraction_ice =
-            sgs_saturated_fraction(thermo_params, q_vap, q_sat, qt_var, h_var, h_qt_cov, dq_sat_dT, p) # pass q_vap here to get supersat fraction (pass q_tot to get cloud fraction (under saturation adjustment to form ql))
+    T = TD.air_temperature(thermo_params, ts)
+    ρ = TD.air_density(thermo_params, ts)
+    p = TD.air_pressure(thermo_params, ts)
+    q_vap = TD.vapor_specific_humidity(thermo_params, ts)
+    q_sat_i = TD.q_vap_saturation_generic(thermo_params, T, ρ, TD.Ice())
+    if isnan(air_supersaturated_fraction_ice)
+        dq_sat_dT_i = TD.∂q_vap_sat_∂T(thermo_params, zero(FT), T, q_sat_i)  # Calculate derivative
+        air_supersaturated_fraction_ice =
+            sgs_saturated_fraction(thermo_params, q_vap, q_sat_i, qt_var, h_var, h_qt_cov, dq_sat_dT_i, p) # pass q_vap here to get supersat fraction (pass q_tot to get cloud fraction (under saturation adjustment to form ql))
     end
-    return partition_condensate_into_sgs_fractions(q.ice, supersaturated_fraction_ice; max_boost_factor)
+    
+    condensate_qt_SD_local = isnan(condensate_qt_SD) ? get_condensate_qt_SD(q.tot, qt_var, q_sat_i, σ_max)[2] : condensate_qt_SD
+    qt_supsat = q.tot + condensate_qt_SD_local * sqrt(qt_var)
+    q_max = max(zero(FT), qt_supsat - q.liq - q_sat_i)
+    
+    return partition_condensate_into_sgs_fractions(q.ice, air_supersaturated_fraction_ice; max_boost_factor, q_max)
 end
 partition_condensate_into_sgs_fractions(
     ::CMT.IceType,
     qi::FT,
-    supersaturated_fraction_ice::FT;
+    air_supersaturated_fraction_ice::FT;
     max_boost_factor::FT = FT(1.1),
-) where {FT} = partition_condensate_into_sgs_fractions(qi, supersaturated_fraction_ice; max_boost_factor)
+    q_max::FT = FT(Inf),
+) where {FT} = partition_condensate_into_sgs_fractions(qi, air_supersaturated_fraction_ice; max_boost_factor, q_max)
+
+
+"""
+    partition_condensate_into_sgs_fractions(thermo_params, ::RainType, ts, qr, ...)
+    
+Partitions rain (`qr`) into the unconditionally supersaturated environment.
+Rain is mathematically modelled as an independent "precipitating" tracer that has fallen 
+out of the continuous distribution `qt` equilibrium framework. Therefore, its partitioned 
+concentration inside the supersaturated fraction is NOT bounded by `q_max`. 
+This physically prevents rain from being forced into the subsaturated fraction and incorrectly evaporated.
+"""
+function partition_condensate_into_sgs_fractions(
+    thermo_params::TDPS,
+    ::CMT.RainType,
+    ts::TD.ThermodynamicState{FT},
+    qr::FT,
+    # θ_liq_ice::FT,
+    qt_var::FT,
+    h_var::FT,
+    h_qt_cov::FT,
+    ;
+    air_supersaturated_fraction_liq::FT = FT(NaN),
+    max_boost_factor::FT = FT(1),
+    condensate_qt_SD::FT = FT(NaN),
+    σ_max::FT = FT(0),
+) where {FT}
+    q = TD.PhasePartition(thermo_params, ts)
+    T = TD.air_temperature(thermo_params, ts)
+    ρ = TD.air_density(thermo_params, ts)
+    p = TD.air_pressure(thermo_params, ts)
+    q_vap = TD.vapor_specific_humidity(thermo_params, ts)
+    q_sat_l = TD.q_vap_saturation_generic(thermo_params, T, ρ, TD.Liquid())
+    if isnan(air_supersaturated_fraction_liq)
+        dq_sat_dT_l = TD.∂q_vap_sat_∂T(thermo_params, one(FT), T, q_sat_l)  # Calculate derivative
+        air_supersaturated_fraction_liq =
+            sgs_saturated_fraction(thermo_params, q_vap, q_sat_l, qt_var, h_var, h_qt_cov, dq_sat_dT_l, p)
+    end
+    return partition_condensate_into_sgs_fractions(qr, air_supersaturated_fraction_liq; max_boost_factor)
+end
+partition_condensate_into_sgs_fractions(
+    ::CMT.RainType,
+    qr::FT,
+    air_supersaturated_fraction_liq::FT;
+    max_boost_factor::FT = FT(1),
+    q_max::FT = FT(Inf),
+) where {FT} = partition_condensate_into_sgs_fractions(qr, air_supersaturated_fraction_liq; max_boost_factor, q_max)
+
+"""
+    partition_condensate_into_sgs_fractions(thermo_params, ::SnowType, ts, qs, ...)
+    
+Partitions snow (`qs`) into the unconditionally supersaturated (ice-based) environment.
+Snow is mathematically modelled as an independent "precipitating" tracer that has fallen out of `qt`. 
+Consequently, its partitioned concentration in the supersaturated fraction is NOT 
+subject to the environmental `q_max` constraint.
+"""
+function partition_condensate_into_sgs_fractions(
+    thermo_params::TDPS,
+    ::CMT.SnowType,
+    ts::TD.ThermodynamicState{FT},
+    qs::FT,
+    # θ_liq_ice::FT,
+    qt_var::FT,
+    h_var::FT,
+    h_qt_cov::FT,
+    ;
+    air_supersaturated_fraction_ice::FT = FT(NaN),
+    max_boost_factor::FT = FT(1),
+    condensate_qt_SD::FT = FT(NaN),
+    σ_max::FT = FT(0),
+) where {FT}
+    q = TD.PhasePartition(thermo_params, ts)
+    T = TD.air_temperature(thermo_params, ts)
+    ρ = TD.air_density(thermo_params, ts)
+    p = TD.air_pressure(thermo_params, ts)
+    q_vap = TD.vapor_specific_humidity(thermo_params, ts)
+    q_sat_i = TD.q_vap_saturation_generic(thermo_params, T, ρ, TD.Ice())
+    if isnan(air_supersaturated_fraction_ice)
+        dq_sat_dT_i = TD.∂q_vap_sat_∂T(thermo_params, zero(FT), T, q_sat_i)  # Calculate derivative
+        air_supersaturated_fraction_ice =
+            sgs_saturated_fraction(thermo_params, q_vap, q_sat_i, qt_var, h_var, h_qt_cov, dq_sat_dT_i, p) # pass q_vap here to get supersat fraction (pass q_tot to get cloud fraction (under saturation adjustment to form ql))
+    end
+    return partition_condensate_into_sgs_fractions(qs, air_supersaturated_fraction_ice; max_boost_factor)
+end
+partition_condensate_into_sgs_fractions(
+    ::CMT.SnowType,
+    qs::FT,
+    air_supersaturated_fraction_ice::FT;
+    max_boost_factor::FT = FT(1),
+    q_max::FT = FT(Inf),
+) where {FT} = partition_condensate_into_sgs_fractions(qs, air_supersaturated_fraction_ice; max_boost_factor, q_max)
+
+
+"""
+    get_sgs_fractional_state_from_moments(thermo_params, type, ts, qt_var, h_var, h_qt_cov; kwargs...)
+
+Consolidates the dynamic dispatch of `partition_condensate_into_sgs_fractions` 
+by parsing standard total mixture variables directly from the `ThermodynamicState` `ts`. 
+
+- Automatically determines the `air_supersaturated_fraction` corresponding to the condensate type.
+- Computes the pure statistical shift of total water `get_condensate_qt_SD`.
+- Returns a NamedTuple with fractional adjustments, `q_supersat`, `q_subsat`, and 
+`condensate_supersaturated_fraction`.
+"""
+function get_sgs_fractional_state_from_moments(
+    thermo_params::TDPS,
+    type::Union{CMT.LiquidType, CMT.IceType},
+    ts::TD.ThermodynamicState{FT},
+    qt_var::FT,
+    h_var::FT,
+    h_qt_cov::FT,
+    ;
+    air_supersaturated_fraction::FT = FT(NaN),
+    max_boost_factor::FT = FT(NaN),
+    condensate_qt_SD::FT = FT(NaN),
+    σ_max::FT = FT(0.0),
+) where {FT}
+    
+    q = TD.PhasePartition(thermo_params, ts)
+    T = TD.air_temperature(thermo_params, ts)
+    ρ = TD.air_density(thermo_params, ts)
+    p = TD.air_pressure(thermo_params, ts)
+    q_vap = TD.vapor_specific_humidity(thermo_params, ts)
+    
+    phase = (type isa CMT.LiquidType || type isa CMT.RainType) ? TD.Liquid() : TD.Ice()
+    q_sat = TD.q_vap_saturation_generic(thermo_params, T, ρ, phase)
+    
+    if isnan(air_supersaturated_fraction)
+        phase_ind = (phase isa TD.Liquid) ? one(FT) : zero(FT)
+        dq_sat_dT = TD.∂q_vap_sat_∂T(thermo_params, phase_ind, T, q_sat)
+        air_supersaturated_fraction = sgs_saturated_fraction(thermo_params, q_vap, q_sat, qt_var, h_var, h_qt_cov, dq_sat_dT, p)
+    end
+    
+    qt_supsat, condensate_qt_SD_calced = get_condensate_qt_SD(q.tot, qt_var, q_sat, σ_max) 
+    qt_subsat = isone(air_supersaturated_fraction) ? q.tot : ((q.tot - qt_supsat * air_supersaturated_fraction) / (one(FT) - air_supersaturated_fraction))
+    
+    kwargs = (;)
+    if !isnan(max_boost_factor)
+        kwargs = (; max_boost_factor)
+    end
+
+    if type isa CMT.LiquidType
+        out = partition_condensate_into_sgs_fractions(thermo_params, type, ts, qt_var, h_var, h_qt_cov; air_supersaturated_fraction_liq = air_supersaturated_fraction, condensate_qt_SD = isnan(condensate_qt_SD) ? condensate_qt_SD_calced : condensate_qt_SD, σ_max = σ_max, kwargs...)
+    else
+        out = partition_condensate_into_sgs_fractions(thermo_params, type, ts, qt_var, h_var, h_qt_cov; air_supersaturated_fraction_ice = air_supersaturated_fraction, condensate_qt_SD = isnan(condensate_qt_SD) ? condensate_qt_SD_calced : condensate_qt_SD, σ_max = σ_max, kwargs...)
+    end
+    
+    return (; 
+        air_supersaturated_fraction = air_supersaturated_fraction,
+        qt_supersat = qt_supsat, 
+        qt_subsat = qt_subsat, 
+        q_supersat = out.q_supersat, 
+        q_subsat = out.q_subsat,
+        condensate_supersaturated_fraction = out.condensate_supersaturated_fraction
+    )
+end
+
+function get_sgs_fractional_state_from_moments(
+    thermo_params::TDPS,
+    type::Union{CMT.RainType, CMT.SnowType},
+    ts::TD.ThermodynamicState{FT},
+    precip_cond::FT,
+    qt_var::FT,
+    h_var::FT,
+    h_qt_cov::FT,
+    ;
+    air_supersaturated_fraction::FT = FT(NaN),
+    max_boost_factor::FT = FT(NaN),
+    condensate_qt_SD::FT = FT(NaN),
+    σ_max::FT = FT(0.0),
+) where {FT}
+    
+    q = TD.PhasePartition(thermo_params, ts)
+    T = TD.air_temperature(thermo_params, ts)
+    ρ = TD.air_density(thermo_params, ts)
+    p = TD.air_pressure(thermo_params, ts)
+    q_vap = TD.vapor_specific_humidity(thermo_params, ts)
+    
+    phase = (type isa CMT.LiquidType || type isa CMT.RainType) ? TD.Liquid() : TD.Ice()
+    q_sat = TD.q_vap_saturation_generic(thermo_params, T, ρ, phase)
+    
+    if isnan(air_supersaturated_fraction)
+        phase_ind = (phase isa TD.Liquid) ? one(FT) : zero(FT)
+        dq_sat_dT = TD.∂q_vap_sat_∂T(thermo_params, phase_ind, T, q_sat)
+        air_supersaturated_fraction = sgs_saturated_fraction(thermo_params, q_vap, q_sat, qt_var, h_var, h_qt_cov, dq_sat_dT, p)
+    end
+    
+    qt_supsat, condensate_qt_SD_calced = get_condensate_qt_SD(q.tot, qt_var, q_sat, σ_max) 
+    qt_subsat = isone(air_supersaturated_fraction) ? q.tot : ((q.tot - qt_supsat * air_supersaturated_fraction) / (one(FT) - air_supersaturated_fraction))
+    
+    kwargs = (;)
+    if !isnan(max_boost_factor)
+        kwargs = (; max_boost_factor)
+    end
+
+    if type isa CMT.RainType
+        out = partition_condensate_into_sgs_fractions(thermo_params, type, ts, precip_cond, qt_var, h_var, h_qt_cov; air_supersaturated_fraction_liq = air_supersaturated_fraction, condensate_qt_SD = isnan(condensate_qt_SD) ? condensate_qt_SD_calced : condensate_qt_SD, σ_max = σ_max, kwargs...)
+    else
+        out = partition_condensate_into_sgs_fractions(thermo_params, type, ts, precip_cond, qt_var, h_var, h_qt_cov; air_supersaturated_fraction_ice = air_supersaturated_fraction, condensate_qt_SD = isnan(condensate_qt_SD) ? condensate_qt_SD_calced : condensate_qt_SD, σ_max = σ_max, kwargs...)
+    end
+    
+    return (; 
+        air_supersaturated_fraction = air_supersaturated_fraction,
+        qt_supersat = qt_supsat, 
+        qt_subsat = qt_subsat, 
+        q_supersat = out.q_supersat, 
+        q_subsat = out.q_subsat,
+        condensate_supersaturated_fraction = out.condensate_supersaturated_fraction
+    )
+end
 
 # ======================================================================================================================================================== #
 # ======================================================================================================================================================== #

@@ -448,8 +448,8 @@ if is_HPC # (if we can)
                 q,
                 q_eq,
                 Δt,
-                ts;
-                opts = MM2015EPAOpts{FT}(
+                ts,
+                MM2015EPAOpts{FT}(
                     use_fix = false,
                     return_mixing_ratio = false,
                     dqvdt = dqvdt,
@@ -487,8 +487,8 @@ if is_HPC # (if we can)
                 q,
                 q_eq,
                 Δt,
-                ts;
-                opts = MM2015EPAOpts{FT}(
+                ts,
+                MM2015EPAOpts{FT}(
                     use_fix = false,
                     return_mixing_ratio = true,
                     depth = 0,
@@ -514,13 +514,11 @@ if is_HPC # (if we can)
                 τ_ice,
                 δ_0,
                 δ_0i,
-                dqvdt,
-                dTdt,
                 q,
                 q_eq,
                 Δt,
-                ts;
-                opts = MM2015EPAOpts{FT}(use_fix = false),
+                ts,
+                MM2015EPAOpts{FT}(use_fix = false, dqvdt = dqvdt, dTdt = dTdt),
             )
 
             # Helper variables for EPA calls

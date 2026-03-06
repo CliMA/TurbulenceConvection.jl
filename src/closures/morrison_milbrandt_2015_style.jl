@@ -77,8 +77,8 @@ function get_params_and_go_to_mixing_ratio(
     q::TD.PhasePartition,
     q_eq::TD.PhasePartition,
     Δt::FT,
-    ts::TD.ThermodynamicState;
-    use_fix::Bool = false, # i think something is wrong with the forumula for large timesteps... is less essential now w/ the limiter but still needed... (unless I just don't understand the physics of it),
+    ts::TD.ThermodynamicState,
+    use_fix::Bool = false,
 ) where {FT}
 
     g = TCP.grav(param_set) # acceleration of gravity
@@ -2547,24 +2547,17 @@ function morrison_milbrandt_2015_style(
     q::TD.PhasePartition,
     q_eq::TD.PhasePartition,
     Δt::FT,
-    ts::TD.ThermodynamicState;
+    ts::TD.ThermodynamicState,
     opts::MM2015Opts{FT} = MM2015Opts{FT}(),
 )::Tuple{FT, FT} where {FT}
     (;
         use_fix,
         return_mixing_ratio,
-        max_depth,
-        depth,
         δ_0_shum,
         δ_0i_shum,
         fallback_to_standard_supersaturation_limiter,
         emit_warnings,
-        time_tolerance,
-        liq_fraction,
-        ice_fraction,
-        cld_fraction,
     ) = opts
-    CF_mp = min(liq_fraction, ice_fraction)
 
     if area > 0
 
@@ -2597,8 +2590,8 @@ function morrison_milbrandt_2015_style(
             q,
             q_eq,
             Δt,
-            ts;
-            opts = MM2015Opts{FT}(
+            ts,
+            MM2015Opts{FT}(
                 use_fix = use_fix,
                 return_mixing_ratio = false,
                 δ_0_shum = δ_0,
@@ -2769,7 +2762,7 @@ function morrison_milbrandt_2015_style(
     q::TD.PhasePartition,
     q_eq::TD.PhasePartition,
     Δt::FT,
-    ts::TD.ThermodynamicState;
+    ts::TD.ThermodynamicState,
     opts::MM2015Opts{FT} = MM2015Opts{FT}(),
 )::Tuple{FT, FT} where {FT}
     (;
@@ -2782,11 +2775,7 @@ function morrison_milbrandt_2015_style(
         dqvdt,
         dTdt,
         fallback_to_standard_supersaturation_limiter,
-        liq_fraction,
-        ice_fraction,
-        cld_fraction,
     ) = opts
-    CF_mp = min(liq_fraction, ice_fraction)
 
     if depth == max_depth
         # @debug "Max depth reached, returning exponential part only fallback (no thermo adjustments)"
@@ -2805,8 +2794,8 @@ function morrison_milbrandt_2015_style(
             q,
             q_eq,
             Δt,
-            ts;
-            opts = MM2015Opts{FT}(
+            ts,
+            MM2015Opts{FT}(
                 use_fix = use_fix,
                 return_mixing_ratio = false,
                 dqvdt = dqvdt,
@@ -3097,8 +3086,8 @@ function morrison_milbrandt_2015_style(
                 new_q,
                 new_q_eq,
                 Δt_left,
-                new_ts;
-                opts = MM2015Opts{FT}(
+                new_ts,
+                MM2015Opts{FT}(
                     use_fix = use_fix,
                     return_mixing_ratio = true,
                     depth = depth + 1,
@@ -3156,8 +3145,8 @@ function morrison_milbrandt_2015_style(
                 new_q,
                 new_q_eq,
                 Δt_left,
-                new_ts;
-                opts = MM2015Opts{FT}(
+                new_ts,
+                MM2015Opts{FT}(
                     use_fix = use_fix,
                     return_mixing_ratio = true,
                     depth = depth + 1,
@@ -3221,8 +3210,8 @@ function morrison_milbrandt_2015_style(
                 new_q,
                 new_q_eq,
                 Δt_left,
-                new_ts;
-                opts = MM2015Opts{FT}(
+                new_ts,
+                MM2015Opts{FT}(
                     use_fix = use_fix,
                     return_mixing_ratio = true,
                     depth = depth + 1,
@@ -3277,7 +3266,7 @@ function morrison_milbrandt_2015_style(
     q::TD.PhasePartition,
     q_eq::TD.PhasePartition,
     Δt::FT,
-    ts::TD.ThermodynamicState;
+    ts::TD.ThermodynamicState,
     opts::MM2015Opts{FT} = MM2015Opts{FT}(),
 )::Tuple{FT, FT} where {FT}
     (;
@@ -3290,11 +3279,7 @@ function morrison_milbrandt_2015_style(
         dqvdt,
         dTdt,
         fallback_to_standard_supersaturation_limiter,
-        liq_fraction,
-        ice_fraction,
-        cld_fraction,
     ) = opts
-    CF_mp = min(liq_fraction, ice_fraction)
 
     # @debug "Calling Supersaturated{$(q.liq > FT(0)), $(q.ice > FT(0)), false}"
 
@@ -3316,8 +3301,8 @@ function morrison_milbrandt_2015_style(
             q,
             q_eq,
             Δt,
-            ts;
-            opts = MM2015Opts{FT}(
+            ts,
+            MM2015Opts{FT}(
                 use_fix = use_fix,
                 return_mixing_ratio = false,
                 dqvdt = dqvdt,
@@ -3512,8 +3497,8 @@ function morrison_milbrandt_2015_style(
                 new_q,
                 new_q_eq,
                 Δt_left,
-                new_ts;
-                opts = MM2015Opts{FT}(
+                new_ts,
+                MM2015Opts{FT}(
                     use_fix = use_fix,
                     return_mixing_ratio = true,
                     depth = depth + 1,
@@ -3576,8 +3561,8 @@ function morrison_milbrandt_2015_style(
                 new_q,
                 new_q_eq,
                 Δt_left,
-                new_ts;
-                opts = MM2015Opts{FT}(
+                new_ts,
+                MM2015Opts{FT}(
                     use_fix = use_fix,
                     return_mixing_ratio = true,
                     depth = depth + 1,
@@ -3625,7 +3610,7 @@ function morrison_milbrandt_2015_style(
     q::TD.PhasePartition,
     q_eq::TD.PhasePartition,
     Δt::FT,
-    ts::TD.ThermodynamicState;
+    ts::TD.ThermodynamicState,
     opts::MM2015Opts{FT} = MM2015Opts{FT}(),
 )::Tuple{FT, FT} where {FT}
     (;
@@ -3640,7 +3625,6 @@ function morrison_milbrandt_2015_style(
         fallback_to_standard_supersaturation_limiter,
         liq_fraction,
         ice_fraction,
-        cld_fraction,
     ) = opts
     CF_mp = min(liq_fraction, ice_fraction)
 
@@ -3664,8 +3648,8 @@ function morrison_milbrandt_2015_style(
             q,
             q_eq,
             Δt,
-            ts;
-            opts = MM2015Opts{FT}(
+            ts,
+            MM2015Opts{FT}(
                 use_fix = use_fix,
                 return_mixing_ratio = false,
                 dqvdt = dqvdt,
@@ -4072,8 +4056,8 @@ function morrison_milbrandt_2015_style(
                 new_q,
                 new_q_eq,
                 Δt_left,
-                new_ts;
-                opts = MM2015Opts{FT}(
+                new_ts,
+                MM2015Opts{FT}(
                     use_fix = use_fix,
                     return_mixing_ratio = true,
                     depth = depth + 1,
@@ -4134,8 +4118,8 @@ function morrison_milbrandt_2015_style(
                 new_q,
                 new_q_eq,
                 Δt_left,
-                new_ts;
-                opts = MM2015Opts{FT}(
+                new_ts,
+                MM2015Opts{FT}(
                     use_fix = use_fix,
                     return_mixing_ratio = true,
                     depth = depth + 1,
@@ -4219,8 +4203,8 @@ function morrison_milbrandt_2015_style(
                 new_q,
                 new_q_eq,
                 Δt_left,
-                new_ts;
-                opts = MM2015Opts{FT}(
+                new_ts,
+                MM2015Opts{FT}(
                     use_fix = use_fix,
                     return_mixing_ratio = true,
                     depth = depth + 1,
@@ -4275,7 +4259,7 @@ function morrison_milbrandt_2015_style(
     q::TD.PhasePartition,
     q_eq::TD.PhasePartition,
     Δt::FT,
-    ts::TD.ThermodynamicState;
+    ts::TD.ThermodynamicState,
     opts::MM2015Opts{FT} = MM2015Opts{FT}(),
 )::Tuple{FT, FT} where {FT}
     (;
@@ -4288,11 +4272,7 @@ function morrison_milbrandt_2015_style(
         dqvdt,
         dTdt,
         fallback_to_standard_supersaturation_limiter,
-        liq_fraction,
-        ice_fraction,
-        cld_fraction,
     ) = opts
-    CF_mp = min(liq_fraction, ice_fraction)
 
     # @debug "Calling WBF{true, false, false}"
     # although we'd be moving towards liquid sat, with outside forcing could still be either, so still need to choose perspectives
@@ -4313,8 +4293,8 @@ function morrison_milbrandt_2015_style(
             q,
             q_eq,
             Δt,
-            ts;
-            opts = MM2015Opts{FT}(
+            ts,
+            MM2015Opts{FT}(
                 use_fix = use_fix,
                 return_mixing_ratio = false,
                 dqvdt = dqvdt,
@@ -4641,8 +4621,8 @@ function morrison_milbrandt_2015_style(
                 new_q,
                 new_q_eq,
                 Δt_left,
-                new_ts;
-                opts = MM2015Opts{FT}(
+                new_ts,
+                MM2015Opts{FT}(
                     use_fix = use_fix,
                     return_mixing_ratio = true,
                     depth = depth + 1,
@@ -4684,8 +4664,8 @@ function morrison_milbrandt_2015_style(
                     q,
                     q_eq,
                     Δt,
-                    ts;
-                    opts = MM2015Opts{FT}(
+                    ts,
+                    MM2015Opts{FT}(
                         use_fix = use_fix,
                         return_mixing_ratio = return_mixing_ratio,
                         max_depth = max_depth,
@@ -4756,8 +4736,8 @@ function morrison_milbrandt_2015_style(
                 new_q,
                 new_q_eq,
                 Δt_left,
-                new_ts;
-                opts = MM2015Opts{FT}(
+                new_ts,
+                MM2015Opts{FT}(
                     use_fix = use_fix,
                     return_mixing_ratio = true,
                     depth = depth + 1,
@@ -4800,8 +4780,8 @@ function morrison_milbrandt_2015_style(
                 q,
                 q_eq,
                 Δt,
-                ts;
-                opts = MM2015Opts{FT}(
+                ts,
+                MM2015Opts{FT}(
                     use_fix = use_fix,
                     return_mixing_ratio = return_mixing_ratio,
                     max_depth = max_depth,
@@ -4843,7 +4823,7 @@ function morrison_milbrandt_2015_style(
     q::TD.PhasePartition,
     q_eq::TD.PhasePartition,
     Δt::FT,
-    ts::TD.ThermodynamicState;
+    ts::TD.ThermodynamicState,
     opts::MM2015Opts{FT} = MM2015Opts{FT}(),
 )::Tuple{FT, FT} where {FT}
     (;
@@ -4856,11 +4836,7 @@ function morrison_milbrandt_2015_style(
         dqvdt,
         dTdt,
         fallback_to_standard_supersaturation_limiter,
-        liq_fraction,
-        ice_fraction,
-        cld_fraction,
     ) = opts
-    CF_mp = min(liq_fraction, ice_fraction)
 
     # @debug "Calling WBF{true, true, false}"
 
@@ -4881,8 +4857,8 @@ function morrison_milbrandt_2015_style(
             q,
             q_eq,
             Δt,
-            ts;
-            opts = MM2015Opts{FT}(
+            ts,
+            MM2015Opts{FT}(
                 use_fix = use_fix,
                 return_mixing_ratio = false,
                 dqvdt = dqvdt,
@@ -5283,8 +5259,8 @@ function morrison_milbrandt_2015_style(
                     q,
                     q_eq,
                     Δt,
-                    ts;
-                    opts = MM2015Opts{FT}(
+                    ts,
+                    MM2015Opts{FT}(
                         use_fix = use_fix,
                         return_mixing_ratio = return_mixing_ratio,
                         max_depth = max_depth,
@@ -5332,8 +5308,8 @@ function morrison_milbrandt_2015_style(
                 new_q,
                 new_q_eq,
                 Δt_left,
-                new_ts;
-                opts = MM2015Opts{FT}(
+                new_ts,
+                MM2015Opts{FT}(
                     use_fix = use_fix,
                     return_mixing_ratio = true,
                     depth = depth + 1,
@@ -5394,8 +5370,8 @@ function morrison_milbrandt_2015_style(
                 new_q,
                 new_q_eq,
                 Δt_left,
-                new_ts;
-                opts = MM2015Opts{FT}(
+                new_ts,
+                MM2015Opts{FT}(
                     use_fix = use_fix,
                     return_mixing_ratio = true,
                     depth = depth + 1,
@@ -5442,8 +5418,8 @@ function morrison_milbrandt_2015_style(
                     q,
                     q_eq,
                     Δt,
-                    ts;
-                    opts = MM2015Opts{FT}(
+                    ts,
+                    MM2015Opts{FT}(
                         use_fix = use_fix,
                         return_mixing_ratio = return_mixing_ratio,
                         max_depth = max_depth,
@@ -5514,8 +5490,8 @@ function morrison_milbrandt_2015_style(
                 new_q,
                 new_q_eq,
                 Δt_left,
-                new_ts;
-                opts = MM2015Opts{FT}(
+                new_ts,
+                MM2015Opts{FT}(
                     use_fix = use_fix,
                     return_mixing_ratio = true,
                     depth = depth + 1,
@@ -5562,8 +5538,8 @@ function morrison_milbrandt_2015_style(
                 q,
                 q_eq,
                 Δt,
-                ts;
-                opts = MM2015Opts{FT}(
+                ts,
+                MM2015Opts{FT}(
                     use_fix = use_fix,
                     return_mixing_ratio = return_mixing_ratio,
                     max_depth = max_depth,
@@ -5600,7 +5576,7 @@ function morrison_milbrandt_2015_style(
     q::TD.PhasePartition,
     q_eq::TD.PhasePartition,
     Δt::FT,
-    ts::TD.ThermodynamicState;
+    ts::TD.ThermodynamicState,
     opts::MM2015Opts{FT} = MM2015Opts{FT}(),
 )::Tuple{FT, FT} where {FT}
     (;
@@ -5613,11 +5589,7 @@ function morrison_milbrandt_2015_style(
         dqvdt,
         dTdt,
         fallback_to_standard_supersaturation_limiter,
-        liq_fraction,
-        ice_fraction,
-        cld_fraction,
     ) = opts
-    CF_mp = min(liq_fraction, ice_fraction)
 
     # @debug "Calling WBF{false, $(q.ice > FT(0)), true}"
 
@@ -5638,8 +5610,8 @@ function morrison_milbrandt_2015_style(
             q,
             q_eq,
             Δt,
-            ts;
-            opts = MM2015Opts{FT}(
+            ts,
+            MM2015Opts{FT}(
                 use_fix = use_fix,
                 return_mixing_ratio = false,
                 dqvdt = dqvdt,
@@ -5951,8 +5923,8 @@ function morrison_milbrandt_2015_style(
                 new_q,
                 new_q_eq,
                 Δt_left,
-                new_ts;
-                opts = MM2015Opts{FT}(
+                new_ts,
+                MM2015Opts{FT}(
                     use_fix = use_fix,
                     return_mixing_ratio = true,
                     depth = depth + 1,
@@ -6033,8 +6005,8 @@ function morrison_milbrandt_2015_style(
                 new_q,
                 new_q_eq,
                 Δt_left,
-                new_ts;
-                opts = MM2015Opts{FT}(
+                new_ts,
+                MM2015Opts{FT}(
                     use_fix = use_fix,
                     return_mixing_ratio = true,
                     depth = depth + 1,
@@ -6087,7 +6059,7 @@ function morrison_milbrandt_2015_style(
     q::TD.PhasePartition,
     q_eq::TD.PhasePartition,
     Δt::FT,
-    ts::TD.ThermodynamicState;
+    ts::TD.ThermodynamicState,
     opts::MM2015Opts{FT} = MM2015Opts{FT}(),
 )::Tuple{FT, FT} where {FT}
     (;
@@ -6100,11 +6072,7 @@ function morrison_milbrandt_2015_style(
         dqvdt,
         dTdt,
         fallback_to_standard_supersaturation_limiter,
-        liq_fraction,
-        ice_fraction,
-        cld_fraction,
     ) = opts
-    CF_mp = min(liq_fraction, ice_fraction)
 
     if depth == max_depth
         # @debug "Max depth reached, returning exponential part only fallback (no thermo adjustments)"
@@ -6123,8 +6091,8 @@ function morrison_milbrandt_2015_style(
             q,
             q_eq,
             Δt,
-            ts;
-            opts = MM2015Opts{FT}(
+            ts,
+            MM2015Opts{FT}(
                 use_fix = use_fix,
                 return_mixing_ratio = false,
                 dqvdt = dqvdt,
@@ -6320,8 +6288,8 @@ function morrison_milbrandt_2015_style(
             new_q,
             new_q_eq,
             Δt_left,
-            new_ts;
-            opts = MM2015Opts{FT}(
+            new_ts,
+            MM2015Opts{FT}(
                 use_fix = use_fix,
                 return_mixing_ratio = true,
                 depth = depth + 1,
@@ -6373,7 +6341,7 @@ function morrison_milbrandt_2015_style(
     q::TD.PhasePartition,
     q_eq::TD.PhasePartition,
     Δt::FT,
-    ts::TD.ThermodynamicState;
+    ts::TD.ThermodynamicState,
     opts::MM2015Opts{FT} = MM2015Opts{FT}(),
 )::Tuple{FT, FT} where {FT}
     (;
@@ -6388,7 +6356,6 @@ function morrison_milbrandt_2015_style(
         fallback_to_standard_supersaturation_limiter,
         liq_fraction,
         ice_fraction,
-        cld_fraction,
     ) = opts
     CF_mp = min(liq_fraction, ice_fraction)
 
@@ -6410,8 +6377,8 @@ function morrison_milbrandt_2015_style(
             q,
             q_eq,
             Δt,
-            ts;
-            opts = MM2015Opts{FT}(
+            ts,
+            MM2015Opts{FT}(
                 use_fix = use_fix,
                 return_mixing_ratio = false,
                 dqvdt = dqvdt,
@@ -6771,8 +6738,8 @@ function morrison_milbrandt_2015_style(
                     q,
                     q_eq,
                     Δt,
-                    ts;
-                    opts = MM2015Opts{FT}(
+                    ts,
+                    MM2015Opts{FT}(
                         use_fix = use_fix,
                         return_mixing_ratio = return_mixing_ratio,
                         max_depth = max_depth,
@@ -6818,8 +6785,8 @@ function morrison_milbrandt_2015_style(
                 new_q,
                 new_q_eq,
                 Δt_left,
-                new_ts;
-                opts = MM2015Opts{FT}(
+                new_ts,
+                MM2015Opts{FT}(
                     use_fix = use_fix,
                     return_mixing_ratio = true,
                     depth = depth + 1,
@@ -6879,8 +6846,8 @@ function morrison_milbrandt_2015_style(
                 new_q,
                 new_q_eq,
                 Δt_left,
-                new_ts;
-                opts = MM2015Opts{FT}(
+                new_ts,
+                MM2015Opts{FT}(
                     use_fix = use_fix,
                     return_mixing_ratio = true,
                     depth = depth + 1,
@@ -6922,8 +6889,8 @@ function morrison_milbrandt_2015_style(
                     q,
                     q_eq,
                     Δt,
-                    ts;
-                    opts = MM2015Opts{FT}(
+                    ts,
+                    MM2015Opts{FT}(
                         use_fix = use_fix,
                         return_mixing_ratio = return_mixing_ratio,
                         max_depth = max_depth,
@@ -6980,8 +6947,8 @@ function morrison_milbrandt_2015_style(
                 new_q,
                 new_q_eq,
                 Δt_left,
-                new_ts;
-                opts = MM2015Opts{FT}(
+                new_ts,
+                MM2015Opts{FT}(
                     use_fix = use_fix,
                     return_mixing_ratio = true,
                     depth = depth + 1,
@@ -7025,8 +6992,8 @@ function morrison_milbrandt_2015_style(
                 q,
                 q_eq,
                 Δt,
-                ts;
-                opts = MM2015Opts{FT}(
+                ts,
+                MM2015Opts{FT}(
                     use_fix = use_fix,
                     return_mixing_ratio = return_mixing_ratio,
                     max_depth = max_depth,
@@ -7067,7 +7034,7 @@ function morrison_milbrandt_2015_style(
     q::TD.PhasePartition,
     q_eq::TD.PhasePartition,
     Δt::FT,
-    ts::TD.ThermodynamicState;
+    ts::TD.ThermodynamicState,
     opts::MM2015Opts{FT} = MM2015Opts{FT}(),
 )::Tuple{FT, FT} where {FT}
     (;
@@ -7100,8 +7067,8 @@ function morrison_milbrandt_2015_style(
             q,
             q_eq,
             Δt,
-            ts;
-            opts = MM2015Opts{FT}(
+            ts,
+            MM2015Opts{FT}(
                 use_fix = use_fix,
                 return_mixing_ratio = false,
                 dqvdt = dqvdt,
@@ -7296,8 +7263,8 @@ function morrison_milbrandt_2015_style(
                 new_q,
                 new_q_eq,
                 Δt - min_t,
-                new_ts;
-                opts = MM2015Opts{FT}(
+                new_ts,
+                MM2015Opts{FT}(
                     use_fix = use_fix,
                     return_mixing_ratio = true,
                     depth = depth + 1,
@@ -7362,8 +7329,8 @@ function morrison_milbrandt_2015_style(
                 new_q,
                 new_q_eq,
                 Δt_left,
-                new_ts;
-                opts = MM2015Opts{FT}(
+                new_ts,
+                MM2015Opts{FT}(
                     use_fix = use_fix,
                     return_mixing_ratio = true,
                     depth = depth + 1,
@@ -7417,7 +7384,7 @@ function morrison_milbrandt_2015_style(
     q::TD.PhasePartition,
     q_eq::TD.PhasePartition,
     Δt::FT,
-    ts::TD.ThermodynamicState;
+    ts::TD.ThermodynamicState,
     opts::MM2015Opts{FT} = MM2015Opts{FT}(),
 )::Tuple{FT, FT} where {FT}
     (;
@@ -7449,8 +7416,8 @@ function morrison_milbrandt_2015_style(
             q,
             q_eq,
             Δt,
-            ts;
-            opts = MM2015Opts{FT}(
+            ts,
+            MM2015Opts{FT}(
                 use_fix = use_fix,
                 return_mixing_ratio = false,
                 dqvdt = dqvdt,
@@ -7652,8 +7619,8 @@ function morrison_milbrandt_2015_style(
                 new_q,
                 new_q_eq,
                 Δt_left,
-                new_ts;
-                opts = MM2015Opts{FT}(
+                new_ts,
+                MM2015Opts{FT}(
                     use_fix = use_fix,
                     return_mixing_ratio = true,
                     depth = depth + 1,
@@ -7692,7 +7659,7 @@ function morrison_milbrandt_2015_style(
                     q,
                     q_eq,
                     Δt,
-                    ts;
+                    ts,
                     use_fix = use_fix,
                     return_mixing_ratio = return_mixing_ratio,
                     max_depth = max_depth,
@@ -7745,8 +7712,8 @@ function morrison_milbrandt_2015_style(
                 new_q,
                 new_q_eq,
                 Δt_left,
-                new_ts;
-                opts = MM2015Opts{FT}(
+                new_ts,
+                MM2015Opts{FT}(
                     use_fix = use_fix,
                     return_mixing_ratio = true,
                     depth = depth + 1,
@@ -7786,8 +7753,8 @@ function morrison_milbrandt_2015_style(
                 q,
                 q_eq,
                 Δt,
-                ts;
-                opts = MM2015Opts{FT}(
+                ts,
+                MM2015Opts{FT}(
                     use_fix = use_fix,
                     return_mixing_ratio = return_mixing_ratio,
                     max_depth = max_depth,
@@ -7825,7 +7792,7 @@ function morrison_milbrandt_2015_style(
     q::TD.PhasePartition,
     q_eq::TD.PhasePartition,
     Δt::FT,
-    ts::TD.ThermodynamicState;
+    ts::TD.ThermodynamicState,
     opts::MM2015Opts{FT} = MM2015Opts{FT}(),
 )::Tuple{FT, FT} where {FT}
     (;
@@ -7853,13 +7820,12 @@ function morrison_milbrandt_2015_style(
             w,
             τ_liq,
             τ_ice,
-            δ_0_shum,
-            δ_0i_shum,
+            q_vap,
             q,
             q_eq,
             Δt,
-            ts;
-            opts = MM2015Opts{FT}(
+            ts,
+            MM2015EPAOpts{FT}(
                 use_fix = use_fix,
                 return_mixing_ratio = false,
                 dqvdt = dqvdt,
@@ -8013,8 +7979,8 @@ function morrison_milbrandt_2015_style(
             new_q,
             new_q_eq,
             Δt_left,
-            new_ts;
-            opts = MM2015Opts{FT}(
+            new_ts,
+            MM2015Opts{FT}(
                 use_fix = use_fix,
                 return_mixing_ratio = true,
                 depth = depth + 1,

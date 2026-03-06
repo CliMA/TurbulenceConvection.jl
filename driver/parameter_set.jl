@@ -294,6 +294,12 @@ function create_parameter_set(
 
     namelist_user_params["apply_nudging_to_updraft"] = TC.parse_namelist(namelist, "user_params", "apply_nudging_to_updraft"; default = true) # this is set no matter what [[ consider removing ]]
 
+    namelist_user_params["max_boost_factor_liq"] =  TC.parse_namelist(namelist, "user_params", "max_boost_factor_liq"; default = FT(2)) # this is set no matter what
+    namelist_user_params["max_boost_factor_ice"] =  TC.parse_namelist(namelist, "user_params", "max_boost_factor_ice"; default = FT(1.1)) # this is set no matter what
+
+    (namelist_user_params["max_boost_factor_liq"] ≥ one(FT)) || error("max_boost_factor_liq must be greater than or equal to 1")
+    (namelist_user_params["max_boost_factor_ice"] ≥ one(FT)) || error("max_boost_factor_ice must be greater than or equal to 1")
+
     # Set default CCN value (should be set in default namelist for SOCRATES)
 
     if namelist["meta"]["casename"] == "SOCRATES"

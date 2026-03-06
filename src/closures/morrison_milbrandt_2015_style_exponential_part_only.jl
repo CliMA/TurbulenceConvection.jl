@@ -50,10 +50,10 @@ function do_standard_fallback(
     q::TD.PhasePartition,
     q_eq::TD.PhasePartition,
     Δt::FT,
-    ts::TD.ThermodynamicState;
+    ts::TD.ThermodynamicState,
     opts::MM2015EPAOpts{FT} = MM2015EPAOpts{FT}(),
 )::Tuple{FT, FT} where {FT}
-    (; return_mixing_ratio, depth, dqvdt, dTdt, fallback_to_standard_supersaturation_limiter, time_tolerance) = opts
+    (; return_mixing_ratio, depth) = opts
 
     # @debug "do_standard_fallback: milestone_t = $milestone_t; milestone = $milestone; time_tolerance = $time_tolerance; S_ql = $S_ql; S_qi = $S_qi; q_liq = $q_liq; q_ice = $q_ice; δ_eq = $δ_eq; δi_eq = $δi_eq; dδdt_no_S = $dδdt_no_S; Γ_l = $Γ_l; Γ_i = $Γ_i; regime = $regime; area = $area; ρ = $ρ; p = $p; T = $T; w = $w; τ_liq = $τ_liq; τ_ice = $τ_ice; δ_0 = $δ_0; δ_0i = $δ_0i; q_eq = $q_eq; Δt = $Δt"
 
@@ -200,8 +200,8 @@ function do_standard_fallback(
             new_q,
             q_eq,
             Δt_left,
-            ts;
-            opts = update(opts; return_mixing_ratio = true, depth = depth + 1),
+            ts,
+            update(opts; return_mixing_ratio = true, depth = depth + 1),
         )::Tuple{FT, FT}
         S_ql, S_qi = resolve_S_S_addit(S_ql, S_qi, dt, S_ql_addit, S_qi_addit, Δt_left, Δt)
 
@@ -240,6 +240,10 @@ function adapt_τ_and_area_to_SGS(τ_liq::FT, f_liq_sat::FT, q_liq_sat::FT, q_li
 end
 
 
+get_params_and_go_to_mixing_ratio_exponential_part_only(param_set::APS, area::FT, ρ::FT, p::FT, T::FT, w::FT, τ_liq::FT, τ_ice::FT, δ_0::FT, δ_0i::FT, q::TD.PhasePartition, q_eq::TD.PhasePartition, Δt::FT, ts::TD.ThermodynamicState,
+    opts::MM2015EPAOpts{FT} = MM2015EPAOpts{FT}(),
+) where {FT} = get_params_and_go_to_mixing_ratio_exponential_part_only(param_set, area, ρ, p, T, w, τ_liq, τ_ice, δ_0, δ_0i, opts.dqvdt, opts.dTdt, q, q_eq, Δt, ts, opts.use_fix)
+
 
 function get_params_and_go_to_mixing_ratio_exponential_part_only(
     param_set::APS,
@@ -257,11 +261,9 @@ function get_params_and_go_to_mixing_ratio_exponential_part_only(
     q::TD.PhasePartition,
     q_eq::TD.PhasePartition,
     Δt::FT,
-    ts::TD.ThermodynamicState;
-    opts::MM2015EPAOpts{FT} = MM2015EPAOpts{FT}(),
+    ts::TD.ThermodynamicState,
+    use_fix::Bool = false,
 ) where {FT}
-    (; use_fix) = opts
-
     thermo_params = TCP.thermodynamics_params(param_set) # currently repeated in both places, pare down later
     g = TCP.grav(param_set) # acceleration of gravity
     L_i = TD.latent_heat_sublim(thermo_params, ts) # Latent heat for ice (L_i)
@@ -951,15 +953,13 @@ function morrison_milbrandt_2015_style_exponential_part_only(
     τ_liq::FT,
     τ_ice::FT,
     q_vap::FT,
-    dqvdt::FT,
-    dTdt::FT,
     q::TD.PhasePartition,
     q_eq::TD.PhasePartition,
     Δt::FT,
-    ts::TD.ThermodynamicState;
+    ts::TD.ThermodynamicState,
     opts::MM2015EPAOpts{FT} = MM2015EPAOpts{FT}(),
 ) where {FT}
-    (; return_mixing_ratio, fallback_to_standard_supersaturation_limiter, emit_warnings, time_tolerance) = opts
+    (; return_mixing_ratio, fallback_to_standard_supersaturation_limiter, emit_warnings, time_tolerance, dqvdt, dTdt, use_fix, depth, max_depth) = opts
 
     # TODO: Track supersaturation directly... should fix floating point problems...
 
@@ -1017,8 +1017,8 @@ function morrison_milbrandt_2015_style_exponential_part_only(
                 q,
                 q_eq,
                 Δt,
-                ts;
-                opts = opts,
+                ts,
+                use_fix,
             )
             dδdt_no_S = A_c_func_no_WBF_EPA(q_sl, g, w, c_p, e_sl, dqsl_dT, dqvdt, dTdt, p, ρ)  # Eq C4 no WBF
             dδdt_0 = get_dδdt_0(δ_0, δ_0i, q.liq, q.ice, τ_liq, τ_ice, dδdt_no_S, below_freezing)
@@ -1041,8 +1041,8 @@ function morrison_milbrandt_2015_style_exponential_part_only(
             q,
             q_eq,
             Δt,
-            ts;
-            opts = update(opts; return_mixing_ratio = true),
+            ts,
+            update(opts; return_mixing_ratio = true),
         )::Tuple{FT, FT} # right now we aren't using mixing ratio, so setting return_mixing_ratio to true means that no conversions happen at all. if you ever bring it back, you'd want to combine false on the output here, with true on all nested calls for summations, but we'd need to ensure everything passed to the next layer is not in mixing ratio which we haven't done
     else
         return FT(0), FT(0)
@@ -1105,7 +1105,7 @@ function morrison_milbrandt_2015_style_exponential_part_only(
     q::TD.PhasePartition,
     q_eq::TD.PhasePartition,
     Δt::FT,
-    ts::TD.ThermodynamicState;
+    ts::TD.ThermodynamicState,
     opts::MM2015EPAOpts{FT} = MM2015EPAOpts{FT}(),
 )::Tuple{FT, FT} where {FT}
     (;
@@ -1113,17 +1113,16 @@ function morrison_milbrandt_2015_style_exponential_part_only(
         depth,
         dqvdt,
         dTdt,
-        fallback_to_standard_supersaturation_limiter,
-        time_tolerance,
         liq_fraction,
         ice_fraction,
-        cld_fraction,
+        time_tolerance,
+        max_depth,
     ) = opts
     CF_mp = min(liq_fraction, ice_fraction)
 
-    if depth ≥ 10
+    if depth ≥ max_depth
         @error "Failed on inputs area = $area; ρ = $ρ; p = $p; T = $T; w = $w; τ_liq = $τ_liq; τ_ice = $τ_ice; δ_0 = $δ_0; δ_0i = $δ_0i; q = $q; q_eq = $q_eq; Δt = $Δt; ts = $ts; dTdt = $dTdt; dqvdt = $dqvdt;"
-        error("Failed to converge after 10 iterations")
+        error("Failed to converge after $max_depth iterations")
     end
 
 
@@ -1132,7 +1131,7 @@ function morrison_milbrandt_2015_style_exponential_part_only(
 
 
     # --- Thermo  constants ------------------------------------------------------------------------------------ #
-    (; g, L_i, L_l, c_p, e_sl, e_si, dqsl_dT, dqsi_dT, q_sl, q_si, q_liq, q_ice, T_freeze, δ_0, δ_0i, Γ_l, Γ_i) =
+    (; g, L_i, c_p, e_sl, dqsl_dT, q_sl, q_si, q_liq, q_ice, T_freeze, δ_0, δ_0i, Γ_l, Γ_i) =
         get_params_and_go_to_mixing_ratio_exponential_part_only(
             param_set,
             area,
@@ -1144,13 +1143,11 @@ function morrison_milbrandt_2015_style_exponential_part_only(
             τ_ice,
             δ_0,
             δ_0i,
-            dqvdt,
-            dTdt,
             q,
             q_eq,
             Δt,
-            ts;
-            opts = opts,
+            ts,
+            opts,
         )
 
 
@@ -1211,8 +1208,8 @@ function morrison_milbrandt_2015_style_exponential_part_only(
             q,
             q_eq,
             Δt,
-            ts;
-            opts = update(opts; return_mixing_ratio = true),
+            ts,
+            update(opts; return_mixing_ratio = true),
         )
     end
     # =========================== #
@@ -1259,8 +1256,8 @@ function morrison_milbrandt_2015_style_exponential_part_only(
             new_q,
             q_eq,
             Δt_left,
-            ts;
-            opts = update(opts; return_mixing_ratio = true, depth = depth + 1),
+            ts,
+            update(opts; return_mixing_ratio = true, depth = depth + 1),
         )
         S_ql, S_qi = resolve_S_S_addit(S_ql, S_qi, min_t, S_ql_addit, S_qi_addit, Δt_left, Δt)
         # @debug "q_ice = $q_ice; S_qi = $S_qi; Δt = $Δt; (q_ice +  S_qi * Δt) = $(q_ice + S_qi * Δt);"
@@ -1307,7 +1304,7 @@ function morrison_milbrandt_2015_style_exponential_part_only(
     q::TD.PhasePartition,
     q_eq::TD.PhasePartition,
     Δt::FT,
-    ts::TD.ThermodynamicState;
+    ts::TD.ThermodynamicState,
     opts::MM2015EPAOpts{FT} = MM2015EPAOpts{FT}(),
 )::Tuple{FT, FT} where {FT}
     (;
@@ -1315,23 +1312,19 @@ function morrison_milbrandt_2015_style_exponential_part_only(
         depth,
         dqvdt,
         dTdt,
-        fallback_to_standard_supersaturation_limiter,
         time_tolerance,
-        liq_fraction,
-        ice_fraction,
-        cld_fraction,
+        max_depth,
     ) = opts
-    CF_mp = min(liq_fraction, ice_fraction)
 
-    if depth ≥ 10
+    if depth ≥ max_depth
         @error "Failed on inputs area = $area; ρ = $ρ; p = $p; T = $T; w = $w; τ_liq = $τ_liq; τ_ice = $τ_ice; δ_0 = $δ_0; δ_0i = $δ_0i; q = $q; q_eq = $q_eq; Δt = $Δt; ts = $ts; dTdt = $dTdt; dqvdt = $dqvdt;"
-        error("Failed to converge after 10 iterations")
+        error("Failed to converge after $max_depth iterations")
     end
 
     # @debug "Calling Supersaturated{$(q.liq > FT(0)), $(q.ice > FT(0)), false}..."
 
 
-    (; g, L_i, L_l, c_p, e_sl, e_si, dqsl_dT, dqsi_dT, q_sl, q_si, q_liq, q_ice, T_freeze, δ_0, δ_0i, Γ_l, Γ_i) =
+    (; g, c_p, e_sl, dqsl_dT, q_sl, q_si, q_liq, q_ice, T_freeze, δ_0, δ_0i, Γ_l, Γ_i) =
         get_params_and_go_to_mixing_ratio_exponential_part_only(
             param_set,
             area,
@@ -1343,13 +1336,11 @@ function morrison_milbrandt_2015_style_exponential_part_only(
             τ_ice,
             δ_0,
             δ_0i,
-            dqvdt,
-            dTdt,
             q,
             q_eq,
             Δt,
-            ts;
-            opts = opts,
+            ts,
+            opts,
         )
 
     A_c = A_c_func_no_WBF_EPA(q_sl, g, w, c_p, e_sl, dqsl_dT, dqvdt, dTdt, p, ρ)
@@ -1404,8 +1395,8 @@ function morrison_milbrandt_2015_style_exponential_part_only(
             q,
             q_eq,
             Δt,
-            ts;
-            opts = update(opts; return_mixing_ratio = true),
+            ts,
+            update(opts; return_mixing_ratio = true),
         )
     end
     # =========================== #
@@ -1445,8 +1436,8 @@ function morrison_milbrandt_2015_style_exponential_part_only(
             new_q,
             q_eq,
             Δt_left,
-            ts;
-            opts = update(opts; return_mixing_ratio = true, depth = depth + 1),
+            ts,
+            update(opts; return_mixing_ratio = true, depth = depth + 1),
         )
 
         S_ql, S_qi = resolve_S_S_addit(S_ql, S_qi, min_t, S_ql_addit, S_qi_addit, Δt_left, Δt)
@@ -1488,7 +1479,7 @@ function morrison_milbrandt_2015_style_exponential_part_only(
     q::TD.PhasePartition,
     q_eq::TD.PhasePartition,
     Δt::FT,
-    ts::TD.ThermodynamicState;
+    ts::TD.ThermodynamicState,
     opts::MM2015EPAOpts{FT} = MM2015EPAOpts{FT}(),
 )::Tuple{FT, FT} where {FT}
     (;
@@ -1500,20 +1491,20 @@ function morrison_milbrandt_2015_style_exponential_part_only(
         time_tolerance,
         liq_fraction,
         ice_fraction,
-        cld_fraction,
+        max_depth,
     ) = opts
     CF_mp = min(liq_fraction, ice_fraction)
 
-    if depth ≥ 10
+    if depth ≥ max_depth
         @error "Failed on inputs area = $area; ρ = $ρ; p = $p; T = $T; w = $w; τ_liq = $τ_liq; τ_ice = $τ_ice; δ_0 = $δ_0; δ_0i = $δ_0i; q = $q; q_eq = $q_eq; Δt = $Δt; ts = $ts; dTdt = $dTdt; dqvdt = $dqvdt;"
-        error("Failed to converge after 10 iterations")
+        error("Failed to converge after $max_depth iterations")
     end
 
 
     # @debug "Calling WBF{true, $(q.ice > FT(0)), true}..."
 
 
-    (; g, L_i, L_l, c_p, e_sl, e_si, dqsl_dT, dqsi_dT, q_sl, q_si, q_liq, q_ice, T_freeze, δ_0, δ_0i, Γ_l, Γ_i) =
+    (; g, L_i, c_p, e_sl, dqsl_dT, q_sl, q_si, q_liq, q_ice, T_freeze, δ_0, δ_0i, Γ_l, Γ_i) =
         get_params_and_go_to_mixing_ratio_exponential_part_only(
             param_set,
             area,
@@ -1525,13 +1516,11 @@ function morrison_milbrandt_2015_style_exponential_part_only(
             τ_ice,
             δ_0,
             δ_0i,
-            dqvdt,
-            dTdt,
             q,
             q_eq,
             Δt,
-            ts;
-            opts = opts,
+            ts,
+            opts,
         )
 
     # One is growing, one is shrinking...
@@ -1591,8 +1580,8 @@ function morrison_milbrandt_2015_style_exponential_part_only(
             q,
             q_eq,
             Δt,
-            ts;
-            opts = update(opts; return_mixing_ratio = true),
+            ts,
+            update(opts; return_mixing_ratio = true),
         )
     end
     # =========================== #
@@ -1698,8 +1687,8 @@ function morrison_milbrandt_2015_style_exponential_part_only(
                 new_q,
                 q_eq,
                 Δt_left,
-                ts;
-                opts = update(opts; return_mixing_ratio = true, depth = depth + 1),
+                ts,
+                update(opts; return_mixing_ratio = true, depth = depth + 1),
             )
 
 
@@ -1743,8 +1732,8 @@ function morrison_milbrandt_2015_style_exponential_part_only(
                 new_q,
                 q_eq,
                 Δt_left,
-                ts;
-                opts = update(opts; return_mixing_ratio = true, depth = depth + 1),
+                ts,
+                update(opts; return_mixing_ratio = true, depth = depth + 1),
             )
             # @debug "S_ql_addit = $S_ql_addit; S_qi_addit = $S_qi_addit; Δt_left = $Δt_left; Δt = $Δt; min_t = $min_t; dqvdt = $dqvdt; dTdt = $dTdt; dqsl_dT = $dqsl_dT; dqsi_dT = $dqsi_dT;"
             S_ql, S_qi = resolve_S_S_addit(S_ql, S_qi, min_t, S_ql_addit, S_qi_addit, Δt_left, Δt) # rescale to the timestep
@@ -1779,8 +1768,8 @@ function morrison_milbrandt_2015_style_exponential_part_only(
                 new_q,
                 q_eq,
                 Δt_left,
-                ts;
-                opts = update(opts; return_mixing_ratio = true, depth = depth + 1),
+                ts,
+                update(opts; return_mixing_ratio = true, depth = depth + 1),
             )
             S_ql, S_qi = resolve_S_S_addit(S_ql, S_qi, min_t, S_ql_addit, S_qi_addit, Δt_left, Δt) # rescale to the timestep
             return return_mixing_ratio ? (S_ql, S_qi) :
@@ -1823,7 +1812,7 @@ function morrison_milbrandt_2015_style_exponential_part_only(
     q::TD.PhasePartition,
     q_eq::TD.PhasePartition,
     Δt::FT,
-    ts::TD.ThermodynamicState;
+    ts::TD.ThermodynamicState,
     opts::MM2015EPAOpts{FT} = MM2015EPAOpts{FT}(),
 )::Tuple{FT, FT} where {FT}
     (;
@@ -1831,22 +1820,21 @@ function morrison_milbrandt_2015_style_exponential_part_only(
         depth,
         dqvdt,
         dTdt,
-        fallback_to_standard_supersaturation_limiter,
         time_tolerance,
         liq_fraction,
         ice_fraction,
-        cld_fraction,
+        max_depth,
     ) = opts
     CF_mp = min(liq_fraction, ice_fraction)
 
-    if depth ≥ 10
+    if depth ≥ max_depth
         @error "Failed on inputs area = $area; ρ = $ρ; p = $p; T = $T; w = $w; τ_liq = $τ_liq; τ_ice = $τ_ice; δ_0 = $δ_0; δ_0i = $δ_0i; q = $q; q_eq = $q_eq; Δt = $Δt; ts = $ts; dTdt = $dTdt; dqvdt = $dqvdt;"
-        error("Failed to converge after 10 iterations")
+        error("Failed to converge after $max_depth iterations")
     end
 
     # @debug "Calling WBF{false, $(q.ice > FT(0)), true}..."
 
-    (; g, L_i, L_l, c_p, e_sl, e_si, dqsl_dT, dqsi_dT, q_sl, q_si, q_liq, q_ice, T_freeze, δ_0, δ_0i, Γ_l, Γ_i) =
+    (; g, L_i, c_p, e_sl, dqsl_dT, q_sl, q_si, q_liq, q_ice, T_freeze, δ_0, δ_0i, Γ_l, Γ_i) =
         get_params_and_go_to_mixing_ratio_exponential_part_only(
             param_set,
             area,
@@ -1858,13 +1846,11 @@ function morrison_milbrandt_2015_style_exponential_part_only(
             τ_ice,
             δ_0,
             δ_0i,
-            dqvdt,
-            dTdt,
             q,
             q_eq,
             Δt,
-            ts;
-            opts = opts,
+            ts,
+            opts,
         )
 
 
@@ -1923,8 +1909,8 @@ function morrison_milbrandt_2015_style_exponential_part_only(
             q,
             q_eq,
             Δt,
-            ts;
-            opts = update(opts; return_mixing_ratio = true),
+            ts,
+            update(opts; return_mixing_ratio = true),
         )
     end
     # =========================== #
@@ -1969,8 +1955,8 @@ function morrison_milbrandt_2015_style_exponential_part_only(
                     new_q,
                     q_eq,
                     Δt_left,
-                    ts;
-                    opts = update(opts; return_mixing_ratio = true, depth = depth + 1),
+                    ts,
+                    update(opts; return_mixing_ratio = true, depth = depth + 1),
                 ) # should have no liq still, no ice above freezing
                 # @debug "S_ql = $S_ql; S_qi = $S_qi; S_ql_addit = $S_ql_addit; S_qi_addit = $S_qi_addit; Δt_left = $Δt_left; min_t = $min_t; q_ice = $q_ice; new_q = $new_q"
                 S_ql, S_qi = resolve_S_S_addit(S_ql, S_qi, min_t, S_ql_addit, S_qi_addit, Δt_left, Δt)
@@ -2004,8 +1990,8 @@ function morrison_milbrandt_2015_style_exponential_part_only(
                     new_q,
                     q_eq,
                     Δt_left,
-                    ts;
-                    opts = update(opts; return_mixing_ratio = true, depth = depth + 1),
+                    ts,
+                    update(opts; return_mixing_ratio = true, depth = depth + 1),
                 ) # should have no liq still
                 S_ql, S_qi = resolve_S_S_addit(S_ql, S_qi, min_t, S_ql_addit, S_qi_addit, Δt_left, Δt)
                 return return_mixing_ratio ? (S_ql, S_qi) :
@@ -2052,7 +2038,7 @@ function morrison_milbrandt_2015_style_exponential_part_only(
     q::TD.PhasePartition,
     q_eq::TD.PhasePartition,
     Δt::FT,
-    ts::TD.ThermodynamicState;
+    ts::TD.ThermodynamicState,
     opts::MM2015EPAOpts{FT} = MM2015EPAOpts{FT}(), # if time is shorter than the tolerance, we do a StandardSupersaturation step first, since we can't guarantee success w/ the lambert W methods...
 )::Tuple{FT, FT} where {FT}
     (;
@@ -2064,17 +2050,17 @@ function morrison_milbrandt_2015_style_exponential_part_only(
         time_tolerance,
         liq_fraction,
         ice_fraction,
-        cld_fraction,
+        max_depth,
     ) = opts
     CF_mp = min(liq_fraction, ice_fraction)
 
-    if depth ≥ 10
+    if depth ≥ max_depth
         @error "Failed on inputs area = $area; ρ = $ρ; p = $p; T = $T; w = $w; τ_liq = $τ_liq; τ_ice = $τ_ice; δ_0 = $δ_0; δ_0i = $δ_0i; q = $q; q_eq = $q_eq; Δt = $Δt; ts = $ts; dTdt = $dTdt; dqvdt = $dqvdt;"
-        error("Failed to converge after 10 iterations")
+        error("Failed to converge after $max_depth iterations")
     end
     # @debug "Calling WBF{false, $(q.ice > FT(0)), false}..."
 
-    (; g, L_i, L_l, c_p, e_sl, e_si, dqsl_dT, dqsi_dT, q_sl, q_si, q_liq, q_ice, T_freeze, δ_0, δ_0i, Γ_l, Γ_i) =
+    (; g, L_i, c_p, e_sl, dqsl_dT, q_sl, q_si, q_liq, q_ice, T_freeze, δ_0, δ_0i, Γ_l, Γ_i) =
         get_params_and_go_to_mixing_ratio_exponential_part_only(
             param_set,
             area,
@@ -2086,13 +2072,11 @@ function morrison_milbrandt_2015_style_exponential_part_only(
             τ_ice,
             δ_0,
             δ_0i,
-            dqvdt,
-            dTdt,
             q,
             q_eq,
             Δt,
-            ts;
-            opts = opts,
+            ts,
+            opts,
         )
 
     # A_c = A_c_func_EPA(τ_ice, Γ_l, q_sl, q_si, g, w, c_p, e_sl, L_i, dqsl_dT, dqvdt, dTdt, p, ρ) # Eq C4
@@ -2151,8 +2135,8 @@ function morrison_milbrandt_2015_style_exponential_part_only(
             q,
             q_eq,
             Δt,
-            ts;
-            opts = update(opts; return_mixing_ratio = true),
+            ts,
+            update(opts; return_mixing_ratio = true),
         )
     end
     # =========================== #
@@ -2261,8 +2245,8 @@ function morrison_milbrandt_2015_style_exponential_part_only(
                 new_q,
                 q_eq,
                 Δt_left,
-                ts;
-                opts = update(opts; return_mixing_ratio = true, depth = depth + 1),
+                ts,
+                update(opts; return_mixing_ratio = true, depth = depth + 1),
             )
             S_ql, S_qi = resolve_S_S_addit(S_ql, S_qi, min_t, S_ql_addit, S_qi_addit, Δt_left, Δt)
             return return_mixing_ratio ? (S_ql, S_qi) :
@@ -2302,8 +2286,8 @@ function morrison_milbrandt_2015_style_exponential_part_only(
                     new_q,
                     q_eq,
                     Δt_left,
-                    ts;
-                    opts = update(opts; return_mixing_ratio = true, depth = depth + 1),
+                    ts,
+                    update(opts; return_mixing_ratio = true, depth = depth + 1),
                 )
                 S_ql, S_qi = resolve_S_S_addit(S_ql, S_qi, min_t, S_ql_addit, S_qi_addit, Δt_left, Δt)
                 return return_mixing_ratio ? (S_ql, S_qi) :
@@ -2338,8 +2322,8 @@ function morrison_milbrandt_2015_style_exponential_part_only(
                 new_q,
                 q_eq,
                 Δt_left,
-                ts;
-                opts = update(opts; return_mixing_ratio = true, depth = depth + 1),
+                ts,
+                update(opts; return_mixing_ratio = true, depth = depth + 1),
             )
             S_ql, S_qi = resolve_S_S_addit(S_ql, S_qi, min_t, S_ql_addit, S_qi_addit, Δt_left, Δt)
             return return_mixing_ratio ? (S_ql, S_qi) :
@@ -2384,7 +2368,7 @@ function morrison_milbrandt_2015_style_exponential_part_only(
     q::TD.PhasePartition,
     q_eq::TD.PhasePartition,
     Δt::FT,
-    ts::TD.ThermodynamicState;
+    ts::TD.ThermodynamicState,
     opts::MM2015EPAOpts{FT} = MM2015EPAOpts{FT}(), # if time is shorter than the tolerance, we do a StandardSupersaturation step first, since we can't guarantee success w/ the lambert W methods...
 )::Tuple{FT, FT} where {FT}
     (;
@@ -2392,21 +2376,20 @@ function morrison_milbrandt_2015_style_exponential_part_only(
         depth,
         dqvdt,
         dTdt,
-        fallback_to_standard_supersaturation_limiter,
         time_tolerance,
         liq_fraction,
         ice_fraction,
-        cld_fraction,
+        max_depth,
     ) = opts
     CF_mp = min(liq_fraction, ice_fraction)
 
-    if depth ≥ 10
+    if depth ≥ max_depth
         @error "Failed on inputs area = $area; ρ = $ρ; p = $p; T = $T; w = $w; τ_liq = $τ_liq; τ_ice = $τ_ice; δ_0 = $δ_0; δ_0i = $δ_0i; q = $q; q_eq = $q_eq; Δt = $Δt; ts = $ts; dTdt = $dTdt; dqvdt = $dqvdt;"
-        error("Failed to converge after 10 iterations")
+        error("Failed to converge after $max_depth iterations")
     end
     # @debug "Calling WBF{false, $(q.ice > FT(0)), false}..."
 
-    (; g, L_i, L_l, c_p, e_sl, e_si, dqsl_dT, dqsi_dT, q_sl, q_si, q_liq, q_ice, T_freeze, δ_0, δ_0i, Γ_l, Γ_i) =
+    (; g, c_p, e_sl, dqsl_dT, q_sl, q_si, q_liq, q_ice, T_freeze, δ_0, δ_0i, Γ_l, Γ_i) =
         get_params_and_go_to_mixing_ratio_exponential_part_only(
             param_set,
             area,
@@ -2418,13 +2401,11 @@ function morrison_milbrandt_2015_style_exponential_part_only(
             τ_ice,
             δ_0,
             δ_0i,
-            dqvdt,
-            dTdt,
             q,
             q_eq,
             Δt,
-            ts;
-            opts = opts,
+            ts,
+            opts,
         )
 
     A_c = A_c_func_no_WBF_EPA(q_sl, g, w, c_p, e_sl, dqsl_dT, dqvdt, dTdt, p, ρ) # Eq C4
@@ -2480,8 +2461,8 @@ function morrison_milbrandt_2015_style_exponential_part_only(
             q,
             q_eq,
             Δt,
-            ts;
-            opts = update(opts; return_mixing_ratio = true),
+            ts,
+            update(opts; return_mixing_ratio = true),
         )
     end
     # =========================== #
@@ -2528,8 +2509,8 @@ function morrison_milbrandt_2015_style_exponential_part_only(
                     new_q,
                     q_eq,
                     Δt_left,
-                    ts;
-                    opts = update(opts; return_mixing_ratio = true, depth = depth + 1),
+                    ts,
+                    update(opts; return_mixing_ratio = true, depth = depth + 1),
                 )
                 S_ql, S_qi = resolve_S_S_addit(S_ql, S_qi, min_t, S_ql_addit, S_qi_addit, Δt_left, Δt)
                 return return_mixing_ratio ? (S_ql, S_qi) :
@@ -2566,8 +2547,8 @@ function morrison_milbrandt_2015_style_exponential_part_only(
                     new_q,
                     q_eq,
                     Δt_left,
-                    ts;
-                    opts = update(opts; return_mixing_ratio = true, depth = depth + 1),
+                    ts,
+                    update(opts; return_mixing_ratio = true, depth = depth + 1),
                 )
                 S_ql, S_qi = resolve_S_S_addit(S_ql, S_qi, min_t, S_ql_addit, S_qi_addit, Δt_left, Δt)
                 return return_mixing_ratio ? (S_ql, S_qi) :
@@ -2614,7 +2595,7 @@ function morrison_milbrandt_2015_style_exponential_part_only(
     q::TD.PhasePartition,
     q_eq::TD.PhasePartition,
     Δt::FT,
-    ts::TD.ThermodynamicState;
+    ts::TD.ThermodynamicState,
     opts::MM2015EPAOpts{FT} = MM2015EPAOpts{FT}(),
 )::Tuple{FT, FT} where {FT}
     (;
@@ -2626,18 +2607,18 @@ function morrison_milbrandt_2015_style_exponential_part_only(
         time_tolerance,
         liq_fraction,
         ice_fraction,
-        cld_fraction,
+        max_depth,
     ) = opts
     CF_mp = min(liq_fraction, ice_fraction)
 
 
-    if depth ≥ 10
+    if depth ≥ max_depth
         @error "Failed on inputs area = $area; ρ = $ρ; p = $p; T = $T; w = $w; τ_liq = $τ_liq; τ_ice = $τ_ice; δ_0 = $δ_0; δ_0i = $δ_0i; q = $q; q_eq = $q_eq; Δt = $Δt; ts = $ts; dTdt = $dTdt; dqvdt = $dqvdt;"
-        error("Failed to converge after 10 iterations")
+        error("Failed to converge after $max_depth iterations")
     end
 
 
-    (; g, L_i, L_l, c_p, e_sl, e_si, dqsl_dT, dqsi_dT, q_sl, q_si, q_liq, q_ice, T_freeze, δ_0, δ_0i, Γ_l, Γ_i) =
+    (; g, L_i, c_p, e_sl, dqsl_dT, q_sl, q_si, q_liq, q_ice, T_freeze, δ_0, δ_0i, Γ_l, Γ_i) =
         get_params_and_go_to_mixing_ratio_exponential_part_only(
             param_set,
             area,
@@ -2649,13 +2630,11 @@ function morrison_milbrandt_2015_style_exponential_part_only(
             τ_ice,
             δ_0,
             δ_0i,
-            dqvdt,
-            dTdt,
             q,
             q_eq,
             Δt,
-            ts;
-            opts = opts,
+            ts,
+            opts,
         )
 
     BF::Bool = T < T_freeze
@@ -2719,8 +2698,8 @@ function morrison_milbrandt_2015_style_exponential_part_only(
             q,
             q_eq,
             Δt,
-            ts;
-            opts = update(opts; return_mixing_ratio = true),
+            ts,
+            update(opts; return_mixing_ratio = true),
         )
     end
     # =========================== #
@@ -2878,8 +2857,8 @@ function morrison_milbrandt_2015_style_exponential_part_only(
                 new_q,
                 q_eq,
                 Δt_left,
-                ts;
-                opts = update(opts; return_mixing_ratio = true, depth = depth + 1),
+                ts,
+                update(opts; return_mixing_ratio = true, depth = depth + 1),
             )
             S_ql, S_qi = resolve_S_S_addit(S_ql, S_qi, min_t, S_ql_addit, S_qi_addit, Δt_left, Δt)
             return return_mixing_ratio ? (S_ql, S_qi) :
@@ -2918,8 +2897,8 @@ function morrison_milbrandt_2015_style_exponential_part_only(
                 new_q,
                 q_eq,
                 Δt_left,
-                ts;
-                opts = update(opts; return_mixing_ratio = true, depth = depth + 1),
+                ts,
+                update(opts; return_mixing_ratio = true, depth = depth + 1),
             )
             S_ql, S_qi = resolve_S_S_addit(S_ql, S_qi, min_t, S_ql_addit, S_qi_addit, Δt_left, Δt)
             return return_mixing_ratio ? (S_ql, S_qi) :
@@ -2957,8 +2936,8 @@ function morrison_milbrandt_2015_style_exponential_part_only(
                 new_q,
                 q_eq,
                 Δt_left,
-                ts;
-                opts = update(opts; return_mixing_ratio = true, depth = depth + 1),
+                ts,
+                update(opts; return_mixing_ratio = true, depth = depth + 1),
             )
             # @debug "S_ql = $S_ql; S_qi = $S_qi; S_ql_addit = $S_ql_addit; S_qi_addit = $S_qi_addit"
             S_ql, S_qi = resolve_S_S_addit(S_ql, S_qi, min_t, S_ql_addit, S_qi_addit, Δt_left, Δt)
@@ -3002,7 +2981,7 @@ function morrison_milbrandt_2015_style_exponential_part_only(
     q::TD.PhasePartition,
     q_eq::TD.PhasePartition,
     Δt::FT,
-    ts::TD.ThermodynamicState;
+    ts::TD.ThermodynamicState,
     opts::MM2015EPAOpts{FT} = MM2015EPAOpts{FT}(),
 )::Tuple{FT, FT} where {FT}
     (;
@@ -3010,20 +2989,20 @@ function morrison_milbrandt_2015_style_exponential_part_only(
         depth,
         dqvdt,
         dTdt,
-        fallback_to_standard_supersaturation_limiter,
-        time_tolerance,
         liq_fraction,
         ice_fraction,
-        cld_fraction,
+        fallback_to_standard_supersaturation_limiter,
+        time_tolerance,
+        max_depth,
     ) = opts
     CF_mp = min(liq_fraction, ice_fraction)
 
-    if depth ≥ 10
+    if depth ≥ max_depth
         @error "Failed on inputs area = $area; ρ = $ρ; p = $p; T = $T; w = $w; τ_liq = $τ_liq; τ_ice = $τ_ice; δ_0 = $δ_0; δ_0i = $δ_0i; q = $q; q_eq = $q_eq; Δt = $Δt; ts = $ts; dTdt = $dTdt; dqvdt = $dqvdt;"
-        error("Failed to converge after 10 iterations")
+        error("Failed to converge after $max_depth iterations")
     end
 
-    (; g, L_i, L_l, c_p, e_sl, e_si, dqsl_dT, dqsi_dT, q_sl, q_si, q_liq, q_ice, T_freeze, δ_0, δ_0i, Γ_l, Γ_i) =
+    (; g, c_p, e_sl, dqsl_dT, q_sl, q_si, q_liq, q_ice, T_freeze, δ_0, δ_0i, Γ_l, Γ_i) =
         get_params_and_go_to_mixing_ratio_exponential_part_only(
             param_set,
             area,
@@ -3035,13 +3014,11 @@ function morrison_milbrandt_2015_style_exponential_part_only(
             τ_ice,
             δ_0,
             δ_0i,
-            dqvdt,
-            dTdt,
             q,
             q_eq,
             Δt,
-            ts;
-            opts = opts,
+            ts,
+            opts,
         )
 
     BF::Bool = T < T_freeze
@@ -3101,8 +3078,8 @@ function morrison_milbrandt_2015_style_exponential_part_only(
             q,
             q_eq,
             Δt,
-            ts;
-            opts = update(opts; return_mixing_ratio = true),
+            ts,
+            update(opts; return_mixing_ratio = true),
         )
     end
     # =========================== #
@@ -3195,8 +3172,8 @@ function morrison_milbrandt_2015_style_exponential_part_only(
                     new_q,
                     q_eq,
                     Δt_left,
-                    ts;
-                    opts = update(opts; return_mixing_ratio = true, depth = depth + 1),
+                    ts,
+                    update(opts; return_mixing_ratio = true, depth = depth + 1),
                 )
                 # @debug "S_ql = $S_ql; S_qi = $S_qi; S_ql_addit = $S_ql_addit; S_qi_addit = $S_qi_addit"
                 S_ql, S_qi = resolve_S_S_addit(S_ql, S_qi, min_t, S_ql_addit, S_qi_addit, Δt_left, Δt)
@@ -3239,8 +3216,8 @@ function morrison_milbrandt_2015_style_exponential_part_only(
                 new_q,
                 q_eq,
                 Δt_left,
-                ts;
-                opts = update(opts; return_mixing_ratio = true, depth = depth + 1),
+                ts,
+                update(opts; return_mixing_ratio = true, depth = depth + 1),
             )
             # @debug "S_ql = $S_ql; S_qi = $S_qi; S_ql_addit = $S_ql_addit; S_qi_addit = $S_qi_addit"
             S_ql, S_qi = resolve_S_S_addit(S_ql, S_qi, min_t, S_ql_addit, S_qi_addit, Δt_left, Δt)
@@ -3282,7 +3259,7 @@ function morrison_milbrandt_2015_style_exponential_part_only(
     q::TD.PhasePartition,
     q_eq::TD.PhasePartition,
     Δt::FT,
-    ts::TD.ThermodynamicState;
+    ts::TD.ThermodynamicState,
     opts::MM2015EPAOpts{FT} = MM2015EPAOpts{FT}(),
 )::Tuple{FT, FT} where {FT}
     (;
@@ -3290,21 +3267,21 @@ function morrison_milbrandt_2015_style_exponential_part_only(
         depth,
         dqvdt,
         dTdt,
-        fallback_to_standard_supersaturation_limiter,
-        time_tolerance,
         liq_fraction,
         ice_fraction,
-        cld_fraction,
+        fallback_to_standard_supersaturation_limiter,
+        time_tolerance,
+        max_depth,
     ) = opts
     CF_mp = min(liq_fraction, ice_fraction)
 
-    if depth ≥ 10
+    if depth ≥ max_depth
         @error "Failed on inputs area = $area; ρ = $ρ; p = $p; T = $T; w = $w; τ_liq = $τ_liq; τ_ice = $τ_ice; δ_0 = $δ_0; δ_0i = $δ_0i; q = $q; q_eq = $q_eq; Δt = $Δt; ts = $ts; dTdt = $dTdt; dqvdt = $dqvdt;"
-        error("Failed to converge after 10 iterations")
+        error("Failed to converge after $max_depth iterations")
     end
 
 
-    (; g, L_i, L_l, c_p, e_sl, e_si, dqsl_dT, dqsi_dT, q_sl, q_si, q_liq, q_ice, T_freeze, δ_0, δ_0i, Γ_l, Γ_i) =
+    (; g, c_p, e_sl, dqsl_dT, q_sl, q_si, q_liq, q_ice, T_freeze, δ_0, δ_0i, Γ_l, Γ_i) =
         get_params_and_go_to_mixing_ratio_exponential_part_only(
             param_set,
             area,
@@ -3316,13 +3293,11 @@ function morrison_milbrandt_2015_style_exponential_part_only(
             τ_ice,
             δ_0,
             δ_0i,
-            dqvdt,
-            dTdt,
             q,
             q_eq,
             Δt,
-            ts;
-            opts = opts,
+            ts,
+            opts,
         )
 
     BF::Bool = T < T_freeze
@@ -3382,8 +3357,8 @@ function morrison_milbrandt_2015_style_exponential_part_only(
             q,
             q_eq,
             Δt,
-            ts;
-            opts = update(opts; return_mixing_ratio = true),
+            ts,
+            update(opts; return_mixing_ratio = true),
         )
     end
     # =========================== #
@@ -3481,8 +3456,8 @@ function morrison_milbrandt_2015_style_exponential_part_only(
                     new_q,
                     q_eq,
                     Δt_left,
-                    ts;
-                    opts = update(opts; return_mixing_ratio = true, depth = depth + 1),
+                    ts,
+                    update(opts; return_mixing_ratio = true, depth = depth + 1),
                 )
                 # @debug "S_ql = $S_ql; S_qi = $S_qi; S_ql_addit = $S_ql_addit; S_qi_addit = $S_qi_addit"
                 S_ql, S_qi = resolve_S_S_addit(S_ql, S_qi, min_t, S_ql_addit, S_qi_addit, Δt_left, Δt)
@@ -3524,8 +3499,8 @@ function morrison_milbrandt_2015_style_exponential_part_only(
                     new_q,
                     q_eq,
                     Δt_left,
-                    ts;
-                    opts = update(opts; return_mixing_ratio = true, depth = depth + 1),
+                    ts,
+                    update(opts; return_mixing_ratio = true, depth = depth + 1),
                 )
                 # @debug "S_ql = $S_ql; S_qi = $S_qi; S_ql_addit = $S_ql_addit; S_qi_addit = $S_qi_addit"
                 S_ql, S_qi = resolve_S_S_addit(S_ql, S_qi, min_t, S_ql_addit, S_qi_addit, Δt_left, Δt)
@@ -3567,7 +3542,7 @@ function morrison_milbrandt_2015_style_exponential_part_only(
     q::TD.PhasePartition,
     q_eq::TD.PhasePartition,
     Δt::FT,
-    ts::TD.ThermodynamicState;
+    ts::TD.ThermodynamicState,
     opts::MM2015EPAOpts{FT} = MM2015EPAOpts{FT}(),
 )::Tuple{FT, FT} where {FT}
     (;
@@ -3575,23 +3550,18 @@ function morrison_milbrandt_2015_style_exponential_part_only(
         depth,
         dqvdt,
         dTdt,
-        fallback_to_standard_supersaturation_limiter,
-        time_tolerance,
-        liq_fraction,
-        ice_fraction,
-        cld_fraction,
+        max_depth,
     ) = opts
-    CF_mp = min(liq_fraction, ice_fraction)
 
 
 
-    if depth ≥ 10
+    if depth ≥ max_depth
         @error "Failed on inputs area = $area; ρ = $ρ; p = $p; T = $T; w = $w; τ_liq = $τ_liq; τ_ice = $τ_ice; δ_0 = $δ_0; δ_0i = $δ_0i; q = $q; q_eq = $q_eq; Δt = $Δt; ts = $ts; dTdt = $dTdt; dqvdt = $dqvdt;"
-        error("Failed to converge after 10 iterations")
+        error("Failed to converge after $max_depth iterations")
     end
 
 
-    (; g, L_i, L_l, c_p, e_sl, e_si, dqsl_dT, dqsi_dT, q_sl, q_si, q_liq, q_ice, T_freeze, δ_0, δ_0i, Γ_l, Γ_i) =
+    (; g, c_p, e_sl, dqsl_dT, q_sl, q_si, q_liq, q_ice, T_freeze, δ_0, δ_0i) =
         get_params_and_go_to_mixing_ratio_exponential_part_only(
             param_set,
             area,
@@ -3603,13 +3573,11 @@ function morrison_milbrandt_2015_style_exponential_part_only(
             τ_ice,
             δ_0,
             δ_0i,
-            dqvdt,
-            dTdt,
             q,
             q_eq,
             Δt,
-            ts;
-            opts = opts,
+            ts,
+            opts,
         )
     BF::Bool = T < T_freeze
     # @debug "Calling Subsaturated{false, false, $(BF)}..."
@@ -3656,8 +3624,8 @@ function morrison_milbrandt_2015_style_exponential_part_only(
             new_q,
             q_eq,
             Δt_left,
-            ts;
-            opts = update(opts; return_mixing_ratio = true, depth = depth + 1),
+            ts,
+            update(opts; return_mixing_ratio = true, depth = depth + 1),
         )
         S_ql, S_qi = resolve_S_S_addit(FT(0), FT(0), min_t, S_ql_addit, S_qi_addit, Δt_left, Δt)
         return return_mixing_ratio ? (S_ql, S_qi) :

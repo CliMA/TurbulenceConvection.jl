@@ -297,6 +297,7 @@ include("types.jl")
 include("name_aliases.jl")
 
 # Domains we use [[ mostly for reweighting, and for threshold_acnv etc...]]
+const GridMean = GridMeanDomain()
 const Env = EnvDomain()
 const Up = UpDomain()
 const Bulk = BulkDomain()

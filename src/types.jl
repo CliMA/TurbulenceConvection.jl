@@ -11,6 +11,7 @@ abstract type AbstractDerivedDomain <: AbstractDomain end
 
 # --- Level 2: Concrete domains
 # Original EDMF domains
+struct GridMeanDomain <: AbstractPrimitiveDomain end
 struct EnvDomain <: AbstractPrimitiveDomain end
 struct BulkDomain <: AbstractPrimitiveDomain end
 struct UpDomain <: AbstractPrimitiveDomain end
