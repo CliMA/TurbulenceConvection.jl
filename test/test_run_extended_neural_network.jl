@@ -58,7 +58,7 @@ namelist_path = joinpath(
 
 namelist = JSON.parsefile(namelist_path, dicttype = Dict, inttype = Int64, null = FT(NaN))
 namelist["meta"]["forcing_type"] = Symbol(namelist["meta"]["forcing_type"])
-default_namelist = NameList.default_namelist(case_name)
+default_namelist = NameList.default_namelist(case_name; write = false)
 NameList.convert_namelist_types_to_default!(namelist, default_namelist)
 
 # Override with extended neural network

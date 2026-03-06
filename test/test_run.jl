@@ -134,7 +134,7 @@ for flight_number in flight_numbers
             # namelist_path = joinpath(CEDMF_dir, "experiments", "SOCRATES_postprocess_runs_storage", "subexperiments","SOCRATES_"*string(nonequilibrium_moisture_scheme), "Calibrate_and_Run", "pow_icenuc_autoconv_eq", dt_string, "iwp_mean__lwp_mean__qi_mean__qip_mean__ql_mean__qr_mean", "postprocessing", "output", "Atlas_LES", "RFAll_obs", method, "data", "Output.$case_name.1_1", "namelist_SOCRATES.in")
             # namelist = JSON.parsefile(namelist_path, dicttype = Dict, inttype = Int64, null = FT(NaN))
             # namelist["meta"]["forcing_type"] = Symbol(namelist["meta"]["forcing_type"]) # this gets messed up for some reason...
-            # default_namelist = default_namelist = NameList.default_namelist(case_name)
+            # default_namelist = default_namelist = NameList.default_namelist(case_name; write = false)
             # NameList.convert_namelist_types_to_default!(namelist, default_namelist) # coerce remaining type
 
             # nonequilibrium_moisture_scheme = :geometric_liq__exponential_T_scaling_and_geometric_ice
@@ -170,7 +170,7 @@ for flight_number in flight_numbers
             )
             namelist = JSON.parsefile(namelist_path, dicttype = Dict, inttype = Int64, null = FT(NaN))
             namelist["meta"]["forcing_type"] = Symbol(namelist["meta"]["forcing_type"]) # this gets messed up for some reason...
-            default_namelist = default_namelist = NameList.default_namelist(case_name)
+            default_namelist = default_namelist = NameList.default_namelist(case_name; write = false)
             NameList.convert_namelist_types_to_default!(namelist, default_namelist) # coerce remaining type
             print(namelist_path)
 
@@ -182,7 +182,7 @@ for flight_number in flight_numbers
             # namelist_path = joinpath(CEDMF_dir, "experiments", "SOCRATES_postprocess_runs_storage", "subexperiments","SOCRATES_"*string(nonequilibrium_moisture_scheme), "Calibrate_and_Run", "tau_autoconv_noneq", dt_string, "iwp_mean__lwp_mean__qi_mean__qip_mean__ql_mean__qr_mean", "postprocessing", "output", "Atlas_LES", "RFAll_obs", method, "data", "Output.$case_name.1_1", "namelist_SOCRATES.in")
             # namelist = JSON.parsefile(namelist_path, dicttype = Dict, inttype = Int64, null = FT(NaN))
             # namelist["meta"]["forcing_type"] = Symbol(namelist["meta"]["forcing_type"]) # this gets messed up for some reason...
-            # default_namelist = default_namelist = NameList.default_namelist(case_name)
+            # default_namelist = default_namelist = NameList.default_namelist(case_name; write = false)
             # NameList.convert_namelist_types_to_default!(namelist, default_namelist) # coerce remaining type
 
 
@@ -194,7 +194,7 @@ for flight_number in flight_numbers
             # namelist_path = joinpath(CEDMF_dir, "experiments", "SOCRATES_postprocess_runs_storage", "subexperiments","SOCRATES_"*string(nonequilibrium_moisture_scheme), "Calibrate_and_Run", "tau_autoconv_noneq", dt_string, "iwp_mean__lwp_mean__qi_mean__qip_mean__ql_mean__qr_mean", "postprocessing", "output", "Atlas_LES", "RFAll_obs", method, "data", "Output.$case_name.1_1", "namelist_SOCRATES.in")
             # namelist = JSON.parsefile(namelist_path, dicttype = Dict, inttype = Int64, null = FT(NaN))
             # namelist["meta"]["forcing_type"] = Symbol(namelist["meta"]["forcing_type"]) # this gets messed up for some reason...
-            # default_namelist = default_namelist = NameList.default_namelist(case_name)
+            # default_namelist = default_namelist = NameList.default_namelist(case_name; write = false)
             # NameList.convert_namelist_types_to_default!(namelist, default_namelist) # coerce remaining type
 
             # nonequilibrium_moisture_scheme = :neural_network # random init [[ sets below]]
@@ -205,7 +205,7 @@ for flight_number in flight_numbers
             # namelist_path = joinpath(CEDMF_dir, "experiments", "SOCRATES_postprocess_runs_storage", "subexperiments","SOCRATES_"*string(nonequilibrium_moisture_scheme), "Calibrate_and_Run", "tau_autoconv_noneq", dt_string, "iwp_mean__lwp_mean__qi_mean__qip_mean__ql_mean__qr_mean", "postprocessing", "output", "Atlas_LES", "RFAll_obs", method, "data", "Output.$case_name.1_1", "namelist_SOCRATES.in")
             # namelist = JSON.parsefile(namelist_path, dicttype = Dict, inttype = Int64, null = FT(NaN))
             # namelist["meta"]["forcing_type"] = Symbol(namelist["meta"]["forcing_type"]) # this gets messed up for some reason...
-            # default_namelist = default_namelist = NameList.default_namelist(case_name)
+            # default_namelist = default_namelist = NameList.default_namelist(case_name; write = false)
             # NameList.convert_namelist_types_to_default!(namelist, default_namelist) # coerce remaining type
             # nonequilibrium_moisture_scheme = :neural_network_random_init
             # namelist["user_args"]["nonequilibrium_moisture_scheme"] = nonequilibrium_moisture_scheme    
@@ -218,7 +218,7 @@ for flight_number in flight_numbers
             # namelist_path = joinpath(CEDMF_dir, "experiments", "SOCRATES_postprocess_runs_storage", "subexperiments","SOCRATES_"*string(nonequilibrium_moisture_scheme), "Calibrate_and_Run", "tau_autoconv_noneq", dt_string, "iwp_mean__lwp_mean__qi_mean__qip_mean__ql_mean__qr_mean", "postprocessing", "output", "Atlas_LES", "RFAll_obs", method, "data", "Output.$case_name.1_1", "namelist_SOCRATES.in")
             # namelist = JSON.parsefile(namelist_path, dicttype = Dict, inttype = Int64, null = FT(NaN))
             # namelist["meta"]["forcing_type"] = Symbol(namelist["meta"]["forcing_type"]) # this gets messed up for some reason...
-            # default_namelist = default_namelist = NameList.default_namelist(case_name)
+            # default_namelist = default_namelist = NameList.default_namelist(case_name; write = false)
             # NameList.convert_namelist_types_to_default!(namelist, default_namelist) # coerce remaining type
             # nonequilibrium_moisture_scheme = :neural_network_random_init
             # namelist["user_args"]["nonequilibrium_moisture_scheme"] = nonequilibrium_moisture_scheme    
