@@ -116,7 +116,7 @@ create_svector(x::NTuple{N, FT}) where {FT, N} = SA.SVector{N, FT}(x) # create a
 # function to_strided_array(x::NTuple{N, FT}) where {FT, N}
 #     out = StrideArray{FT}(undef, N)
 #     # out .= x # doesn't work, but this does
-#     for i in eachindex(x)
+#     @inbounds for i in eachindex(x)
 #         out[i] = x[i]
 #     end
 #     return out
@@ -144,7 +144,7 @@ end
 function to_static_strided_array(x::NTuple{N, FT}) where {FT, N}
     out = SimpleChains.StrideArray{FT}(undef, SimpleChains.StaticInt(N))
     # out .= x # doesn't work, but this does
-    for i in eachindex(x)
+    @inbounds for i in eachindex(x)
         out[i] = x[i]
     end
     return out

@@ -148,11 +148,13 @@ my_microphysics_additions(
     #
     dTdz = FT(0), # store the vertical gradient of temperature for diagnostic purposes. Store here instead of aux_tc because we maybe want separately for env and up, though we don't do boost in the updraft so idk.
     #
+    ql_tendency_acnv = FT(0), # tendency due to autoconversion [ here for testing with SGS precip covariance accounting]
+    qi_tendency_acnv = FT(0), # tendency due to autoconversion [ here for testing with SGS precip covariance accounting]
     (
         calibrate_io ? (;) :
         (;
-            ql_tendency_acnv = FT(0), # tendency due to autoconversion
-            qi_tendency_acnv = FT(0), # tendency due to autoconversion
+            # ql_tendency_acnv = FT(0), # tendency due to autoconversion
+            # qi_tendency_acnv = FT(0), # tendency due to autoconversion
             qi_tendency_acnv_dep = FT(0), # tendency due to sublimation/deposition
             qi_tendency_acnv_dep_is = FT(0), # tendency due to sublimation/deposition, only from crossing r_is.
             qi_tendency_acnv_dep_above = FT(0), # tendency due to sublimation/deposition, only from particles that were already above r_is

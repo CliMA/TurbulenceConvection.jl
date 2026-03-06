@@ -1004,7 +1004,7 @@ function get_process_threshold_fraction(
         end
 
         sum_val = zero(FT)
-        for i in 0:k
+        @inbounds for i in 0:k
             sum_val += ξ^i / factorial(i)
         end
         F_target = exp(-ξ) * sum_val

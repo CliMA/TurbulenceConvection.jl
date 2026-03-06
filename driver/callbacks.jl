@@ -745,7 +745,7 @@ function compute_dt_max(
             w_adv = max(w_adv, abs(aux_en_f.w[k + 1])) # check k+1 at toa
         end
 
-        for i in 1:N_up
+        @inbounds for i in 1:N_up
             w_adv = max(w_adv, abs(aux_up_f[i].w[k])) # out
             w_adv = max(w_adv, abs(aux_up_f[i].w[k - 1])) # incoming [we are already not boa]
 
@@ -837,7 +837,7 @@ function compute_dt_max(
                 if !is_toa
                     w_sed = max(w_sed, aux_en.term_vel_liq[k + 1], aux_en.term_vel_ice[k + 1])
                 end
-                for i in 1:N_up
+                @inbounds for i in 1:N_up
                     w_sed = max(w_sed, aux_up[i].term_vel_liq[k], aux_up[i].term_vel_ice[k])
                     if !is_toa
                         w_sed = max(w_sed, aux_up[i].term_vel_liq[k + 1], aux_up[i].term_vel_ice[k + 1])
@@ -1069,7 +1069,7 @@ function monitor_cfl_detailed!(state, edmf, Δt, CFL_limit)
             aux_up = TC.center_aux_updrafts(state)
             @inbounds term_vel_liqs = (aux_en.term_vel_liq, (aux_up[i].term_vel_liq for i in 1:N_up)...) # hopefully it infers
             @inbounds term_vel_ices = (aux_en.term_vel_ice, (aux_up[i].term_vel_ice for i in 1:N_up)...) # hopefully it infers
-            aux_ice = (aux_en, (aux_up[i] for i in 1:N_up)...) # hopefully it infers
+            @inbounds aux_ice = (aux_en, (aux_up[i] for i in 1:N_up)...) # hopefully it infers
         end
     else
         term_vel_liqs = tuple()

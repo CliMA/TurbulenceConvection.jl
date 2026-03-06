@@ -141,7 +141,7 @@ function compute_precipitation_advection_tendencies(
         q_rai_here = aux_tc.temporary_1
         q_sno_here = aux_tc.temporary_2
 
-        for i in 1:N_up
+        @inbounds for i in 1:N_up
             @. q_rai_here =
                 ifelse(aux_gm.q_liq > FT(0), (aux_up[i].q_liq * aux_up[i].area) / aux_gm.q_liq, FT(1)) * q_rai # fraction of liquid in Updraft
             @. q_sno_here =

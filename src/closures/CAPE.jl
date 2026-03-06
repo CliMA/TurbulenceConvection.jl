@@ -85,7 +85,7 @@ function _run_cape_core_optimized!(
     s_cape = SA.MVector{NUM_SLOTS, FT}(undef); s_mse = SA.MVector{NUM_SLOTS, FT}(undef)
     s_w = SA.MVector{NUM_SLOTS, FT}(undef)
 
-    for i in 1:NUM_SLOTS
+    @inbounds for i in 1:NUM_SLOTS
         if NUM_SLOTS == 1
             s_qt[i] = qt_mean
             s_θl[i] = θl_mean
@@ -115,7 +115,7 @@ function _run_cape_core_optimized!(
         is_unstable = ((mse_c - mse_p) / (z_k - grid.zc.z[k - 1]) < FT(0)) || (TD.total_specific_humidity(thermo_params, ts_e) > TD.q_vap_saturation(thermo_params, ts_e))
 
         # A. Update Survivors
-        for i in 1:NUM_SLOTS
+        @inbounds for i in 1:NUM_SLOTS
             ts_p, sat_p = _get_parcel_thermo_opt(Val(is_noneq), thermo_params, p_env, s_θl[i], s_qt[i], FT)
             b = buoyancy_c(param_set, ρ_env, TD.air_density(thermo_params, ts_p))
             p_sat[i] = sat_p
@@ -139,7 +139,7 @@ function _run_cape_core_optimized!(
         rl = (σ_ql > eps(FT) && σ_hl > eps(FT)) ? clamp(aux_en.HQTcov[k] / (σ_ql * σ_hl), FT(-1), FT(1)) : FT(0)
         σ_cl = sqrt(max(FT(1) - rl^2, FT(0))) * σ_hl
 
-        for i in 1:NUM_SLOTS
+        @inbounds for i in 1:NUM_SLOTS
             idx = NUM_SLOTS + i
             if NUM_SLOTS == 1
                 r_qt = q_env_l; r_θl = θl_env_l
@@ -159,10 +159,10 @@ function _run_cape_core_optimized!(
         end
 
         # C. Selection Sort Tournament (Fixed Indexing)
-        for i in 1:POOL_SIZE; indices[i] = i; end
-        for i in 1:NUM_SLOTS
+        @inbounds for i in 1:POOL_SIZE; indices[i] = i; end
+        @inbounds for i in 1:NUM_SLOTS
             best_val = -FT(Inf); best_k = i
-            for j in i:POOL_SIZE
+            @inbounds for j in i:POOL_SIZE
                 idx = indices[j]; is_better = false
                 cand_dead = (p_mse[idx] == -FT(Inf)); best_dead = (best_val == -FT(Inf))
                 if cand_dead
@@ -183,15 +183,15 @@ function _run_cape_core_optimized!(
 
         # D. Energy Redistribution
         de = FT(0); tw = FT(0)
-        for i in (NUM_SLOTS+1):POOL_SIZE
+        @inbounds for i in (NUM_SLOTS+1):POOL_SIZE
             loser = indices[i]; if p_cape[loser] > FT(0); de += p_cape[loser] * p_w[loser]; end
         end
-        for i in 1:NUM_SLOTS
+        @inbounds for i in 1:NUM_SLOTS
             winner = indices[i]; if p_mse[winner] > -FT(Inf); tw += p_w[winner]; end
         end
 
         total_cape = FT(0); total_weight = FT(0)
-        for i in 1:NUM_SLOTS
+        @inbounds for i in 1:NUM_SLOTS
             winner = indices[i]
             s_qt[i] = p_qt[winner]; s_θl[i] = p_θl[winner]; s_w[i] = p_w[winner]; s_mse[i] = p_mse[winner]
             if s_mse[i] > -FT(Inf)
@@ -250,7 +250,7 @@ function compute_CAPE!(
         end
     end
     @inbounds for k in real_center_indices(grid)
-        tot_a = sum(aux_up[i].area[k] for i in 1:n_up)
+        @inbounds tot_a = sum(aux_up[i].area[k] for i in 1:n_up)
         if tot_a > FT(1e-5); aux_bk.CAPE[k] /= tot_a; end
     end
     return nothing

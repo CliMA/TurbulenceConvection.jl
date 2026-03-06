@@ -1313,7 +1313,7 @@ function filter_small_moisture_vars(edmf::EDMFModel, state::State, param_set::AP
         # end
 
         # up
-        for i in 1:n_updrafts(edmf)
+        @inbounds for i in 1:n_updrafts(edmf)
             if edmf.moisture_model isa NonEquilibriumMoisture
                 @. prog_up[i].ρaq_liq = cutoff_small_values_positive(prog_up[i].ρaq_liq, q_min * prog_up[i].ρarea)
                 @. prog_up[i].ρaq_ice = cutoff_small_values_positive(prog_up[i].ρaq_ice, q_min * prog_up[i].ρarea)
